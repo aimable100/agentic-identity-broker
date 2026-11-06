@@ -204,8 +204,8 @@ See Principle II in `.specify/memory/constitution.md`.
 | 046 | `adrs/046-observed-refresh-token-rejection.md` | Observed provider refresh rejection replaces predicted refresh expiry; `requires_reauthentication`; no schema change |
 | 047 | `adrs/047-unique-agent-external-id-reconcile.md` | Unique Agent external IDs, collection PUT reconciliation, safe migration 047, and Admin API 3.0.0 |
 | 048 | `adrs/048-authzen-delegation-pip.md` | AuthZEN delegation PDP sharing exchange resolution; opt-in ExtProc grant-context resolver with bounded permit freshness and identity-safe permit-bound result reuse; `granted_permission_sets` deprecation |
-| 045 | `adrs/045-service-session-recovery-return.md` | Approved service-page recovery return and existing persisted refresh rejection; Feature 055 implementation pending |
-| 046 | `adrs/046-virtual-service-scopes.md` | Approved virtual service scopes, shared usability/coverage and immutable refresh assurance; Feature 055 implementation pending |
+| 045 | `adrs/045-service-session-recovery-return.md` | Service-page recovery return (`/sessions/<identifier>`) and existing persisted refresh rejection (Feature 055) |
+| 046 | `adrs/046-virtual-service-scopes.md` | Virtual service scopes, shared usability/coverage in `domain/servicescope/` and immutable refresh assurance (Feature 055) |
 
 ## Domain Glossary
 
