@@ -205,9 +205,9 @@ At startup ExtProc fetches the metadata without credentials, requires the advert
 See [`examples/config/extproc-grant-context.yaml`](https://github.com/zalando-incubator/agentic-identity-broker/blob/main/examples/config/extproc-grant-context.yaml).
 
 
-## Incremental service authorization (approved design)
+## Incremental service authorization
 
-Feature 055's implementation is pending. The approved design reuses
+Incremental service authorization ([guide](guides/incremental-authorization.md)) reuses
 `server.enduser.public_url` for service scopes and recovery URLs, and
 `oauth2_authorization_server.mode` for local/proxy/hybrid behavior. It adds no broker
 or ExtProc process configuration key. See the
