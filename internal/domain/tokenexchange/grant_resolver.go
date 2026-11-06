@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 
 	"go.opentelemetry.io/otel"
@@ -17,8 +16,8 @@ import (
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/jwtclaims"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/model"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/permissionset"
-	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/servicescope"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/security"
+	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/servicescope"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/storage"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/thirdparty"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/ports"
@@ -65,6 +64,8 @@ type GrantResolver struct {
 	permissionSetService *permissionset.Service
 	agentRepository      ports.AgentRepository
 	consentBaseURL       string
+	// serviceScope names the resolved service's Virtual Service Scope on recoverable errors.
+	serviceScope func(*model.ThirdpartyOAuth2ProviderEntity) string
 }
 
 // NewGrantResolver creates a resolver. consentBaseURL is the end-user public base used
@@ -111,6 +112,7 @@ func NewGrantResolver(
 // failing stage's diagnostic and the service and authorization references observed so far.
 func (r *GrantResolver) Resolve(ctx context.Context, req GrantResolutionRequest) (_ *ResolvedGrant, err error) {
 	var serviceRef ServiceRef
+	var serviceScope string
 	var resolvedPrincipal id.Principal
 	var registeredAgentID id.AgentID
 	var grant *storage.UserGrant
@@ -129,6 +131,9 @@ func (r *GrantResolver) Resolve(ctx context.Context, req GrantResolutionRequest)
 		}
 		if ctx.Err() != nil && errors.Is(err, ctx.Err()) {
 			diagnostic = NewDiagnostic(diagnostic.Stage(), DetailCallerCanceled)
+		}
+		if serviceScope != "" && tokenErr.ErrorURI() != "" {
+			tokenErr = tokenErr.WithScope(serviceScope)
 		}
 		err = tokenErr.WithObservation(diagnostic, serviceRef, authorizationRef(resolvedPrincipal, registeredAgentID, grant))
 	}()
@@ -204,6 +209,9 @@ func (r *GrantResolver) Resolve(ctx context.Context, req GrantResolutionRequest)
 		return nil, NewServerErrorWithCause("failed to lookup service by resource URI", err).WithDiagnostic(NewDiagnostic(stage, DetailResourceRepositoryUnavailable))
 	}
 	serviceRef = ServiceRef{ID: service.ID}
+	if r.serviceScope != nil {
+		serviceScope = r.serviceScope(service)
+	}
 
 	// Step 9: Verify user has granted agent access to service (T059-T065)
 	// CRITICAL (T078): Grant verification MUST occur BEFORE session check
