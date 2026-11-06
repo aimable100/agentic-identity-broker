@@ -204,6 +204,8 @@ See Principle II in `.specify/memory/constitution.md`.
 | 046 | `adrs/046-observed-refresh-token-rejection.md` | Observed provider refresh rejection replaces predicted refresh expiry; `requires_reauthentication`; no schema change |
 | 047 | `adrs/047-unique-agent-external-id-reconcile.md` | Unique Agent external IDs, collection PUT reconciliation, safe migration 047, and Admin API 3.0.0 |
 | 048 | `adrs/048-authzen-delegation-pip.md` | AuthZEN delegation PDP sharing exchange resolution; opt-in ExtProc grant-context resolver with bounded permit freshness and identity-safe permit-bound result reuse; `granted_permission_sets` deprecation |
+| 045 | `adrs/045-service-session-recovery-return.md` | Approved service-page recovery return and existing persisted refresh rejection; Feature 055 implementation pending |
+| 046 | `adrs/046-virtual-service-scopes.md` | Approved virtual service scopes, shared usability/coverage and immutable refresh assurance; Feature 055 implementation pending |
 
 ## Domain Glossary
 
@@ -238,6 +240,10 @@ Read `ARCHITECTURE.md` for the full glossary and relationships.
 | **PermitResolver** | ExtProc port and permit-cache implementation (`server.PermitResolver`, `grantcontext.PermitResolver`), distinct from the broker's invariant-enforcing `tokenexchange.GrantResolver`. The permit's wire `subject.id` becomes the principal for OPA. Enabled mode checks it against the exchange-response approval identity under ADR 036; it does not replace that identity. |
 | **PDP identifier** | AuthZEN `policy_decision_point`: the end-user public URL without a trailing slash, compared exactly by consumers before sending credentials. |
 | **Refresh Rejection** | Observed terminal provider `invalid_grant` for a stored refresh token (`UserSession.RefreshRejectedAt`). The broker never predicts refresh-token expiry. |
+| **Virtual Service Scope** | Broker-only `<public URL>/sessions/<canonical-id-or-UUID>` requesting a usable, grant-covered third-party session; never a provider scope or an implicit permission selection. |
+| **Requested Service Set** | Deduplicated services named by requested scopes or original refresh assurance bindings, without changing permanent Agent requirements. |
+| **Service-Scope Binding** | Protected/persisted scope-string-to-service-UUID map, immutable through consent/code/refresh continuity and retained after scope narrowing without restoring removed privileges. |
+| **Session Usability** | Verified effective provider scopes and established client identity with valid or successfully refreshed access: usable, missing, definitively unusable, or transiently unverifiable. Stored refreshability alone is not verification. |
 
 ## Development Workflow
 
