@@ -132,12 +132,6 @@
       "note": "Verified six audit helpers lack events; posted finite operation/outcome mapping and exact-allowlist/message-selector test seams, including bootstrap rejection/public CIMD/JWKS/refresh. Implement when capacity permits; coordinate #415."
     },
     {
-      "number": 427,
-      "state": "awaiting_clarification",
-      "updated_at": "2026-11-12",
-      "note": "Asked string-set vs key/value, any/all match and end-user delegation UI vs admin catalogue. Include External-ID reconcile omission/empty semantics and order-independent no-op equality; no new PR at capacity."
-    },
-    {
       "number": 430,
       "state": "commented",
       "updated_at": "2026-11-12",
@@ -196,6 +190,12 @@
       "state": "awaiting_clarification",
       "updated_at": "2026-11-14",
       "note": "Posted RFC8414 vs OIDC discovery gap and fixed-purpose assertion/audience prerequisites; asked UUID subject and provider-binding ownership. Existing signer has no default aud or explicit audience validation; static only, no security reproduction."
+    },
+    {
+      "number": 427,
+      "state": "awaiting_approval",
+      "updated_at": "2026-11-14",
+      "note": "Maintainer confirmed literal sets, end-user display, filtering deferred. Draft design specs/056-agent-tags prepared; exact bounds/null/omission/order/version proposal awaits review before runtime implementation. Locate PR by recorded branch; do not duplicate or close #427."
     }
   ],
   "fixes": [
@@ -254,6 +254,14 @@
       "status": "open",
       "updated_at": "2026-11-11",
       "note": "Resolved published draft #461; both checks and statuses read, DCO/pipeline/unit/integration/all E2E passed. No duplicate fix or push needed."
+    },
+    {
+      "issue": 427,
+      "pr": null,
+      "branch": "repo-assist/fix-issue-427-agent-tags-design",
+      "status": "open",
+      "updated_at": "2026-11-14",
+      "note": "Design-only draft PR prepared, not implemented. Check/build/renderer/docs validation pass; full verify stops at existing Go 1.27.3 security advisory GO-2026-6859. Review exact contract before test-first implementation; locate PR by branch."
     }
   ],
   "checks": [
