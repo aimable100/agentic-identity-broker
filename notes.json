@@ -2,7 +2,7 @@
   "version": 1,
   "cursors": {
     "labelling_after": null,
-    "investigation_after": 478
+    "investigation_after": 243
   },
   "issues": [
     {
@@ -129,7 +129,7 @@
       "number": 418,
       "state": "commented",
       "updated_at": "2026-11-11",
-      "note": "Verified six audit helpers lack events; posted finite operation/outcome mapping and exact-allowlist/message-selector test seams, including bootstrap rejection/public CIMD/JWKS/refresh. Implement when capacity permits; coordinate #415."
+      "note": "Prior finite audit-event mapping posted; author now has active PR #488. Avoid duplicate implementation; await review/merge and verify remaining acceptance afterward."
     },
     {
       "number": 430,
@@ -195,7 +195,13 @@
       "number": 427,
       "state": "awaiting_approval",
       "updated_at": "2026-11-14",
-      "note": "Maintainer confirmed literal sets, end-user display, filtering deferred. Draft design specs/056-agent-tags prepared; exact bounds/null/omission/order/version proposal awaits review before runtime implementation. Locate PR by recorded branch; do not duplicate or close #427."
+      "note": "Maintainer literal-set/end-user-display clarification captured in live design draft #490; exact contract review still required. No runtime tags. Generated closing footer must be removed before merge; do not duplicate."
+    },
+    {
+      "number": 243,
+      "state": "awaiting_clarification",
+      "updated_at": "2026-11-14",
+      "note": "Posted observation/applied-config status distinction. Update commits endpoints/version; ready equates attempt/success; only failure-only port exists. Asked drift and prior-failure clearing policy. Preserve version ordering, no registration/decryption. Existing thirdparty/model race tests pass."
     }
   ],
   "fixes": [
@@ -257,11 +263,11 @@
     },
     {
       "issue": 427,
-      "pr": null,
-      "branch": "repo-assist/fix-issue-427-agent-tags-design",
+      "pr": 490,
+      "branch": "repo-assist/fix-issue-427-agent-tags-design-fddf1b2d469f10f1",
       "status": "open",
       "updated_at": "2026-11-14",
-      "note": "Design-only draft PR prepared, not implemented. Check/build/renderer/docs validation pass; full verify stops at existing Go 1.27.3 security advisory GO-2026-6859. Review exact contract before test-first implementation; locate PR by branch."
+      "note": "Published design-only draft located. CodeQL/CI gate pass, jobs skipped; external pipeline cannot start without accountable user. Posted maintainer-start and erroneous closing-footer note. Exact API contract approval precedes runtime work."
     }
   ],
   "checks": [
@@ -298,37 +304,37 @@
     {
       "area": "repo_assist_prs",
       "checked_at": "2026-11-14",
-      "result": "Eight open PRs, unchanged published heads. #403/#432 dirty and size-blocked; no repeat pushes. Seven drafts and maintainer non-draft #424. Read comments/review threads; no actionable new revision request.",
-      "follow_up": "Maintainer semantic integration and classification recovery remain; no new PR at capacity."
+      "result": "Nine live open PRs: eight drafts, non-draft #424. #403/#432 remain dirty and size-blocked; no retry. Resolved #427 design draft to #490 and actual branch. No new review threads or human revision requests.",
+      "follow_up": "#490 needs approved external pipeline start and removal of generated Fixes #427 before merge; runtime feature remains open."
     },
     {
       "area": "ci",
       "checked_at": "2026-11-14",
-      "result": "Read both checks and commit statuses for all eight published heads: DCO and pipeline/unit/integration/all E2E pass. Classification failures #403/#420/#448 and approvals remain; rejected integrations have no fresh CI.",
-      "follow_up": "Required classification labels outside allowed writes need maintainers; do not duplicate limitation reports."
+      "result": "Both checks/statuses read for nine PRs. Older eight heads retain passing DCO/pipeline/test stages; classifications fail #403/#420/#448. #490 CodeQL/CI gate pass, jobs skipped; external pipeline cannot start without accountable user. Posted infrastructure-only note; no push.",
+      "follow_up": "Maintainer classification and pipeline-start recovery only; no complete validation claim for #490."
     },
     {
       "area": "hygiene",
       "checked_at": "2026-11-14",
-      "result": "All open issues and PRs already labelled; Task 1 fell back to Task 2. Outstanding monthly threads have no new substantive human acknowledgements; monthly checklist has no checked actions.",
+      "result": "All open issues and PRs already labelled; Task 1 fell back to Task 2. Monthly pending comment threads have no new substantive human acknowledgements except #427 clarification already captured by #490; no checked monthly items.",
       "follow_up": null
     },
     {
       "area": "tests",
       "checked_at": "2026-11-14",
-      "result": "Maintained just test package override passed race-enabled tokenexchange, oauth2server and oauth2 packages. Existing behavior only; no GitHub App/federation, E2E, full-gate or build validation claimed.",
+      "result": "just test with maintained package override passed race-enabled thirdparty and model packages (1.868s/1.089s). Existing behavior only; no revalidation implementation, E2E, new build or full-gate pass claimed.",
       "follow_up": null
     },
     {
       "area": "code",
       "checked_at": "2026-11-14",
-      "result": "Investigated #476/#477 and parent #478: literal scope algebra, account repository restrictions, observed ceiling freshness, RFC8414 discovery and signer audience boundary. Posted two focused clarification comments; no source changes or security reproduction.",
-      "follow_up": "Await permission/freshness and assertion/binding decisions; retain earlier phase-1 and bootstrap gates."
+      "result": "After #478, verified #480 is existing classification limitation, reset oldest-first and investigated untouched #243. Observation-only success cannot reuse applied-config Update/status semantics unchanged. Posted focused design questions; no source changes or security reproduction.",
+      "follow_up": "Resume after #243; await drift/status distinction before a spec/ADR. #418 now has active author PR #488; avoid duplicate work."
     },
     {
       "area": "release",
       "checked_at": "2026-11-14",
-      "result": "Latest release remains v0.1.145. Investigation-only maintenance run does not warrant a release PR; Go baseline update already proposed in #486.",
+      "result": "Latest release remains v0.1.145. Investigation-only maintenance does not warrant a release PR; Go toolchain remediation already proposed in #486.",
       "follow_up": null
     }
   ],
@@ -350,8 +356,8 @@
     },
     {
       "task": 2,
-      "item": "Resume investigation after #478, then reset oldest-first",
-      "note": "#476 needs GitHub level/freshness decisions; #477 needs purpose-bound assertion/provider-binding contract. Parent reviewed; preserve #472 identity partition, #473 cache/ADR and #474/#475 holds. Do not duplicate clarification."
+      "item": "Resume investigation after #243",
+      "note": "Await #243 observation-status/drift decision. Preserve machine-account phase holds and #427 detailed contract gate. #418 has active author PR #488; avoid duplicate work."
     },
     {
       "task": 3,
