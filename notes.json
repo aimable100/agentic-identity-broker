@@ -2,7 +2,7 @@
   "version": 1,
   "cursors": {
     "labelling_after": null,
-    "investigation_after": 350
+    "investigation_after": 354
   },
   "issues": [
     {
@@ -208,6 +208,18 @@
       "state": "commented",
       "updated_at": "2026-11-15",
       "note": "Posted current tracing delta: PostgreSQL helper and ExtProc Server/5xx classification already land; AWS and approval result status remain. Reuse storage outcomes for #354, keep approval Internal and principal policy gated. Fresh focused race tests pass; no changes."
+    },
+    {
+      "number": 352,
+      "state": "commented",
+      "updated_at": "2026-11-15",
+      "note": "Posted dual-name parity and single-callback/snapshot gauge migration plan. Update 029+053 contracts and prefix-filtered metric tests; preserve no-points/query failure and one unregister. Maintenance-only fix candidate; coordinate #353/#448."
+    },
+    {
+      "number": 354,
+      "state": "commented",
+      "updated_at": "2026-11-15",
+      "note": "Posted startStorageSpan reuse and missing-method inventory, including partially covered repos. Preserve transaction/locking/timeouts and expected outcomes; extend failed-repository matrix. Focused existing race tests pass; no missing spans implemented."
     }
   ],
   "fixes": [
@@ -310,37 +322,37 @@
     {
       "area": "repo_assist_prs",
       "checked_at": "2026-11-15",
-      "result": "Read all nine open Repo Assist PRs, comments and review threads. Eight drafts, #424 non-draft; #403/#432 still dirty and publication-size blocked. No substantive new revision requests; no pushes or repeated blocker comments.",
-      "follow_up": "Maintainer conflict/publication recovery; #490 exact contract review, closing-footer removal and approved external pipeline start."
+      "result": "Read all nine live Repo Assist PRs, comments and review threads. Heads unchanged; eight drafts and non-draft #424. #403/#432 dirty and publication-size blocked; no new revision request, push or repeated blocker comment.",
+      "follow_up": "Maintainer recovery/classifications; #490 exact-contract approval, closing-footer removal and authorized external pipeline start."
     },
     {
       "area": "ci",
       "checked_at": "2026-11-15",
-      "result": "Read checks AND statuses for nine PRs: older eight retain passing DCO/pipeline/tests; classifications fail #403/#420/#448. #490 CodeQL/CI gate pass with skipped build/tests and external pipeline-start failure. No full green claim.",
-      "follow_up": "Classification labels outside allowed write set need maintainers; no code-only infrastructure workaround."
+      "result": "Read both checks and statuses for nine PRs. Older eight DCO/pipelines/test stages pass; classifications fail #403/#420/#448. #490 CodeQL/CI gate pass, build/tests skipped and external pipeline-start failure persists.",
+      "follow_up": "No full-green claim; unavailable classification writes and external pipeline start remain maintainer actions."
     },
     {
       "area": "hygiene",
       "checked_at": "2026-11-15",
-      "result": "All live open issues and PRs labelled; Task 1 fell back to Task 2. Reread monthly comments and outstanding issue threads: no new human acknowledgements/checked actions; historical #427 clarification already handled.",
+      "result": "All 66 open issues and all open PRs labelled; Task 1 fell back to Task 2. Reread monthly checklist/comments and outstanding issue-comment threads; no new acknowledgements/check-offs. #367 historical request already covered by #403.",
       "follow_up": null
     },
     {
       "area": "tests",
       "checked_at": "2026-11-15",
-      "result": "Fresh maintained just test package overrides with -race -count=1 passed PostgreSQL result/failed-repository span tests (1.036s) and ExtProc unavailable-response/body-denial span tests (1.072s). Existing behavior only; no encryption/approval fix, full gate, build or E2E claim.",
+      "result": "Uncached just test package override with race detection passed TestStartStorageSpan_RecordsResult, TestStorageSpans_FailedRepositoryCalls (1.054s) and TestSessionHealthMetrics* (1.073s). Existing behavior only; no new implementation, build, static/full gate or PostgreSQL integration.",
       "follow_up": null
     },
     {
       "area": "code",
       "checked_at": "2026-11-15",
-      "result": "Resumed after #243: #244 active fix, #245/#246 awaiting replies; #285/#289/#299 covered by prior investigation/design PRs. Investigated untouched #350 against current storage, encryption, approval and ExtProc source. Posted remaining AWS/approval status scope and existing storage/ExtProc progress.",
-      "follow_up": "Resume after #350. #354 can reuse startStorageSpan for missing methods; do not blanket-classify expected storage outcomes as failures."
+      "result": "Resumed after #350; investigated untouched #352/#354 and skipped active #353 fix. Posted metric dual-emission/single-snapshot callback plan and complete storage-span helper coverage plan. Source unchanged; retain as maintenance-only fix candidates.",
+      "follow_up": "Resume after #354, prioritizing untouched #356 principal exporter policy. #357 already investigated; preserve existing dependency/design gates."
     },
     {
       "area": "release",
       "checked_at": "2026-11-15",
-      "result": "Latest release v0.1.145; investigation-only maintenance does not warrant release PR. Existing Go security remediation is #486.",
+      "result": "Latest release v0.1.146 includes Go 1.27.4 security remediation #486. Investigation-only maintenance warrants no release PR; remove stale claim remediation remains open.",
       "follow_up": null
     }
   ],
@@ -362,8 +374,8 @@
     },
     {
       "task": 2,
-      "item": "Resume investigation after #350",
-      "note": "#350 AWS/approval status coverage is a verified fix candidate; #354 should reuse storage helper. Preserve #243 drift/status and machine-account/tag/principal gates. Existing design/author PRs cover #299/#388/#418."
+      "item": "Resume investigation after #354",
+      "note": "Untouched #356 principal exporter policy is next. Retain #352 dual-name/single-query gauge migration and #354 complete storage helper coverage as fix candidates. Preserve #350 AWS/approval work, #243 drift/status and machine/tag gates."
     },
     {
       "task": 3,
