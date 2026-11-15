@@ -2,7 +2,7 @@
   "version": 1,
   "cursors": {
     "labelling_after": null,
-    "investigation_after": 243
+    "investigation_after": 350
   },
   "issues": [
     {
@@ -202,6 +202,12 @@
       "state": "awaiting_clarification",
       "updated_at": "2026-11-14",
       "note": "Posted observation/applied-config status distinction. Update commits endpoints/version; ready equates attempt/success; only failure-only port exists. Asked drift and prior-failure clearing policy. Preserve version ordering, no registration/decryption. Existing thirdparty/model race tests pass."
+    },
+    {
+      "number": 350,
+      "state": "commented",
+      "updated_at": "2026-11-15",
+      "note": "Posted current tracing delta: PostgreSQL helper and ExtProc Server/5xx classification already land; AWS and approval result status remain. Reuse storage outcomes for #354, keep approval Internal and principal policy gated. Fresh focused race tests pass; no changes."
     }
   ],
   "fixes": [
@@ -303,38 +309,38 @@
     },
     {
       "area": "repo_assist_prs",
-      "checked_at": "2026-11-14",
-      "result": "Nine live open PRs: eight drafts, non-draft #424. #403/#432 remain dirty and size-blocked; no retry. Resolved #427 design draft to #490 and actual branch. No new review threads or human revision requests.",
-      "follow_up": "#490 needs approved external pipeline start and removal of generated Fixes #427 before merge; runtime feature remains open."
+      "checked_at": "2026-11-15",
+      "result": "Read all nine open Repo Assist PRs, comments and review threads. Eight drafts, #424 non-draft; #403/#432 still dirty and publication-size blocked. No substantive new revision requests; no pushes or repeated blocker comments.",
+      "follow_up": "Maintainer conflict/publication recovery; #490 exact contract review, closing-footer removal and approved external pipeline start."
     },
     {
       "area": "ci",
-      "checked_at": "2026-11-14",
-      "result": "Both checks/statuses read for nine PRs. Older eight heads retain passing DCO/pipeline/test stages; classifications fail #403/#420/#448. #490 CodeQL/CI gate pass, jobs skipped; external pipeline cannot start without accountable user. Posted infrastructure-only note; no push.",
-      "follow_up": "Maintainer classification and pipeline-start recovery only; no complete validation claim for #490."
+      "checked_at": "2026-11-15",
+      "result": "Read checks AND statuses for nine PRs: older eight retain passing DCO/pipeline/tests; classifications fail #403/#420/#448. #490 CodeQL/CI gate pass with skipped build/tests and external pipeline-start failure. No full green claim.",
+      "follow_up": "Classification labels outside allowed write set need maintainers; no code-only infrastructure workaround."
     },
     {
       "area": "hygiene",
-      "checked_at": "2026-11-14",
-      "result": "All open issues and PRs already labelled; Task 1 fell back to Task 2. Monthly pending comment threads have no new substantive human acknowledgements except #427 clarification already captured by #490; no checked monthly items.",
+      "checked_at": "2026-11-15",
+      "result": "All live open issues and PRs labelled; Task 1 fell back to Task 2. Reread monthly comments and outstanding issue threads: no new human acknowledgements/checked actions; historical #427 clarification already handled.",
       "follow_up": null
     },
     {
       "area": "tests",
-      "checked_at": "2026-11-14",
-      "result": "just test with maintained package override passed race-enabled thirdparty and model packages (1.868s/1.089s). Existing behavior only; no revalidation implementation, E2E, new build or full-gate pass claimed.",
+      "checked_at": "2026-11-15",
+      "result": "Fresh maintained just test package overrides with -race -count=1 passed PostgreSQL result/failed-repository span tests (1.036s) and ExtProc unavailable-response/body-denial span tests (1.072s). Existing behavior only; no encryption/approval fix, full gate, build or E2E claim.",
       "follow_up": null
     },
     {
       "area": "code",
-      "checked_at": "2026-11-14",
-      "result": "After #478, verified #480 is existing classification limitation, reset oldest-first and investigated untouched #243. Observation-only success cannot reuse applied-config Update/status semantics unchanged. Posted focused design questions; no source changes or security reproduction.",
-      "follow_up": "Resume after #243; await drift/status distinction before a spec/ADR. #418 now has active author PR #488; avoid duplicate work."
+      "checked_at": "2026-11-15",
+      "result": "Resumed after #243: #244 active fix, #245/#246 awaiting replies; #285/#289/#299 covered by prior investigation/design PRs. Investigated untouched #350 against current storage, encryption, approval and ExtProc source. Posted remaining AWS/approval status scope and existing storage/ExtProc progress.",
+      "follow_up": "Resume after #350. #354 can reuse startStorageSpan for missing methods; do not blanket-classify expected storage outcomes as failures."
     },
     {
       "area": "release",
-      "checked_at": "2026-11-14",
-      "result": "Latest release remains v0.1.145. Investigation-only maintenance does not warrant a release PR; Go toolchain remediation already proposed in #486.",
+      "checked_at": "2026-11-15",
+      "result": "Latest release v0.1.145; investigation-only maintenance does not warrant release PR. Existing Go security remediation is #486.",
       "follow_up": null
     }
   ],
@@ -356,8 +362,8 @@
     },
     {
       "task": 2,
-      "item": "Resume investigation after #243",
-      "note": "Await #243 observation-status/drift decision. Preserve machine-account phase holds and #427 detailed contract gate. #418 has active author PR #488; avoid duplicate work."
+      "item": "Resume investigation after #350",
+      "note": "#350 AWS/approval status coverage is a verified fix candidate; #354 should reuse storage helper. Preserve #243 drift/status and machine-account/tag/principal gates. Existing design/author PRs cover #299/#388/#418."
     },
     {
       "task": 3,
