@@ -243,7 +243,7 @@ var _ = Describe("Session Metrics", func() {
 
 		Describe("User Story 2: session health per service", func() {
 			// US2-S1 from specs/053-session-auto-refresh/spec.md
-			It("reports one value per service and series that sums to the stored sessions", func() {
+			It("reports one value per service and series that sums to the stored sessions", example("third-party-sessions.metrics.health-per-service"), func() {
 				seed(fixtures.HealthJourneySessions(time.Now(), calendar, tickets)...)
 				boot()
 				counts, _ := sessionHealthCounts(reader)

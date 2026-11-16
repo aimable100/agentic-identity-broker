@@ -57,23 +57,11 @@ HTTP/1.1 201 Created
 }
 ```
 
-The client ID is the agent's UUID. The broker never shows the secret again. A later read returns
-only metadata:
-
-```http example="client-registration-and-authentication.credentials.rotate"
-GET /api/agents/550e8400-e29b-41d4-a716-446655440000/client-credentials HTTP/1.1
-X-Remote-User: admin@example.com
-
-HTTP/1.1 200 OK
-
-{
-  "client_id": "550e8400-e29b-41d4-a716-446655440000",
-  "created_at": "2026-10-30T09:00:00Z"
-}
-```
+The client ID is the agent's UUID. The broker never shows the secret again: a later `GET` of the
+same path returns only `client_id` and `created_at`.
 
 The same call on an agent that already has credentials rotates them. It answers `200 OK` with a
-new secret and the time at which the old one stopped working:
+new secret and the time at which the broker invalidated the previous one:
 
 ```http example="client-registration-and-authentication.credentials.rotate"
 POST /api/agents/550e8400-e29b-41d4-a716-446655440000/client-credentials HTTP/1.1
@@ -90,9 +78,9 @@ HTTP/1.1 200 OK
 }
 ```
 
-Rotation is a sensitive action that a web page could try to trigger in the administrator's
-browser. The broker refuses a rotation request that comes from another origin or that does not
-declare a JSON body, and the stored credential stays as it was.
+A web page could try to trigger a rotation in the administrator's browser. The broker refuses a
+rotation request that comes from another origin or that does not declare a JSON body, and the
+stored credential stays as it was. `example:client-registration-and-authentication.credentials.rotate`
 
 ### The administrator lists the redirect URIs
 
@@ -105,35 +93,10 @@ broker accepts three kinds of entry:
   for a native app.
 
 The broker stores the list as written and returns it in the same order. `example:client-registration-and-authentication.private-use.register`
-It refuses any other kind of URI and names the position of the bad entry: `example:client-registration-and-authentication.private-use.unsafe`
-
-```http example="client-registration-and-authentication.private-use.unsafe"
-POST /api/agents HTTP/1.1
-X-Remote-User: admin@example.com
-Content-Type: application/json
-
-{
-  "display_name": "Example Desktop App",
-  "description": "Desktop assistant that signs in through its native callback",
-  "redirect_uris": ["javascript://oauth/callback"],
-  "permission_sets": [
-    {
-      "permission_set_id": "770e8400-e29b-41d4-a716-446655440001",
-      "requirement_type": "mandatory"
-    }
-  ]
-}
-
-HTTP/1.1 400 Bad Request
-
-{
-  "error": "validation failed",
-  "message": "redirect_uris[0] must be an https URI, an http URI on a loopback host, or a valid private-use scheme URI"
-}
-```
-
-The same answer is given to a private-use URI that is not in its plainest form: one with a
-fragment, an upper-case scheme, user information, a `..` segment, or a percent-encoded character.
+It refuses any other kind of URI, such as `javascript://oauth/callback`, with `400` and a message
+that names the position of the bad entry, here `redirect_uris[0]`. It refuses in the same way a
+private-use URI that is not in its plainest form: one with a fragment, an upper-case scheme, user
+information, a `..` segment, or a percent-encoded character. `example:client-registration-and-authentication.private-use.unsafe`
 
 ### The broker compares the redirect URI of each request with the list
 
@@ -144,21 +107,8 @@ Two rules decide whether a requested `redirect_uri` is registered:
   for `http://localhost:9999/callback`, and the broker delivers the code there. `example:client-registration-and-authentication.redirect.loopback-uuid-agent`
 - **Every other URI must match exactly.** For an agent registered with
   `com.example.app:/oauth2redirect/example-provider`, a different path, an upper-case scheme, a
-  double slash, a trailing slash, and an added query are all refused. `example:client-registration-and-authentication.private-use.look-alike`
-
-A refused request gets an error page from the broker. The broker does not redirect to an address
-that it does not trust:
-
-```http example="client-registration-and-authentication.private-use.look-alike"
-GET /oauth2/authorize?client_id=550e8400-e29b-41d4-a716-446655440000&code_challenge=…&code_challenge_method=S256&redirect_uri=com.example.app%3A%2Foauth2redirect%2Fother&response_type=code&state=native-app-state HTTP/1.1
-
-HTTP/1.1 400 Bad Request
-
-{
-  "error": "invalid_redirect_uri",
-  "error_description": "redirect_uri not registered for this client"
-}
-```
+  double slash, a trailing slash, and an added query are all refused. The broker answers `400`
+  with `invalid_redirect_uri` itself. It does not redirect to an address that it does not trust. `example:client-registration-and-authentication.private-use.look-alike`
 
 ## Identify by a metadata document URL
 
@@ -193,6 +143,8 @@ X-Remote-User: user@example.com
 
 HTTP/1.1 302 Found
 Location: http://localhost:8000/agents/550e8400-e29b-41d4-a716-446655440000?session_token=…
+
+<a href="…">Found</a>.
 ```
 
 The `session_token` carries the authorization request in sealed form. The page "Consent and
@@ -220,15 +172,8 @@ HTTP/1.1 400 Bad Request
 Some vendors give each installation its own document URL. The administrator can register a
 pattern in which `*` stands for exactly one path segment. Suppose the Research Assistant has the
 client URI `https://cimd-wildcard.test.invalid/oauth/codex/*/client.json`. A concrete URL with
-one segment in that place resolves to the agent: `example:client-registration-and-authentication.wildcard.match`
-
-```http example="client-registration-and-authentication.wildcard.match"
-GET /oauth2/authorize?client_id=https://cimd-wildcard.test.invalid/oauth/codex/dIwd44EtAHp-/client.json&redirect_uri=https://cimd-wildcard.test.invalid/callback&response_type=code&state=xyz HTTP/1.1
-X-Remote-User: user@example.com
-
-HTTP/1.1 302 Found
-Location: http://localhost:8000/agents/550e8400-e29b-41d4-a716-446655440000?session_token=…
-```
+one segment in that place, such as `…/oauth/codex/dIwd44EtAHp-/client.json`, resolves to the
+agent and leads to its consent screen. `example:client-registration-and-authentication.wildcard.match`
 
 Three rules keep a pattern from matching more than the administrator meant:
 
@@ -247,19 +192,8 @@ It also refuses a document that asks for a shared-secret method such as `client_
 client that anyone can install cannot keep a shared secret. `example:client-registration-and-authentication.cimd.shared-secret-method`
 
 For a client with a metadata document, the redirect URIs come from the document. A requested
-`redirect_uri` that the document does not list is refused, and the broker does not redirect: `example:client-registration-and-authentication.cimd.redirect-not-in-document`
-
-```http example="client-registration-and-authentication.cimd.redirect-not-in-document"
-GET /oauth2/authorize?client_id=https://cimd-e2e-redirect.test.invalid/client&redirect_uri=https://cimd-e2e-redirect.test.invalid/client/other-callback&response_type=code&state=xyz HTTP/1.1
-X-Remote-User: user@example.com
-
-HTTP/1.1 400 Bad Request
-
-{
-  "error": "invalid_request",
-  "error_description": "redirect_uri not registered for this client"
-}
-```
+`redirect_uri` that the document does not list is refused with `400` and `invalid_request`, and
+the broker does not redirect. `example:client-registration-and-authentication.cimd.redirect-not-in-document`
 
 The two matching rules of the previous section apply here as well:
 
@@ -309,19 +243,7 @@ The fetch is also bounded in size and time:
 - A document larger than `oauth2_authorization_server.cimd.max_response_bytes` gets the same
   `invalid_client` answer. The scenario uses a limit of 5120 bytes. `example:client-registration-and-authentication.fetch.size-limit`
 - A host that does not answer within `oauth2_authorization_server.cimd.fetch_timeout` makes the
-  request fail as a fault of a dependency, not of the client: `example:client-registration-and-authentication.fetch.timeout`
-
-```http example="client-registration-and-authentication.fetch.timeout"
-GET /oauth2/authorize?client_id=https://cimd-e2e-timeout.test.invalid/client&redirect_uri=https://cimd-e2e-timeout.test.invalid/client/cb&response_type=code&state=xyz HTTP/1.1
-X-Remote-User: user@example.com
-
-HTTP/1.1 500 Internal Server Error
-
-{
-  "error": "server_error",
-  "error_description": "CIMD document unavailable"
-}
-```
+  request fail with `500` and `server_error`: the fault is in a dependency, not in the client. `example:client-registration-and-authentication.fetch.timeout`
 
 The broker keeps a valid document in a cache. A second authorization request for the same client
 within the cache lifetime does not fetch the document again. `example:client-registration-and-authentication.fetch.cache-hit`
@@ -352,7 +274,7 @@ metadata document.
 
 ### `none`: a public client
 
-A client whose document says `none`, or names no method, has no credential. PKCE protects its
+A client whose document says `none` has no credential. PKCE protects its
 code. It exchanges the code and later refreshes its token with its `client_id` alone. `example:client-registration-and-authentication.public-client.token`
 Such a client must not send an assertion. The broker rejects a token request that carries one
 with `401` and `invalid_client`, and the same code still works without it. `example:client-registration-and-authentication.assertion.public-client-sends-one`
@@ -403,19 +325,16 @@ broker has not seen, the broker reads the key set again and accepts the new key.
 - The exchanges of the token endpoint for a client with a metadata document. The scenarios that
   prove the token rules above pass, but their HTTP traffic is not recorded, so the page cites
   them without showing requests.
-- The scopes that an administrator allows for an agent, the contents of issued tokens, and
-  refresh. See "Token issuance and refresh".
 - Registering `client_uris` through the admin API, including the refusal of a malformed pattern
   and of a client URI that another agent already holds.
 - The other checks on a document: an empty `redirect_uris` list, a `client_secret` member, a
   redirect URI on another origin, and a blocked client name.
 - The other limits on fetching: loopback and link-local addresses, plain `http` URLs, dot
-  segments, the cache lifetime bounds, and the same protections for `jwks_uri`.
-- The limit on how often an unknown `kid` causes a new read of the key set, and the refusal of
-  weak keys.
-- What the consent screen shows for a client with a metadata document. See "Consent and
-  delegation".
-- How the broker identifies itself to a third-party provider. That is a different capability.
+  segments, the cache lifetime bounds, the same protections for `jwks_uri`, the limit on how
+  often an unknown `kid` causes a new read of the key set, and the refusal of weak keys.
+- Allowed scopes, token contents, and refresh ("Token issuance and refresh"); the consent screen
+  for a client with a metadata document ("Consent and delegation"); and how the broker
+  identifies itself to a third-party provider, which is a different capability.
 
 ## Sources
 

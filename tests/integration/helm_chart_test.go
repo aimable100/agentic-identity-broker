@@ -12,6 +12,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"go.yaml.in/yaml/v3"
+
+	"github.com/agentic-identity-broker/agentic-identity-broker/tools/livingdoc/evidence"
 )
 
 func runHelmTemplate(t *testing.T, extraArgs ...string) (string, error) {
@@ -454,6 +456,7 @@ func TestHelmTemplate_SessionSweep(t *testing.T) {
 
 	// US1-S2 from specs/053-session-auto-refresh/spec.md
 	t.Run("renders an hourly Forbid CronJob targeting the admin Service with the public-URL Host and PT2H", func(t *testing.T) {
+		evidence.ForTest(t, "third-party-sessions.sweep.scheduled")
 		output := renderHelmTemplate(t, sessionSweepArgs("--show-only", "templates/cronjob-session-sweep.yaml")...)
 		for _, want := range []string{
 			"kind: CronJob",

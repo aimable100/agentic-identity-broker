@@ -83,7 +83,7 @@ var _ = Describe("Local key sets for JWT pre-authentication", Label(trustAnchorL
 
 	Context("an inline key set or a key-set file", func() {
 		// US5-S1 from specs/052-inline-jwks-trust-anchors/spec.md
-		It("derives the principal for GET /api/me with an inline source and, separately, with a file source", example("trust-anchors.jwt.local-key-set"), func() {
+		It("derives the principal for GET /api/me with an inline source and, separately, with a file source", example("trust-anchors.jwt.local-key-set"), example("end-user-authentication.jwt.local-key-set"), func() {
 			By("verifying with an inline key set")
 			startEnduser(signedConfig(func(jwt *ports.JWTConfig) {
 				jwt.JWKS = helpers.PublicKeySet(mesh)
@@ -102,7 +102,7 @@ var _ = Describe("Local key sets for JWT pre-authentication", Label(trustAnchorL
 
 	Context("separate key sets on the admin and end-user servers", func() {
 		// US5-S4 from specs/052-inline-jwks-trust-anchors/spec.md
-		It("derives the admin principal only from a JWT signed by the admin server's own key set", example("trust-anchors.jwt.per-server"), func() {
+		It("derives the admin principal only from a JWT signed by the admin server's own key set", example("trust-anchors.jwt.per-server"), example("end-user-authentication.servers.separate-key-sets"), func() {
 			operator := helpers.NewLocalES256Key("admin-proxy-2026-10")
 			path := env.trust.WriteFile("mesh-jwks.json", helpers.PublicKeySet(mesh))
 			config := signedConfig(func(jwt *ports.JWTConfig) {

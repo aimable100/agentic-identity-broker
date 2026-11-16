@@ -13,12 +13,14 @@ import (
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/configutil"
 	domainconfig "github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/config"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/ports"
+	"github.com/agentic-identity-broker/agentic-identity-broker/tools/livingdoc/evidence"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestConfigurationDefaults(t *testing.T) {
+	evidence.ForTest(t, "end-user-authentication.configuration.method-required")
 	// Set valid JWESigningKey for all tests
 
 	t.Run("missing authentication config fails validation", func(t *testing.T) {
@@ -78,6 +80,7 @@ func TestDefaultServerConfig(t *testing.T) {
 }
 
 func TestConfigurationPrecedence(t *testing.T) {
+	evidence.ForTest(t, "end-user-authentication.configuration.per-server")
 	t.Run("environment variable sets principal header", func(t *testing.T) {
 		t.Setenv("IDENTITY_BROKER_JWE_SIGNING_KEY", generateBase64EncodedString(t, 32))
 		t.Setenv("IDENTITY_BROKER_ENCRYPTION_MEMORY_RAW_KEY", generateBase64EncodedString(t, 32))

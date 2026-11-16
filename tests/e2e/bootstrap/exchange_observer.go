@@ -17,8 +17,8 @@ type ObservedExchange struct {
 
 var exchangeObserver atomic.Pointer[func(ObservedExchange)]
 
-// ObserveHTTPExchanges reports every exchange of every TestServer client in
-// this process to observe. Pass nil to stop. Bodies are only buffered while
+// ObserveHTTPExchanges reports every exchange of every TestServer client and
+// of the shared helpers client in this process to observe. Pass nil to stop. Bodies are only buffered while
 // an observer is set.
 func ObserveHTTPExchanges(observe func(ObservedExchange)) {
 	if observe == nil {
@@ -26,6 +26,11 @@ func ObserveHTTPExchanges(observe func(ObservedExchange)) {
 		return
 	}
 	exchangeObserver.Store(&observe)
+}
+
+// ObserveTransport wraps a test client's transport so that its exchanges reach the observer.
+func ObserveTransport(next http.RoundTripper) http.RoundTripper {
+	return observingTransport{next: next}
 }
 
 type observingTransport struct{ next http.RoundTripper }

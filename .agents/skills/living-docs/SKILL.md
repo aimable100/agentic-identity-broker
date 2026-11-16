@@ -20,7 +20,8 @@ and maintain the prose. You never decide that an example is correct: only record
     `tools/livingdoc/evidence`).
 - With `LIVING_DOCS_EVIDENCE_DIR` set, each bound test records its outcome to that directory. A
   scenario of the backend suite `tests/e2e/` also records every HTTP exchange that it makes through
-  a `bootstrap.TestServer` method. Requests made with another HTTP client are not recorded.
+  a `bootstrap.TestServer` method or through `helpers.HTTPClient()`. Requests made with another
+  HTTP client are not recorded.
 - A page cites an example in two ways. An inline marker in code font, `example:<id>`, says the
   preceding claim is proven by that test. A fenced `http` block with `example="<id>"` in its
   info string shows one request and its response.

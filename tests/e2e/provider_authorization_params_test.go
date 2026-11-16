@@ -184,7 +184,7 @@ var _ = Describe("Provider authorization parameters", func() {
 	}
 
 	// Scenario 2.1 from specs/034-provider-auth-params/spec.md
-	It("adds configured parameters to the upstream authorization and code exchange", example("third-party-service-registration.authorization-params.sent-to-provider"), func() {
+	It("adds configured parameters to the upstream authorization and code exchange", example("third-party-sessions.connect.provider-parameters"), example("third-party-service-registration.authorization-params.sent-to-provider"), func() {
 		created := create(serviceRequest(map[string]string{"business_partner_id": "12345"}))
 		Expect(completeAuthorization(created, "")["business_partner_id"]).To(ConsistOf("12345"))
 		Expect(upstream.GetLastRequest().Form.Get("business_partner_id")).To(Equal("12345"))

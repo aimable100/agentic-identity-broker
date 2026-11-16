@@ -173,7 +173,7 @@ var _ = Describe("Session Token Grant Submission", func() {
 
 	// SR-014 principal isolation from specs/031-unified-session-token/spec.md
 	Describe("when session_token belongs to a different principal", func() {
-		It("rejects with 403 Forbidden", func() {
+		It("rejects with 403 Forbidden", example("consent-and-delegation.session-token.other-user-save"), func() {
 			agent := createAgent()
 			token := buildToken(agent.ID, "other-user@example.com",
 				"/oauth2/authorize?client_id="+agent.ID.String(),

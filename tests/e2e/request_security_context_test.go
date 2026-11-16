@@ -256,7 +256,7 @@ var _ = Describe("Request Security Context", func() {
 
 	Context("when an authenticated request crosses the HTTP perimeter", func() {
 		// Scenario 1.1 from specs/033-request-security-context/spec.md
-		It("should establish trace_id, actor, and client_ip at the perimeter before business logic runs", func() {
+		It("should establish trace_id, actor, and client_ip at the perimeter before business logic runs", example("end-user-authentication.actor.recorded"), func() {
 			resp := authenticatedGET("/api/me", map[string]string{"User-Agent": "request-security-context-e2e/1.0"})
 			defer func() { _ = resp.Body.Close() }()
 

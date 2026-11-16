@@ -141,7 +141,7 @@ var _ = Describe("CIMD public third-party service registration", func() {
 	})
 
 	// US6-S2 from specs/046-cimd-upstream-client/spec.md
-	It("should allow public create and replacement without generating a key", Label("cimd-upstream-client", "cimd-public-client"), func() {
+	It("should allow public create and replacement without generating a key", Label("cimd-upstream-client", "cimd-public-client"), example("broker-credentials-at-third-party-services.cimd-public.no-key"), func() {
 		Expect(keyList()).To(BeEmpty())
 		created := createPublic()
 		serviceID := created["id"].(string)

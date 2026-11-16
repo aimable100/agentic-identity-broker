@@ -234,7 +234,7 @@ var _ = Describe("CIMD client-authentication key rotation", func() {
 		})
 
 		// US4-S1 from specs/046-cimd-upstream-client/spec.md
-		It("should keep the public key location stable before use", Label("cimd-upstream-client"), func() {
+		It("should keep the public key location stable before use", Label("cimd-upstream-client"), example("broker-credentials-at-third-party-services.cimd.rotation.stable-location"), func() {
 			metadataBefore := readCIMDMetadata()
 			rotatedKey := createCIMDKey(adminServer, "ES256")
 			metadataAfter := readCIMDMetadata()

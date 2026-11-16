@@ -143,7 +143,7 @@ var _ = Describe("Third-Party Session Reliability", func() {
 	})
 
 	// US2-S10 from specs/008-thirdparty-oauth2-sessions/spec.md
-	It("[US2-S10] accepts reconnect without a refresh token and requires login after expiry", func() {
+	It("[US2-S10] accepts reconnect without a refresh token and requires login after expiry", example("third-party-sessions.connect.reconnect"), func() {
 		ctx := context.Background()
 		mockUpstream.WithAccessToken("account-a-access").WithRefreshToken("account-a-refresh")
 		Expect(completeConnect().Query().Get("success")).To(Equal("true"))
@@ -191,7 +191,7 @@ var _ = Describe("Third-Party Session Reliability", func() {
 	})
 
 	// US2-S11 from specs/008-thirdparty-oauth2-sessions/spec.md
-	It("[US2-S11] keeps the first completed callback and accepts a later deliberate reconnect", func() {
+	It("[US2-S11] keeps the first completed callback and accepts a later deliberate reconnect", example("third-party-sessions.connect.concurrent-logins"), example("third-party-sessions.terminate.pending-login"), func() {
 		first, second := startConnect(), startConnect()
 		mockUpstream.WithAccessToken("initial-winner")
 		Expect(finishConnect(second).Query().Get("success")).To(Equal("true"))

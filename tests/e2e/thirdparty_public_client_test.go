@@ -300,7 +300,7 @@ var _ = Describe("Public Client Support for Third-Party OAuth2 Services", func()
 		})
 
 		// US2-S2 from specs/042-thirdparty-public-pkce/spec.md
-		It("sends client_id and code_verifier with no client_secret in the body", example("broker-credentials-at-third-party-services.public.connect"), func() {
+		It("sends client_id and code_verifier with no client_secret in the body", example("third-party-sessions.connect.public-client"), example("broker-credentials-at-third-party-services.public.connect"), func() {
 			service := publicService
 			response := completeFlow(enduserServer, principal, service.ID)
 			Expect(response.StatusCode).To(Equal(http.StatusFound))
@@ -324,7 +324,7 @@ var _ = Describe("Public Client Support for Third-Party OAuth2 Services", func()
 			credentialFreeTokenRequests(upstream)
 		})
 		// US2-S4 from specs/042-thirdparty-public-pkce/spec.md
-		It("stores an encrypted session exactly as for a confidential service", func() {
+		It("stores an encrypted session exactly as for a confidential service", example("third-party-sessions.connect.tokens-encrypted"), func() {
 			service := publicService
 			response := completeFlow(enduserServer, principal, service.ID)
 			Expect(response.StatusCode).To(Equal(http.StatusFound))
