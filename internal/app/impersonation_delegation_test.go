@@ -17,9 +17,10 @@ import (
 func TestUserDelegationVerifier(t *testing.T) {
 	principal := id.NewPrincipal("subject-1")
 	agentID := id.NewAgentID()
+	agent := &storage.Agent{ID: agentID}
 
 	newVerifier := func(repo ports.UserGrantRepository) ports.UserDelegationVerifier {
-		return newUserDelegationVerifier(consent.NewService(readinessAgentRepository{agent: &storage.Agent{ID: agentID}}, nil, repo, &readinessSessionRepository{}, memorystorage.NewRefreshTokenSessionStore(), nil, nil))
+		return newUserDelegationVerifier(consent.NewService(nil, nil, repo, memorystorage.NewInMemoryUserSessionRepository(), memorystorage.NewRefreshTokenSessionStore(), nil, nil))
 	}
 	createGrant := func(t *testing.T, repo ports.UserGrantRepository, validUntil time.Time) {
 		t.Helper()
@@ -35,28 +36,28 @@ func TestUserDelegationVerifier(t *testing.T) {
 		repo := memorystorage.NewUserGrantRepository()
 		createGrant(t, repo, time.Now().Add(time.Hour))
 
-		status, err := newVerifier(repo).VerifyUserDelegation(context.Background(), principal, agentID)
+		status, err := newVerifier(repo).VerifyUserDelegation(context.Background(), principal, agent)
 		require.NoError(t, err)
-		assert.Equal(t, ports.UserDelegationActive, status)
+		assert.Equal(t, ports.UserDelegationActive, status.Status)
 	})
 
 	t.Run("classifies missing delegation", func(t *testing.T) {
-		status, err := newVerifier(memorystorage.NewUserGrantRepository()).VerifyUserDelegation(context.Background(), principal, agentID)
+		status, err := newVerifier(memorystorage.NewUserGrantRepository()).VerifyUserDelegation(context.Background(), principal, agent)
 		require.NoError(t, err)
-		assert.Equal(t, ports.UserDelegationMissing, status)
+		assert.Equal(t, ports.UserDelegationMissing, status.Status)
 	})
 
 	t.Run("classifies expired delegation", func(t *testing.T) {
 		repo := memorystorage.NewUserGrantRepository()
 		createGrant(t, repo, time.Now().Add(-time.Hour))
 
-		status, err := newVerifier(repo).VerifyUserDelegation(context.Background(), principal, agentID)
+		status, err := newVerifier(repo).VerifyUserDelegation(context.Background(), principal, agent)
 		require.NoError(t, err)
-		assert.Equal(t, ports.UserDelegationExpired, status)
+		assert.Equal(t, ports.UserDelegationExpired, status.Status)
 	})
 
 	t.Run("fails closed when no consent service is available", func(t *testing.T) {
-		status, err := userDelegationVerifier{}.VerifyUserDelegation(context.Background(), principal, agentID)
+		status, err := userDelegationVerifier{}.VerifyUserDelegation(context.Background(), principal, agent)
 		require.Error(t, err)
 		assert.Empty(t, status)
 	})

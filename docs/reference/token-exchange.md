@@ -481,7 +481,11 @@ rejected scopes.
 
 Each impersonation decision records a credential-free structured log event named `impersonation_decision`.
 The event contains the target, selected rule, validated credential roles, safe identities, OAuth error code, outcome, and `request_id`.
-Separate token-exchange diagnostic fields distinguish missing and expired grants.
+Readiness diagnostics retain the specific failed prerequisite (`grant_missing`, `grant_expired`,
+`grant_permission_set_undeclared`, `session_missing`, `access_token_expired`, or
+`session_scope_insufficient`) and the affected service ID when applicable. These impersonation
+denials use the grant-authorization stage and consent recovery; third-party exchanges retain
+their existing session-reauthentication diagnostics.
 The event excludes routing audiences, issuer URLs, free-form failure categories, credentials, issued access tokens, and signing keys.
 
 See [Configuration](/docs/configuration) and

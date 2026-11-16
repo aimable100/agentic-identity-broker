@@ -16,6 +16,21 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
+func TestConsentReadinessDiagnostic(t *testing.T) {
+	for _, detail := range []FailureDetail{DetailGrantMissing, DetailGrantExpired, DetailGrantPermissionSetUndeclared, DetailSessionMissing, DetailAccessTokenExpired, DetailSessionScopeInsufficient} {
+		t.Run(string(detail), func(t *testing.T) {
+			d := ConsentReadinessDiagnostic(detail)
+			assert.Equal(t, detail, d.Detail())
+			assert.Equal(t, StageGrantAuthorization, d.Stage())
+			assert.Equal(t, OutcomeAuthorizationDenied, d.Outcome())
+			assert.Equal(t, RecoveryReconsent, d.RecoveryAction())
+			assert.Equal(t, TargetConsent, d.RecoveryTarget())
+			assert.Equal(t, ExchangeImpersonation, d.ExchangeKind())
+		})
+	}
+	assert.Equal(t, DetailConsentRequired, ConsentReadinessDiagnostic(FailureDetail("untrusted-sentinel")).Detail())
+}
+
 func TestDiagnosticClassificationContract(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {

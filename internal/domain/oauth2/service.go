@@ -219,29 +219,30 @@ func (s *AuthorizationService) HandleAuthorization(ctx context.Context, req *por
 	}
 
 	readiness, err := consent.EvaluateAuthorizationReadiness(ctx, principal, agent, s.grantRepo, s.sessionRepo)
-	if err != nil {
-		errRedirect, _ := BuildErrorRedirectURL(req.RedirectURI, req.State, "server_error", "server error")
-		return &ports.AuthorizationDecision{
-			Action:      "error",
-			ErrorCode:   "server_error",
-			ErrorDesc:   "Failed to check authorization readiness",
-			RedirectURL: errRedirect,
-		}, nil
+	readinessAttrs := []any{"agent_id", agent.ID, "reason", readiness.Reason}
+	if !readiness.ServiceID.IsZero() {
+		readinessAttrs = append(readinessAttrs, "service_id", readiness.ServiceID)
 	}
-	if readiness != ports.UserDelegationActive {
+	if !readiness.PermissionSetID.IsZero() {
+		readinessAttrs = append(readinessAttrs, "permission_set_id", readiness.PermissionSetID)
+	}
+	if err != nil {
 		if s.logger != nil {
-			s.logger.WarnContext(ctx, "authorization requires consent", "event", "oauth2.authorization.consent_required",
-				"agent_id", agent.ID, "principal", principal, "reason", readiness)
+			s.logger.ErrorContext(ctx, "failed to check authorization readiness", append(readinessAttrs, "error", err)...)
+		}
+		return s.authorizationErrorDecision(ctx, req, "Failed to check authorization readiness"), nil
+	}
+	if readiness.Status != ports.UserDelegationActive {
+		if s.logger != nil {
+			s.logger.WarnContext(ctx, "authorization requires consent", append(readinessAttrs,
+				"event", "oauth2.authorization.consent_required", "principal", principal)...)
 		}
 		consentURL, buildErr := s.buildConsentURL(ctx, req, principal, agent, cimdMeta)
 		if buildErr != nil {
-			errRedirect, _ := BuildErrorRedirectURL(req.RedirectURI, req.State, "server_error", "server error")
-			return &ports.AuthorizationDecision{
-				Action:      "error",
-				ErrorCode:   "server_error",
-				ErrorDesc:   "Failed to initiate consent session",
-				RedirectURL: errRedirect,
-			}, nil
+			if s.logger != nil {
+				s.logger.ErrorContext(ctx, "failed to initiate consent session", "agent_id", agent.ID, "error_kind", "consent_session_build_failed")
+			}
+			return s.authorizationErrorDecision(ctx, req, "Failed to initiate consent session"), nil
 		}
 		return ports.ConsentDecision(consentURL), nil
 	}
@@ -280,6 +281,15 @@ func (s *AuthorizationService) HandleAuthorization(ctx context.Context, req *por
 		}, nil
 	}
 	return ports.ProceedDecision(upstreamURL, agent.ClientType()), nil
+}
+
+func (s *AuthorizationService) authorizationErrorDecision(ctx context.Context, req *ports.AuthorizationRequest, description string) *ports.AuthorizationDecision {
+	redirectURL, err := BuildErrorRedirectURL(req.RedirectURI, req.State, "server_error", "server error")
+	if err != nil && s.logger != nil {
+		// Parse errors can contain the callback URL, including its query and fragment.
+		s.logger.ErrorContext(ctx, "failed to build error redirect url", "error_kind", "invalid_redirect_uri")
+	}
+	return ports.ErrorDecision("server_error", description, redirectURL)
 }
 
 // buildUpstreamAuthorizeURL constructs the upstream authorization endpoint URL

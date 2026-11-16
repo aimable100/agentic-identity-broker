@@ -6,6 +6,7 @@ import (
 
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/consent"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/id"
+	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/storage"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/ports"
 )
 
@@ -17,10 +18,10 @@ func newUserDelegationVerifier(consentService *consent.Service) ports.UserDelega
 	return userDelegationVerifier{consentService: consentService}
 }
 
-func (v userDelegationVerifier) VerifyUserDelegation(ctx context.Context, principal id.Principal, agentID id.AgentID) (ports.UserDelegationStatus, error) {
+func (v userDelegationVerifier) VerifyUserDelegation(ctx context.Context, principal id.Principal, agent *storage.Agent) (ports.AuthorizationReadiness, error) {
 	if v.consentService == nil {
-		return "", fmt.Errorf("user delegation verifier is not configured")
+		return ports.AuthorizationReadiness{}, fmt.Errorf("user delegation verifier is not configured")
 	}
 
-	return v.consentService.VerifyAuthorizationReadiness(ctx, principal, agentID)
+	return v.consentService.VerifyAuthorizationReadiness(ctx, principal, agent)
 }

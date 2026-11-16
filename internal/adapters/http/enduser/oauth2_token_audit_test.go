@@ -68,8 +68,8 @@ func (i *handlerIssuer) IssueImpersonationToken(_ context.Context, input ports.I
 
 type handlerDelegationVerifier struct{}
 
-func (handlerDelegationVerifier) VerifyUserDelegation(context.Context, id.Principal, id.AgentID) (ports.UserDelegationStatus, error) {
-	return ports.UserDelegationActive, nil
+func (handlerDelegationVerifier) VerifyUserDelegation(context.Context, id.Principal, *storage.Agent) (ports.AuthorizationReadiness, error) {
+	return ports.AuthorizationReadiness{Status: ports.UserDelegationActive}, nil
 }
 
 func newImpersonationHeaderHandler(t *testing.T) (*OAuth2TokenHandler, *handlerIssuer, *storage.Agent) {

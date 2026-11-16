@@ -39,23 +39,27 @@ func (s *stubIssuer) IssueImpersonationToken(_ context.Context, input ports.Impe
 
 type allowDelegationVerifier struct{}
 
-func (allowDelegationVerifier) VerifyUserDelegation(context.Context, id.Principal, id.AgentID) (ports.UserDelegationStatus, error) {
-	return ports.UserDelegationActive, nil
+func (allowDelegationVerifier) VerifyUserDelegation(context.Context, id.Principal, *storage.Agent) (ports.AuthorizationReadiness, error) {
+	return ports.AuthorizationReadiness{Status: ports.UserDelegationActive}, nil
 }
 
 type recordingDelegationVerifier struct {
 	status    ports.UserDelegationStatus
+	reason    ports.AuthorizationReadinessReason
+	serviceID id.ServiceID
+	agent     *storage.Agent
 	err       error
 	calls     int
 	principal id.Principal
 	agentID   id.AgentID
 }
 
-func (v *recordingDelegationVerifier) VerifyUserDelegation(_ context.Context, principal id.Principal, agentID id.AgentID) (ports.UserDelegationStatus, error) {
+func (v *recordingDelegationVerifier) VerifyUserDelegation(_ context.Context, principal id.Principal, agent *storage.Agent) (ports.AuthorizationReadiness, error) {
 	v.calls++
 	v.principal = principal
-	v.agentID = agentID
-	return v.status, v.err
+	v.agentID = agent.ID
+	v.agent = agent
+	return ports.AuthorizationReadiness{Status: v.status, Reason: v.reason, ServiceID: v.serviceID}, v.err
 }
 
 type stubAgentRepository struct {
@@ -165,20 +169,27 @@ func TestImpersonate_RequiresActiveUserDelegation(t *testing.T) {
 		assert.Equal(t, 1, verifier.calls)
 		assert.Equal(t, id.Principal("subject-1"), verifier.principal)
 		assert.Equal(t, target.Agent.ID, verifier.agentID)
+		assert.Same(t, target.Agent, verifier.agent)
 		assert.True(t, issuer.called)
 	})
 
 	for _, tc := range []struct {
 		name   string
 		status ports.UserDelegationStatus
+		reason ports.AuthorizationReadinessReason
 		detail tokenexchange.FailureDetail
 	}{
 		{name: "missing delegation", status: ports.UserDelegationMissing, detail: tokenexchange.DetailGrantMissing},
 		{name: "expired delegation", status: ports.UserDelegationExpired, detail: tokenexchange.DetailGrantExpired},
 		{name: "browser consent required", status: ports.UserDelegationConsentRequired, detail: tokenexchange.DetailConsentRequired},
+		{name: "undeclared permission set", status: ports.UserDelegationConsentRequired, reason: ports.ReadinessPermissionSetUndeclared, detail: tokenexchange.DetailGrantPermissionSetUndeclared},
+		{name: "missing delegated session", status: ports.UserDelegationConsentRequired, reason: ports.ReadinessSessionMissing, detail: tokenexchange.DetailSessionMissing},
+		{name: "expired delegated session", status: ports.UserDelegationConsentRequired, reason: ports.ReadinessSessionExpired, detail: tokenexchange.DetailAccessTokenExpired},
+		{name: "missing mandatory scopes", status: ports.UserDelegationConsentRequired, reason: ports.ReadinessScopeInsufficient, detail: tokenexchange.DetailSessionScopeInsufficient},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			verifier := &recordingDelegationVerifier{status: tc.status}
+			serviceID := id.NewServiceID()
+			verifier := &recordingDelegationVerifier{status: tc.status, reason: tc.reason, serviceID: serviceID}
 			outcome, issuer, target, err := newService(t, verifier, "true")
 			var tokenErr *tokenexchange.TokenExchangeError
 			require.ErrorAs(t, err, &tokenErr)
@@ -187,6 +198,8 @@ func TestImpersonate_RequiresActiveUserDelegation(t *testing.T) {
 			assert.Nil(t, outcome.Response)
 			assert.Equal(t, tokenexchange.StageGrantAuthorization, tokenErr.Diagnostic().Stage())
 			assert.Equal(t, tc.detail, tokenErr.Diagnostic().Detail())
+			assert.Equal(t, serviceID, tokenErr.Service().ID)
+			assert.Equal(t, target.Agent.ID, tokenErr.Authorization().AgentID)
 			assert.Equal(t, tokenexchange.RecoveryReconsent, tokenErr.Diagnostic().RecoveryAction())
 			assert.Equal(t, tokenexchange.TargetConsent, tokenErr.Diagnostic().RecoveryTarget())
 			assert.Equal(t, tokenexchange.ExchangeImpersonation, tokenErr.Diagnostic().ExchangeKind())

@@ -164,6 +164,19 @@ func NewDiagnostic(stage FailureStage, detail FailureDetail) Diagnostic {
 	return d
 }
 
+// ConsentReadinessDiagnostic preserves the failed prerequisite while directing recovery
+// through the agent consent journey rather than the third-party exchange's session flow.
+func ConsentReadinessDiagnostic(detail FailureDetail) Diagnostic {
+	switch detail {
+	case DetailGrantMissing, DetailGrantExpired, DetailGrantPermissionSetUndeclared,
+		DetailSessionMissing, DetailAccessTokenExpired, DetailSessionScopeInsufficient:
+	default:
+		detail = DetailConsentRequired
+	}
+	return Diagnostic{outcome: OutcomeAuthorizationDenied, stage: StageGrantAuthorization,
+		detail: detail, action: RecoveryReconsent, target: TargetConsent, kind: ExchangeImpersonation}
+}
+
 func boundedStage(stage FailureStage) FailureStage {
 	switch stage {
 	case StageRequestValidation, StageExchangeRouting, StageSubjectValidation, StageClientValidation, StageIdentityResolution,

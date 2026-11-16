@@ -248,24 +248,30 @@ func (s *Service) evaluateRule(ctx context.Context, rule *compiledRule, req *Req
 		return res
 	}
 
-	delegationStatus, err := s.delegationVerifier.VerifyUserDelegation(ctx, id.Principal(subjectID), targetAgent.ID)
+	delegationStatus, err := s.delegationVerifier.VerifyUserDelegation(ctx, id.Principal(subjectID), targetAgent)
+	serviceRef := tokenexchange.ServiceRef{ID: delegationStatus.ServiceID}
+	authorizationRef := tokenexchange.AuthorizationRef{AgentID: targetAgent.ID}
 	if err != nil {
-		res.abort = originError(ctx, serverError("user delegation verification failed"), err, tokenexchange.StageGrantAuthorization, tokenexchange.DetailGrantRepositoryUnavailable)
+		detail := tokenexchange.DetailGrantRepositoryUnavailable
+		if delegationStatus.Reason == ports.ReadinessSessionUnavailable {
+			detail = tokenexchange.DetailSessionRepositoryUnavailable
+		}
+		failure := originError(ctx, serverError("user delegation verification failed"), err, tokenexchange.StageGrantAuthorization, detail)
+		res.abort = failure.WithObservation(failure.Diagnostic(), serviceRef, authorizationRef)
 		return res
 	}
-	switch delegationStatus {
+	switch delegationStatus.Status {
 	case ports.UserDelegationActive:
-	case ports.UserDelegationMissing:
-		res.abort = consentRequired(strings.TrimRight(s.consentBaseURL, "/") + "/agents/" + targetAgent.ID.String()).
-			WithDiagnostic(impersonationDiagnostic(tokenexchange.StageGrantAuthorization, tokenexchange.DetailGrantMissing))
-		return res
-	case ports.UserDelegationConsentRequired:
-		res.abort = consentRequired(strings.TrimRight(s.consentBaseURL, "/") + "/agents/" + targetAgent.ID.String()).
-			WithDiagnostic(impersonationDiagnostic(tokenexchange.StageGrantAuthorization, tokenexchange.DetailConsentRequired))
-		return res
-	case ports.UserDelegationExpired:
-		res.abort = consentRequired(strings.TrimRight(s.consentBaseURL, "/") + "/agents/" + targetAgent.ID.String()).
-			WithDiagnostic(impersonationDiagnostic(tokenexchange.StageGrantAuthorization, tokenexchange.DetailGrantExpired))
+	case ports.UserDelegationMissing, ports.UserDelegationExpired, ports.UserDelegationConsentRequired:
+		detail := tokenexchange.FailureDetail(delegationStatus.Reason)
+		switch delegationStatus.Status {
+		case ports.UserDelegationMissing:
+			detail = tokenexchange.DetailGrantMissing
+		case ports.UserDelegationExpired:
+			detail = tokenexchange.DetailGrantExpired
+		}
+		res.abort = consentRequired(strings.TrimRight(s.consentBaseURL, "/")+"/agents/"+targetAgent.ID.String()).
+			WithObservation(tokenexchange.ConsentReadinessDiagnostic(detail), serviceRef, authorizationRef)
 		return res
 	default:
 		res.abort = originError(ctx, serverError("user delegation verification returned an unknown status"), nil, tokenexchange.StageGrantAuthorization, tokenexchange.DetailInternalUnclassified)

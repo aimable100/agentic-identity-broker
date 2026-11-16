@@ -285,9 +285,32 @@ const (
 	UserDelegationConsentRequired UserDelegationStatus = "consent_required"
 )
 
-// UserDelegationVerifier reports whether a principal is ready to authorize an agent.
+// AuthorizationReadinessReason identifies the prerequisite that prevented authorization.
+type AuthorizationReadinessReason string
+
+const (
+	ReadinessGrantMissing            AuthorizationReadinessReason = "grant_missing"
+	ReadinessGrantExpired            AuthorizationReadinessReason = "grant_expired"
+	ReadinessPermissionSetUndeclared AuthorizationReadinessReason = "grant_permission_set_undeclared"
+	ReadinessSessionMissing          AuthorizationReadinessReason = "session_missing"
+	ReadinessSessionExpired          AuthorizationReadinessReason = "access_token_expired"
+	ReadinessScopeInsufficient       AuthorizationReadinessReason = "session_scope_insufficient"
+	ReadinessGrantUnavailable        AuthorizationReadinessReason = "grant_repository_unavailable"
+	ReadinessSessionUnavailable      AuthorizationReadinessReason = "session_repository_unavailable"
+)
+
+// AuthorizationReadiness contains only bounded diagnostics and affected entity IDs.
+// A non-nil error makes Status indeterminate; Reason may identify the failed dependency.
+type AuthorizationReadiness struct {
+	Status          UserDelegationStatus
+	Reason          AuthorizationReadinessReason
+	ServiceID       id.ServiceID
+	PermissionSetID id.PermissionSetID
+}
+
+// UserDelegationVerifier checks readiness using the caller's already-resolved agent.
 // ConsentRequired means an active grant no longer meets browser consent prerequisites.
-// A non-nil error means the status could not be determined and callers must fail closed.
+// A non-nil error means callers must fail closed.
 type UserDelegationVerifier interface {
-	VerifyUserDelegation(ctx context.Context, principal id.Principal, agentID id.AgentID) (UserDelegationStatus, error)
+	VerifyUserDelegation(ctx context.Context, principal id.Principal, agent *storage.Agent) (AuthorizationReadiness, error)
 }
