@@ -50,13 +50,6 @@ Use this map to find the specs to read before you write or change a capability p
 | **Impersonation** | A privileged client obtains a broker token that represents a user or an agent | `037-oauth2-user-impersonation`, `054-agent-subject-impersonation` | `052-inline-jwks-trust-anchors`, `036-canonical-resource-ids` | `054-agent-subject-impersonation` tightens `037`: a signed `sub` equal to the target agent UUID is rejected on a human-only rule. | Yes. Some scenarios need Docker. |
 | **Trust anchors** | Supply the public keys that the broker trusts, from a URL, inline, or a file | `052-inline-jwks-trust-anchors` | `013-token-exchange`, `016-jwt-preauth`, `037-oauth2-user-impersonation`, `adrs/040-trust-anchor-local-key-sets.md` | None found | Yes |
 
-### For gateway operators
-
-| Capability | The job | Primary specs | Also read | Outdated parts | Evidence today |
-|---|---|---|---|---|---|
-| **Gateway token exchange** | The gateway filter replaces the caller's token with the right third-party token on each request | `015-extproc-token-exchange`, `043-extproc-metadata-input`, `023-extproc-mcp-elicitation` | `013-token-exchange`, `adrs/012-extproc-in-memory-token-cache.md` | `015` FR-002 to FR-004, FR-009, and FR-013 (header input, pass-through) are replaced by `043`. `015` stays current for cache and circuit breaker. | No. The ExtProc suite does not record evidence. |
-| **Gateway policy authorization** | Allow or deny a request, such as one MCP tool call, with an OPA policy | `020-extproc-opa-authorization`, `044-extproc-opa-mcp-target-server` | `026-extproc-approval-sync`, `019-permission-sets` | `020` FR-016 is replaced by `026` for `approval_required`. `ciba_required` is still denied. | No |
-
 ### For platform operators
 
 | Capability | The job | Primary specs | Also read | Outdated parts | Evidence today |
@@ -65,6 +58,8 @@ Use this map to find the specs to read before you write or change a capability p
 | **Deployment** | Run the two servers in a container and on Kubernetes | `003-dual-port-server`, `010-docker-setup`, `014-helm-charts` | `053-session-auto-refresh` (CronJob) | The single image of `010` is replaced by separate runtime and migration images in `014`. | No. Covered by `tests/integration/` and Helm tests. |
 | **Storage and encryption at rest** | Choose a storage backend and keep stored provider tokens encrypted | `004-persistence-layer`, `012-aws-encryption-vault` | `055-agent-external-id-upsert` (migration runbook) | The configuration section of `012` is replaced by the shipped `encryption.aws_kms` and `encryption.memory` contract. | Partly. Encryption scenarios are in the backend suite, but they assert stored data, not HTTP. |
 | **Observability and audit** | Follow a request through traces, metrics, logs, and audit records | `017-opentelemetry-support`, `027-extproc-otel`, `033-request-security-context` | `053-session-auto-refresh` (metrics) | None found | No. The evidence is telemetry, not HTTP exchanges. |
+| **Gateway token exchange** | The gateway filter replaces the caller's token with the right third-party token on each request | `015-extproc-token-exchange`, `043-extproc-metadata-input`, `023-extproc-mcp-elicitation` | `013-token-exchange`, `adrs/012-extproc-in-memory-token-cache.md` | `015` FR-002 to FR-004, FR-009, and FR-013 (header input, pass-through) are replaced by `043`. `015` stays current for cache and circuit breaker. | No. The ExtProc suite does not record evidence. |
+| **Gateway policy authorization** | Allow or deny a request, such as one MCP tool call, with an OPA policy | `020-extproc-opa-authorization`, `044-extproc-opa-mcp-target-server` | `026-extproc-approval-sync`, `019-permission-sets` | `020` FR-016 is replaced by `026` for `approval_required`. `ciba_required` is still denied. | No |
 
 ### Not a capability
 
@@ -148,7 +143,7 @@ The order puts capabilities first that the recorder can already check and that m
    from the browser suite before a page can show the screens.
 10. **Gateway token exchange** and **Gateway policy authorization**: these need evidence from the
     ExtProc suite.
-11. The platform-operator capabilities: these need evidence types other than HTTP exchanges.
+11. The other platform-operator capabilities: these need evidence types other than HTTP exchanges.
 
 ## Findings
 
