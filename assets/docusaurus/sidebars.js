@@ -55,6 +55,11 @@ const sidebars = {
     },
     {
       type: 'category',
+      label: 'Specification',
+      items: ['living/agent-registration'],
+    },
+    {
+      type: 'category',
       label: 'Reference',
       items: [
         'reference/index',
@@ -71,11 +76,6 @@ const sidebars = {
         },
         'reference/token-exchange',
         'configuration',
-        {
-          type: 'category',
-          label: 'Living specification',
-          items: ['living/agent-registration'],
-        },
       ],
     },
     {
