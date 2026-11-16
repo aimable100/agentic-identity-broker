@@ -1072,7 +1072,7 @@ var _ = Describe("RFC 8693 Token Exchange E2E Tests", func() {
 			Expect(refreshForm.Get("refresh_token")).To(Equal("replacement-github-refresh"))
 		},
 			Entry("missing session", example("token-exchange.session.recovery"), false),
-			Entry("rejected existing session", true),
+			Entry("rejected existing session", example("token-exchange.session.recovery-after-rejection"), true),
 		)
 
 		// Spec Reference: US5-S4 from specs/013-token-exchange/spec.md
