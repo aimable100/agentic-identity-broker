@@ -2,7 +2,7 @@
   "version": 1,
   "cursors": {
     "labelling_after": null,
-    "investigation_after": 356
+    "investigation_after": 418
   },
   "issues": [
     {
@@ -127,9 +127,9 @@
     },
     {
       "number": 418,
-      "state": "commented",
+      "state": "awaiting_clarification",
       "updated_at": "2026-11-16",
-      "note": "Author PR #488 merged Nov 15; current checkout predates it. Verify merged source and remaining acceptance before recommending closure; no duplicate implementation or repeat comment."
+      "note": "Verified #488 covers six audit families on release/v0.2; focused uncached race tests pass in five packages. Main still lacks events. Asked closure-on-release vs propagation-to-main; no duplicate fix."
     },
     {
       "number": 430,
@@ -235,7 +235,7 @@
       "branch": "repo-assist/fix-issue-367-authorization-readiness-17a1d83b98b8ce0c",
       "status": "blocked",
       "updated_at": "2026-11-16",
-      "note": "161f3b62 review fixes submitted: diagnostics/logging, resolved-agent reuse, consent table tests, ADR048. check/build/test/race/focused E2E pass; verify timed out at govulncheck. Main/ADR045+046 integration still blocked by prior oversized merge; do not retry."
+      "note": "Review fixes published at live head 71c02faa (squashed from submitted 161f3b62). Still dirty; external pipeline cannot start: no accountable user. DCO passes; classification missing. Main/ADR045+046 merge remains size-blocked; no repeat push."
     },
     {
       "issue": 212,
@@ -328,37 +328,37 @@
     {
       "area": "repo_assist_prs",
       "checked_at": "2026-11-16",
-      "result": "Read all nine live Repo Assist PRs, comments and review threads. Heads unchanged; eight drafts and non-draft #424. #403/#432 dirty and publication-size blocked; no new revision request or repeat push/comment.",
-      "follow_up": "Maintainer recovery/classifications; #490 exact-contract approval, closing-footer removal and authorized external pipeline start."
+      "result": "Read all nine live Repo Assist PR details, comments, reviews and threads. #403 review fixes now published at 71c02faa; main integration still dirty. #432 unchanged and dirty. Eight drafts and non-draft #424. No duplicate push/comment.",
+      "follow_up": "Maintainer size-blocked integrations/classifications; #403/#490 authorized external pipeline start; #490 exact-contract approval and closing-footer removal."
     },
     {
       "area": "ci",
       "checked_at": "2026-11-16",
-      "result": "Read both checks and statuses for nine PRs. Older eight DCO/pipelines/test stages pass; classifications fail #403/#420/#448. #490 CodeQL/CI gate pass, build/tests skipped and external pipeline-start failure persists.",
-      "follow_up": "No full-green claim; unavailable classification writes and external pipeline start remain maintainer actions."
+      "result": "Both checks and statuses read for all nine PRs: seven external pipelines/test stages pass; #403 and #490 cannot start due to accountable-user association. DCO passes where present; classification failures #403/#420/#448. #488 checks and statuses pass.",
+      "follow_up": "No code change for infrastructure-only pipeline failures; retain existing comments and monthly actions."
     },
     {
       "area": "hygiene",
       "checked_at": "2026-11-16",
-      "result": "All 66 open issues and all open PRs labelled; Task 1 fell back to Task 2. Monthly checklist/comments and outstanding issue-comment threads show no new acknowledgements/check-offs. #367 historical request already covered by #403.",
+      "result": "All 66 open issues labelled. Inspected unlabelled #493 body and submitted documentation label. Other open PRs labelled. No monthly maintainer comments/check-offs beyond recorded completions.",
       "follow_up": null
     },
     {
       "area": "tests",
       "checked_at": "2026-11-16",
-      "result": "Uncached race-enabled just test package override passed TestPrincipal* in telemetry and ID, plus HTTP signal export/path regressions and gRPC provider initialization. Existing behavior only; no span-policy implementation, full gate, build or E2E claimed.",
+      "result": "On release/v0.2 at 3b3c0b85, just test with explicit package/name override and -count=1 passed focused CIMD audit regressions under race detection in five owning packages. No local full gate/build/E2E run; returned to original main checkout clean.",
       "follow_up": null
     },
     {
       "area": "code",
       "checked_at": "2026-11-16",
-      "result": "Resumed after #354; investigated untouched #356. #340 complete via #363; provider branches converge at buildTracerProvider but no exporter policy or SpanAttribute. Posted shared-policy and non-identity batch/isolation acceptance plan. Repository source unchanged.",
-      "follow_up": "Resume after #356; skip #357 already investigated and active fixes. #431 is assigned and dependency migration needs coordination; verify merged #488 acceptance for #418."
+      "result": "Resumed after #356; skipped prior investigations, assigned migration and active fixes. Verified merged #488 patch and release source against all six #418 audit families/tests. Main lacks events; asked whether closure targets release or propagation. No source edits.",
+      "follow_up": "Resume after #418; do not duplicate merged release-branch implementation."
     },
     {
       "area": "release",
       "checked_at": "2026-11-16",
-      "result": "Latest release v0.1.146 includes Go 1.27.4 security remediation #486. Investigation-only maintenance warrants no release PR.",
+      "result": "Latest release remains v0.1.146. #488 merged into release/v0.2, not main; investigation and triage do not warrant a release PR, and scheduled maintenance-only cap prohibits new PRs.",
       "follow_up": null
     }
   ],
@@ -380,8 +380,8 @@
     },
     {
       "task": 2,
-      "item": "Resume investigation after #356",
-      "note": "Skip previously investigated #357 and active fixes; verify merged #488 acceptance for #418. Retain #356 shared principal exporter policy, #352 dual-name gauge and #354 complete storage-span coverage as maintenance-only fix candidates. Preserve machine/tag gates."
+      "item": "Resume investigation after #418",
+      "note": "Await #418 closure target: #488 fixes release/v0.2, not main. Skip prior investigations and active fixes; #431 is assigned. Retain #356 principal exporter policy, #352 dual-name gauge and #354 complete storage spans as capacity-deferred candidates."
     },
     {
       "task": 3,
