@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const MARKER = /^example:([A-Za-z0-9._-]+)$/;
-const BINDING = /livingdoc\.Example\("([^"]+)"\)/g;
+const BINDING = /(?:\bexample\(|livingdoc\.Example\(|evidence\.ForTest\(\s*\w+\s*,\s*)"([^"]+)"\)/g;
 const EXAMPLE_ATTR = /\bexample="([^"]+)"/;
 const STATUS_LINE = /^HTTP\/\d(?:\.\d)? (\d{3})\s*(.*)$/;
 const REQUEST_LINE = /^([A-Z]+) (\S+)(?: HTTP\/\d(?:\.\d)?)?$/;
@@ -70,7 +70,7 @@ export function parseExchange(text) {
 
 const attribute = (name, value) => ({type: 'mdxJsxAttribute', name, value});
 
-export default function livingDocs({repoRoot, testsDir = 'tests/e2e', statusFile, sourceUrl}) {
+export default function livingDocs({repoRoot, testsDir = 'tests', statusFile, sourceUrl}) {
   return (tree) => {
     const bindings = findBindings(repoRoot, testsDir);
     const status = statusFile && fs.existsSync(statusFile) ? JSON.parse(fs.readFileSync(statusFile, 'utf8')) : {};

@@ -34,8 +34,8 @@ Read the governing feature's `spec.md`, `plan.md`, and `tasks.md` under `specs/`
 
 ## Living Documentation Examples
 
-A scenario with `livingdoc.Example("<id>")` is the evidence for an example on a page under `docs/specification/`.
-`tools/livingdoc` compares the page with the HTTP exchanges that the scenario performs.
+A scenario with the decorator `example("<id>")` is the evidence for an example on a page under `docs/specification/`.
+`tools/livingdoc` compares the page with the outcome of the scenario and, in the backend suite, with its HTTP exchanges.
 If you change such a scenario or the behavior it covers, run `just living-docs` and update the page in the same change.
 Read `.agents/skills/living-docs/SKILL.md` first. Do not remove or rename an example without the page.
 

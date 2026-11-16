@@ -23,7 +23,6 @@ import (
 	"github.com/agentic-identity-broker/agentic-identity-broker/tests/e2e/bootstrap"
 	"github.com/agentic-identity-broker/agentic-identity-broker/tests/e2e/fixtures"
 	"github.com/agentic-identity-broker/agentic-identity-broker/tests/e2e/helpers"
-	"github.com/agentic-identity-broker/agentic-identity-broker/tests/e2e/livingdoc"
 )
 
 var _ = Describe("Admin agent create-or-update by external ID", func() {
@@ -128,7 +127,7 @@ var _ = Describe("Admin agent create-or-update by external ID", func() {
 
 	Context("US1: reconcile an agent in one retry-safe call", func() {
 		// Scenario US1.1 from specs/055-agent-external-id-upsert/spec.md
-		It("should create the agent with 201 and a UUID Location when no agent holds the external ID", livingdoc.Example("agent-registration.reconcile.create"), func() {
+		It("should create the agent with 201 and a UUID Location when no agent holds the external ID", example("agent-registration.reconcile.create"), func() {
 			resp, err := helpers.ReconcileAgent(server, principal, selector, definition, "")
 			Expect(err).To(Succeed())
 			body := readObject(resp, http.StatusCreated)
@@ -143,7 +142,7 @@ var _ = Describe("Admin agent create-or-update by external ID", func() {
 		})
 
 		// Scenario US1.2 from specs/055-agent-external-id-upsert/spec.md
-		It("should return 200 with an unchanged representation and timestamps on replay", Label("docker"), livingdoc.Example("agent-registration.reconcile.replay"), func() {
+		It("should return 200 with an unchanged representation and timestamps on replay", Label("docker"), example("agent-registration.reconcile.replay"), func() {
 			for _, backend := range []string{"memory", "postgres"} {
 				withExternalIDBackend(backend, func(s *bootstrap.TestServer, st *storageadapter.Adapter) {
 					definition["client_uris"] = []string{"https://agent.example/z.json", "https://agent.example/a.json"}
@@ -173,7 +172,7 @@ var _ = Describe("Admin agent create-or-update by external ID", func() {
 		})
 
 		// Scenario US1.3 from specs/055-agent-external-id-upsert/spec.md
-		It("should update the same agent and preserve its identity and creation time when the definition changes", Label("docker"), livingdoc.Example("agent-registration.reconcile.update"), func() {
+		It("should update the same agent and preserve its identity and creation time when the definition changes", Label("docker"), example("agent-registration.reconcile.update"), func() {
 			for _, backend := range []string{"memory", "postgres"} {
 				withExternalIDBackend(backend, func(s *bootstrap.TestServer, st *storageadapter.Adapter) {
 					definition["display_name"] = "Research Assistant"
@@ -224,7 +223,7 @@ var _ = Describe("Admin agent create-or-update by external ID", func() {
 		})
 
 		// Scenario US1.4 from specs/055-agent-external-id-upsert/spec.md
-		It("should create exactly one agent when two PostgreSQL brokers race on the first call", Label("docker"), livingdoc.Example("agent-registration.reconcile.concurrent-first-call"), func() {
+		It("should create exactly one agent when two PostgreSQL brokers race on the first call", Label("docker"), example("agent-registration.reconcile.concurrent-first-call"), func() {
 			withExternalIDPostgresBrokers(func(first, second *bootstrap.TestServer, st *storageadapter.Adapter) {
 				for _, calls := range []int{2, 10} {
 					key := id.ExternalID(id.NewAgentID().String())
@@ -303,7 +302,7 @@ var _ = Describe("Admin agent create-or-update by external ID", func() {
 			})
 
 			// Scenario US1.5 from specs/055-agent-external-id-upsert/spec.md
-			It("should preserve identities and clear metadata and collections when optional fields are omitted", livingdoc.Example("agent-registration.reconcile.full-replacement"), func() {
+			It("should preserve identities and clear metadata and collections when optional fields are omitted", example("agent-registration.reconcile.full-replacement"), func() {
 				before := selected.Copy()
 				body := put(definition, http.StatusOK)
 				actual := stored(selected.ID)
@@ -377,7 +376,7 @@ var _ = Describe("Admin agent create-or-update by external ID", func() {
 		})
 
 		// Scenario US2.1 from specs/055-agent-external-id-upsert/spec.md
-		It("should reject POST with an external ID held by another agent", livingdoc.Example("agent-registration.external-id.unique"), func() {
+		It("should reject POST with an external ID held by another agent", example("agent-registration.external-id.unique"), func() {
 			before := stored(selected.ID)
 			definition["external_id"] = selector
 			body := write(http.MethodPost, "/api/agents", definition, http.StatusConflict)
@@ -429,7 +428,7 @@ var _ = Describe("Admin agent create-or-update by external ID", func() {
 		})
 
 		// Scenario US2.5 from specs/055-agent-external-id-upsert/spec.md
-		It("should reject a body external ID that differs from, empties, or nulls the selector", livingdoc.Example("agent-registration.reconcile.selector-mismatch"), func() {
+		It("should reject a body external ID that differs from, empties, or nulls the selector", example("agent-registration.reconcile.selector-mismatch"), func() {
 			beforeSelected, beforeOther := stored(selected.ID), stored(other.ID)
 			for _, bodyID := range []any{*other.ExternalID, "", nil} {
 				definition["external_id"] = bodyID
@@ -698,7 +697,7 @@ var _ = Describe("Admin agent create-or-update by external ID", func() {
 		BeforeEach(seedSelected)
 
 		// Scenario US4.1 from specs/055-agent-external-id-upsert/spec.md
-		It("should return an empty or one-element array for a valid filter", livingdoc.Example("agent-registration.external-id.lookup"), func() {
+		It("should return an empty or one-element array for a valid filter", example("agent-registration.external-id.lookup"), func() {
 			before := stored(selected.ID)
 			Expect(readList(filterPath(selector))).To(ConsistOf(HaveKeyWithValue("id", selected.ID.String())))
 			for _, value := range []id.ExternalID{"urn:example:missing", id.ExternalID(strings.ToUpper(string(selector))), id.ExternalID(" " + string(selector)), id.ExternalID(selected.ID.String()), id.ExternalID(*selected.CanonicalID)} {

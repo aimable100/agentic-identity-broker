@@ -7,6 +7,7 @@ import (
 	"github.com/agentic-identity-broker/agentic-identity-broker/tests/e2e/bootstrap"
 	"github.com/agentic-identity-broker/agentic-identity-broker/tests/e2e/helpers"
 	"github.com/agentic-identity-broker/agentic-identity-broker/tests/e2e/livingdoc"
+	"github.com/agentic-identity-broker/agentic-identity-broker/tools/livingdoc/evidence"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -15,7 +16,13 @@ const e2eUpstreamBaseURLEnv = "E2E_UPSTREAM_BASE_URL"
 
 var suiteUpstream *helpers.MockUpstreamOAuth2Server
 
-var _ = livingdoc.Record()
+var _ = livingdoc.Record(func(record func(evidence.Exchange)) {
+	bootstrap.ObserveHTTPExchanges(func(observed bootstrap.ObservedExchange) {
+		record(livingdoc.HTTPExchange(observed.Request, observed.RequestBody, observed.Response, observed.ResponseBody))
+	})
+})
+
+func example(id string) Labels { return livingdoc.Example(id) }
 
 func TestE2E(t *testing.T) {
 	RegisterFailHandler(Fail)

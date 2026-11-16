@@ -65,18 +65,19 @@ func checkClaim(claim Claim, records []evidence.Record) Result {
 	closest := ""
 	for _, exchange := range exchanges {
 		got := canonicalRecorded(exchange, claim.Exchange)
-		if got == want {
+		wantText, gotText := align(want, got)
+		if wantText == gotText {
 			return Result{Claim: claim, Verdict: verdictPassed}
 		}
-		if closest == "" && firstLine(got) == firstLine(want) {
-			closest = got
+		if closest == "" && firstLine(gotText) == firstLine(wantText) {
+			closest = diff(wantText, gotText)
 		}
 	}
 	if closest == "" {
 		return Result{Claim: claim, Verdict: verdictStale,
 			Detail: fmt.Sprintf("no recorded exchange for %s %s", claim.Exchange.Method, claim.Exchange.Target)}
 	}
-	return Result{Claim: claim, Verdict: verdictStale, Detail: diff(want, closest)}
+	return Result{Claim: claim, Verdict: verdictStale, Detail: closest}
 }
 
 func undocumented(claims []Claim, records []evidence.Record) []string {
@@ -125,11 +126,15 @@ func status(results []Result) map[string]string {
 	return worst
 }
 
+const ellipsis = "…"
+
 func canonicalDoc(doc *DocExchange) string {
-	return canonical(doc.Method, doc.Target, doc.RequestHeader, doc.RequestBody, doc.Status, doc.ResponseHeader, doc.ResponseBody)
+	return canonical(doc.Method, doc.Target, doc.RequestHeader, canonicalBody(doc.RequestBody, ""),
+		doc.Status, doc.ResponseHeader, canonicalBody(doc.ResponseBody, ""))
 }
 
-// canonicalRecorded renders a recorded exchange with only the headers the page shows.
+// canonicalRecorded renders a recorded exchange with only the headers and,
+// where the page elides object members, only the members that the page shows.
 func canonicalRecorded(recorded evidence.Exchange, doc *DocExchange) string {
 	pick := func(shown []Header, actual http.Header) []Header {
 		picked := make([]Header, 0, len(shown))
@@ -138,18 +143,57 @@ func canonicalRecorded(recorded evidence.Exchange, doc *DocExchange) string {
 		}
 		return picked
 	}
-	return canonical(recorded.Method, recorded.Target, pick(doc.RequestHeader, recorded.RequestHeader), recorded.RequestBody,
-		recorded.Status, pick(doc.ResponseHeader, recorded.ResponseHeader), recorded.ResponseBody)
+	return canonical(recorded.Method, recorded.Target, pick(doc.RequestHeader, recorded.RequestHeader),
+		canonicalBody(recorded.RequestBody, doc.RequestBody), recorded.Status,
+		pick(doc.ResponseHeader, recorded.ResponseHeader), canonicalBody(recorded.ResponseBody, doc.ResponseBody))
 }
 
 func canonical(method, target string, requestHeader []Header, requestBody string, status int, responseHeader []Header, responseBody string) string {
 	var out strings.Builder
 	fmt.Fprintf(&out, "%s %s\n", method, target)
 	writeHeaders(&out, requestHeader)
-	fmt.Fprintf(&out, "\n%s\n\nHTTP %d\n", canonicalBody(requestBody), status)
+	fmt.Fprintf(&out, "\n%s\n\nHTTP %d\n", requestBody, status)
 	writeHeaders(&out, responseHeader)
-	fmt.Fprintf(&out, "\n%s\n", canonicalBody(responseBody))
-	return placeholders(out.String())
+	fmt.Fprintf(&out, "\n%s\n", responseBody)
+	return out.String()
+}
+
+// align applies the page's ellipses and then replaces volatile values on both
+// sides. A page line with an ellipsis matches any recorded line that agrees
+// with its literal text; such a recorded line is replaced by the page line.
+// UUIDs on a line with an ellipsis compare by shape only.
+func align(want, got string) (string, string) {
+	wantLines, gotLines := strings.Split(want, "\n"), strings.Split(got, "\n")
+	for i := 0; i < len(wantLines) && i < len(gotLines); i++ {
+		if strings.Contains(wantLines[i], ellipsis) && linePattern(wantLines[i]).MatchString(gotLines[i]) {
+			wantLines[i] = volatile.ReplaceAllString(wantLines[i], "<volatile>")
+			gotLines[i] = wantLines[i]
+		}
+	}
+	return placeholders(strings.Join(wantLines, "\n")), placeholders(strings.Join(gotLines, "\n"))
+}
+
+func linePattern(line string) *regexp.Regexp {
+	var pattern strings.Builder
+	pattern.WriteString("^")
+	for i, part := range strings.Split(line, ellipsis) {
+		if i > 0 {
+			pattern.WriteString(".+")
+		}
+		rest := part
+		for {
+			loc := volatile.FindStringIndex(rest)
+			if loc == nil {
+				break
+			}
+			pattern.WriteString(regexp.QuoteMeta(rest[:loc[0]]))
+			pattern.WriteString("(?:" + volatile.String() + ")")
+			rest = rest[loc[1]:]
+		}
+		pattern.WriteString(regexp.QuoteMeta(rest))
+	}
+	pattern.WriteString("$")
+	return regexp.MustCompile(pattern.String())
 }
 
 func writeHeaders(out *strings.Builder, headers []Header) {
@@ -161,11 +205,26 @@ func writeHeaders(out *strings.Builder, headers []Header) {
 	}
 }
 
-func canonicalBody(body string) string {
+var formBody = regexp.MustCompile(`^[^\s=&{}\[\]"]+=[^\s&]*(?:[&\s]+[^\s=&]+=[^\s&]*)*$`)
+
+// canonicalBody renders a body for comparison. JSON is re-encoded with sorted
+// keys, and a form body becomes one sorted parameter per line. When shown is
+// the page's version of a recorded JSON body, members that the page elides
+// with an ellipsis member are removed.
+func canonicalBody(body, shown string) string {
 	body = strings.TrimSpace(body)
 	var decoded any
 	if json.Unmarshal([]byte(body), &decoded) != nil {
+		if formBody.MatchString(body) {
+			parameters := strings.FieldsFunc(body, func(r rune) bool { return r == '&' || r == '\n' || r == ' ' || r == '\t' || r == '\r' })
+			sort.Strings(parameters)
+			return strings.Join(parameters, "\n")
+		}
 		return body
+	}
+	var shownDecoded any
+	if shown != "" && json.Unmarshal([]byte(shown), &shownDecoded) == nil {
+		decoded = elide(shownDecoded, decoded)
 	}
 	var out bytes.Buffer
 	encoder := json.NewEncoder(&out)
@@ -175,6 +234,45 @@ func canonicalBody(body string) string {
 		return body
 	}
 	return strings.TrimSpace(out.String())
+}
+
+func elide(shown, recorded any) any {
+	switch shownValue := shown.(type) {
+	case map[string]any:
+		recordedValue, ok := recorded.(map[string]any)
+		if !ok {
+			return recorded
+		}
+		marker, elided := shownValue[ellipsis]
+		reduced := map[string]any{}
+		for key, value := range recordedValue {
+			shownMember, isShown := shownValue[key]
+			if elided && !isShown {
+				continue
+			}
+			reduced[key] = elide(shownMember, value)
+		}
+		if elided {
+			reduced[ellipsis] = marker
+		}
+		return reduced
+	case []any:
+		recordedValue, ok := recorded.([]any)
+		if !ok {
+			return recorded
+		}
+		reduced := make([]any, len(recordedValue))
+		for i, value := range recordedValue {
+			if i < len(shownValue) {
+				reduced[i] = elide(shownValue[i], value)
+			} else {
+				reduced[i] = value
+			}
+		}
+		return reduced
+	default:
+		return recorded
+	}
 }
 
 var volatile = regexp.MustCompile(

@@ -161,3 +161,65 @@ func TestStatus_ReportsWorstVerdictPerExample(t *testing.T) {
 		}
 	}
 }
+
+func checkOne(t *testing.T, block string, exchange evidence.Exchange) Result {
+	t.Helper()
+	claims, err := parsePage("p.md", "```http example=\"x\"\n"+block+"\n```\n")
+	if err != nil {
+		t.Fatalf("parsePage: %v", err)
+	}
+	results := check(claims, []evidence.Record{{Example: "x", State: evidence.StatePassed, Exchanges: []evidence.Exchange{exchange}}})
+	return results[0]
+}
+
+func TestCheck_EllipsisMatchesAnyTextOnItsLine(t *testing.T) {
+	exchange := evidence.Exchange{
+		Method: "GET", Target: "/oauth2/authorize?client_id=0b9f4c0e-51c1-4d0b-9a55-7f2f6f0f3c11&state=abc", Status: 302,
+		ResponseHeader: map[string][]string{"Location": {"https://broker.example/agents/0b9f4c0e-51c1-4d0b-9a55-7f2f6f0f3c11?session_token=eyJhbGciOi.x.y"}},
+		ResponseBody:   `{"access_token":"eyJhbGciOi.payload.sig","token_type":"Bearer","agent":"0b9f4c0e-51c1-4d0b-9a55-7f2f6f0f3c11"}`,
+	}
+	block := "GET /oauth2/authorize?client_id=550e8400-e29b-41d4-a716-446655440000&state=abc HTTP/1.1\n\n" +
+		"HTTP/1.1 302 Found\nLocation: https://broker.example/agents/550e8400-e29b-41d4-a716-446655440000?session_token=…\n\n" +
+		`{"access_token": "…", "token_type": "Bearer", "agent": "550e8400-e29b-41d4-a716-446655440000"}`
+	if got := checkOne(t, block, exchange); got.Verdict != verdictPassed {
+		t.Fatalf("got %q\n%s", got.Verdict, got.Detail)
+	}
+	wrong := strings.Replace(block, `"Bearer"`, `"DPoP"`, 1)
+	if got := checkOne(t, wrong, exchange); got.Verdict != verdictStale {
+		t.Fatalf("a wrong literal next to an ellipsis must be stale, got %q", got.Verdict)
+	}
+}
+
+func TestCheck_EllipsisMemberElidesOtherObjectMembers(t *testing.T) {
+	exchange := evidence.Exchange{
+		Method: "GET", Target: "/api/services/1", Status: 200,
+		ResponseBody: `{"id":"1","name":"GitHub","scopes":[{"name":"repo","description":"d"}],"issuer_uri":"https://github.example"}`,
+	}
+	block := "GET /api/services/1 HTTP/1.1\n\nHTTP/1.1 200 OK\n\n" +
+		`{"name": "GitHub", "scopes": [{"name": "repo", "…": "…"}], "…": "…"}`
+	if got := checkOne(t, block, exchange); got.Verdict != verdictPassed {
+		t.Fatalf("got %q\n%s", got.Verdict, got.Detail)
+	}
+	missing := strings.Replace(block, `"name": "GitHub"`, `"name": "GitHub", "flavor": "x"`, 1)
+	if got := checkOne(t, missing, exchange); got.Verdict != verdictStale {
+		t.Fatalf("a shown member that was not recorded must be stale, got %q", got.Verdict)
+	}
+	full := "GET /api/services/1 HTTP/1.1\n\nHTTP/1.1 200 OK\n\n" + `{"name": "GitHub"}`
+	if got := checkOne(t, full, exchange); got.Verdict != verdictStale {
+		t.Fatalf("without an ellipsis member the body must match completely, got %q", got.Verdict)
+	}
+}
+
+func TestCheck_FormBodyComparesParametersInAnyLayout(t *testing.T) {
+	exchange := evidence.Exchange{
+		Method: "POST", Target: "/oauth2/token", Status: 400,
+		RequestBody:  "grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Atoken-exchange&resource=https%3A%2F%2Fapi.example&subject_token=eyJ.a.b",
+		ResponseBody: `{"error":"invalid_grant"}`,
+	}
+	block := "POST /oauth2/token HTTP/1.1\n\n" +
+		"subject_token=…\n&grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Atoken-exchange\n&resource=https%3A%2F%2Fapi.example\n\n" +
+		"HTTP/1.1 400 Bad Request\n\n" + `{"error": "invalid_grant"}`
+	if got := checkOne(t, block, exchange); got.Verdict != verdictPassed {
+		t.Fatalf("got %q\n%s", got.Verdict, got.Detail)
+	}
+}

@@ -10,7 +10,9 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
+	"testing"
 )
 
 const (
@@ -81,4 +83,36 @@ func ReadDir(dir string) ([]Record, error) {
 		return records[i].Spec < records[j].Spec
 	})
 	return records, nil
+}
+
+// EvidenceDirEnv names the directory that receives evidence. Recording is off when it is unset.
+const EvidenceDirEnv = "LIVING_DOCS_EVIDENCE_DIR"
+
+// ForTest marks a Go test as the evidence for the example that pages cite as id.
+// It records the outcome when the test ends.
+func ForTest(t testing.TB, id string) {
+	t.Helper()
+	dir := os.Getenv(EvidenceDirEnv)
+	if dir == "" {
+		return
+	}
+	_, file, line, _ := runtime.Caller(1)
+	if cwd, err := os.Getwd(); err == nil {
+		if relative, err := filepath.Rel(cwd, file); err == nil {
+			file = relative
+		}
+	}
+	t.Cleanup(func() {
+		state := StatePassed
+		switch {
+		case t.Failed():
+			state = StateFailed
+		case t.Skipped():
+			state = StateSkipped
+		}
+		record := Record{Example: id, Spec: t.Name(), Location: fmt.Sprintf("%s:%d", filepath.ToSlash(file), line), State: state}
+		if err := Write(dir, record); err != nil {
+			t.Errorf("living documentation evidence not written: %v", err)
+		}
+	})
 }

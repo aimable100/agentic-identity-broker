@@ -107,18 +107,35 @@ test-e2e-performance:
     @echo "Running backend E2E performance measurement..."
     @if command -v ginkgo > /dev/null; then ginkgo -v --procs=1 --label-filter="performance" ./tests/e2e/; else echo "Error: ginkgo is not installed. Install it with: go install github.com/onsi/ginkgo/v2/ginkgo@latest"; exit 1; fi
 
-# Check the living documentation in docs/specification/ against the acceptance scenarios bound to its examples.
-# Docker-backed examples report "not run"; pass "-strict" where Docker is available to require them.
-living-docs *flags:
+# Check the living documentation in docs/specification/ against the tests bound to its examples.
+# Flags: "-strict" also requires Docker-backed examples. "-browser" also runs the browser suite (needs Playwright).
+living-docs *flags: web-build
     #!/usr/bin/env bash
-    set -euo pipefail
+    set -uo pipefail
     command -v ginkgo > /dev/null || { echo "Error: ginkgo is not installed. Run: just install-tools" >&2; exit 1; }
     out="{{justfile_directory()}}/test-results/living-docs"
     rm -rf "$out" && mkdir -p "$out/evidence"
-    filter='/^example:/'
+    export LIVING_DOCS_EVIDENCE_DIR="$out/evidence"
+    filter='/^example:/' browser=false checker_flags=()
+    for flag in {{flags}}; do
+        case "$flag" in
+            -browser) browser=true ;;
+            *) checker_flags+=("$flag") ;;
+        esac
+    done
     case " {{flags}} " in *" -strict "*) ;; *) filter="$filter && !docker" ;; esac
-    LIVING_DOCS_EVIDENCE_DIR="$out/evidence" ginkgo --succinct --procs={{GINKGO_BACKEND_PROCS}} --label-filter="$filter" ./tests/e2e/
-    go run ./tools/livingdoc -evidence "$out/evidence" -report "$out/report.md" -status "$out/status.json" {{flags}} docs/specification/*.md
+    failed=0
+    ginkgo --succinct --procs={{GINKGO_BACKEND_PROCS}} --label-filter="$filter" ./tests/e2e/ || failed=1
+    ginkgo --succinct --procs={{GINKGO_EXTPROC_PROCS}} --label-filter="$filter" ./tests/e2e/extproc/ || failed=1
+    if [ "$browser" = true ]; then
+        E2E_FRONTEND_MODE=built ginkgo --succinct --procs={{GINKGO_FRONTEND_PROCS}} --output-interceptor-mode=none --label-filter="$filter" ./tests/e2e/frontend/ || failed=1
+    fi
+    packages=$(grep -rl --include='*_test.go' 'evidence\.ForTest(' tests/integration internal cmd 2>/dev/null | xargs -r -n1 dirname | sort -u | sed 's#^#./#')
+    if [ -n "$packages" ]; then
+        go test $packages > "$out/go-test.log" 2>&1 || { failed=1; tail -n 30 "$out/go-test.log"; }
+    fi
+    go run ./tools/livingdoc -evidence "$out/evidence" -report "$out/report.md" -status "$out/status.json" "${checker_flags[@]}" docs/specification/*.md || failed=1
+    exit $failed
 
 # Run the backend E2E acceptance suite with coverage report
 test-e2e-backend-coverage: web-build

@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import livingDocs, {parseExchange} from './living-docs.mjs';
+import livingDocs, {findBindings, parseExchange} from './living-docs.mjs';
 
 test('parseExchange splits request and response and joins wrapped targets', () => {
   const exchange = parseExchange(
@@ -30,7 +30,12 @@ test('plugin replaces markers and example blocks, and leaves other code alone', 
   fs.mkdirSync(path.join(repoRoot, 'tests/e2e'), {recursive: true});
   fs.writeFileSync(
     path.join(repoRoot, 'tests/e2e/agents_test.go'),
-    'package e2e_test\n\nIt("creates", livingdoc.Example("agents.create"), func() {})\n',
+    'package e2e_test\n\nIt("creates", example("agents.create"), func() {})\n',
+  );
+  fs.mkdirSync(path.join(repoRoot, 'tests/integration'), {recursive: true});
+  fs.writeFileSync(
+    path.join(repoRoot, 'tests/integration/config_test.go'),
+    'package integration\n\nfunc TestX(t *testing.T) {\n\tevidence.ForTest(t, "config.precedence")\n}\n',
   );
   const statusFile = path.join(repoRoot, 'status.json');
   fs.writeFileSync(statusFile, JSON.stringify({'agents.create': 'passed'}));
@@ -59,6 +64,7 @@ test('plugin replaces markers and example blocks, and leaves other code alone', 
     href: 'https://example.test/tests/e2e/agents_test.go#L3',
   });
   assert.deepEqual(attributes(unbound), {example: 'agents.unbound'});
+  assert.deepEqual(findBindings(repoRoot, 'tests')['config.precedence'], {file: 'tests/integration/config_test.go', line: 4});
   assert.equal(plain.type, 'inlineCode');
   assert.equal(tree.children[1].name, 'HttpExchange');
   assert.equal(JSON.parse(attributes(tree.children[1]).exchange).response.status, 200);
