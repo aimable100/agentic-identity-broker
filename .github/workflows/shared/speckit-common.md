@@ -122,8 +122,18 @@ workflow or its permissions.
 Use the compiler-installed Spec Kit skills. `/speckit-specify` and similar
 names refer to those skills; Pi's native invocation form is
 `/skill:speckit-specify`. Follow the installed skill's full procedure, not a
-summary or an independently recreated procedure. Run only this session's phase.
-Do not delegate another pipeline phase or reuse a previous conversation.
+summary or an independently recreated procedure, except where these
+instructions narrow it. Run only this session's phase. Do not delegate another
+pipeline phase or reuse a previous conversation.
+
+Report a run's evidence only in this session's result: test and validation
+output, red and green results, per-run status, and remaining work. Never
+append it to `quickstart.md`, `tasks.md`, or any other file in the feature
+directory. This limits only run evidence: phases still write the requirements,
+plans, tasks, checklists, and decisions that their skills produce.
+`quickstart.md` describes how to validate the feature, not what a run
+observed. A feature's `implementation-log.md` holds evidence from earlier
+runs; do not read or extend it.
 
 For PR phases, switch to `context.head` **inside the agent sandbox**, before
 reading or executing feature code. Fetch only that exact SHA from `origin`,
@@ -165,3 +175,15 @@ Use safe outputs for every GitHub mutation. If work is inapplicable, call `noop`
 with the reason. If work is blocked or cannot finish an assigned phase, publish
 the actual blocker and call `report_incomplete`; never report success for
 partial work.
+
+## Follow-up issues
+
+Open one follow-up issue per topic, not one per pull request. Before you
+request one, list the repository's open issues labelled `follow-up` that
+reference `#<context.pr>`. When one already tracks the topic, reference that
+issue by number and do not request another. Otherwise request it with
+`create_issue`, titled `#<context.pr>: <topic>`, where `<topic>` names the
+deferred work in a few words. The workflow prefixes the title and drops a
+request whose title an open issue already has, so a reused title silently
+creates nothing. A requested issue gets its number only after this session,
+so link it as a search for its exact title in the repository's issues.
