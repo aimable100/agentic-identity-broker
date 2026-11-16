@@ -71,6 +71,11 @@ const sidebars = {
         },
         'reference/token-exchange',
         'configuration',
+        {
+          type: 'category',
+          label: 'Living specification',
+          items: ['living/agent-registration'],
+        },
       ],
     },
     {

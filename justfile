@@ -107,6 +107,19 @@ test-e2e-performance:
     @echo "Running backend E2E performance measurement..."
     @if command -v ginkgo > /dev/null; then ginkgo -v --procs=1 --label-filter="performance" ./tests/e2e/; else echo "Error: ginkgo is not installed. Install it with: go install github.com/onsi/ginkgo/v2/ginkgo@latest"; exit 1; fi
 
+# Check the living documentation in docs/living/ against the acceptance scenarios bound to its examples.
+# Docker-backed examples report "not run"; pass "-strict" where Docker is available to require them.
+living-docs *flags:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    command -v ginkgo > /dev/null || { echo "Error: ginkgo is not installed. Run: just install-tools" >&2; exit 1; }
+    out="{{justfile_directory()}}/test-results/living-docs"
+    rm -rf "$out" && mkdir -p "$out/evidence"
+    filter='/^example:/'
+    case " {{flags}} " in *" -strict "*) ;; *) filter="$filter && !docker" ;; esac
+    LIVING_DOCS_EVIDENCE_DIR="$out/evidence" ginkgo --succinct --procs={{GINKGO_BACKEND_PROCS}} --label-filter="$filter" ./tests/e2e/
+    go run ./tools/livingdoc -evidence "$out/evidence" -report "$out/report.md" {{flags}} docs/living/*.md
+
 # Run the backend E2E acceptance suite with coverage report
 test-e2e-backend-coverage: web-build
     @echo "Running backend E2E suite with coverage..."

@@ -6,6 +6,7 @@ import (
 
 	"github.com/agentic-identity-broker/agentic-identity-broker/tests/e2e/bootstrap"
 	"github.com/agentic-identity-broker/agentic-identity-broker/tests/e2e/helpers"
+	"github.com/agentic-identity-broker/agentic-identity-broker/tests/e2e/livingdoc"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -13,6 +14,8 @@ import (
 const e2eUpstreamBaseURLEnv = "E2E_UPSTREAM_BASE_URL"
 
 var suiteUpstream *helpers.MockUpstreamOAuth2Server
+
+var _ = livingdoc.Record()
 
 func TestE2E(t *testing.T) {
 	RegisterFailHandler(Fail)
