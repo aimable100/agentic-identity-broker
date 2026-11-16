@@ -391,16 +391,7 @@ Content-Type: application/json
 
 The representation shows the source and neither credential, not even the client ID. The broker
 reads the files when it needs them. When Alice starts to connect, the client ID in the redirect
-is the content of the client ID file at that moment:
-
-```http example="broker-credentials-at-third-party-services.files.create"
-GET /api/third-party/550e8400-e29b-41d4-a716-446655440005/oauth2/authorize?redirect_uri=http%3A%2F%2F127.0.0.1%3A8000%2Fdone HTTP/1.1
-
-HTTP/1.1 302 Found
-Location: http://127.0.0.1:…/oauth/authorize?client_id=synthetic-client-A&code_challenge=…&code_challenge_method=S256&redirect_uri=http%3A%2F%2F127.0.0.1%3A8000%2Fapi%2Fthird-party%2F550e8400-e29b-41d4-a716-446655440005%2Foauth2%2Fcallback&response_type=code&scope=profile&state=…
-
-<a href="…">Found</a>.
-```
+to the provider is the content of the client ID file at that moment. `example:broker-credentials-at-third-party-services.files.create`
 
 ### Rotation without a restart
 
