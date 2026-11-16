@@ -478,7 +478,7 @@ var _ = Describe("CIMD Authorization", func() {
 			}
 		})
 
-		It("rejects the authorization request with invalid_client", func() {
+		It("rejects the authorization request with invalid_client", example("client-registration-and-authentication.cimd.shared-secret-method"), func() {
 			// FR-022: CIMD clients are always public clients — any auth method other than
 			// "none" is rejected, even if the document is otherwise structurally valid.
 			resp, err := server.AuthenticatedGET(

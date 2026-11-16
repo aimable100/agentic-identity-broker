@@ -134,7 +134,7 @@ var _ = Describe("CIMD Private-Use Redirect URIs", func() {
 		})
 
 		// Scenario US7.5 from specs/028-cimd-support/spec.md
-		It("completes consent, code issuance, and public-client token exchange", func() {
+		It("completes consent, code issuance, and public-client token exchange", example("client-registration-and-authentication.private-use.cimd-flow"), func() {
 			code, verifier := completeAuthorizationCodeFlow(server, testStorage, principal, clientURL, fixtures.GitHubAppCallback, func(data map[string]any) {
 				assertCIMDConsentContext(data, fixtures.GitHubAppCallback, fakeHost)
 			})

@@ -390,7 +390,7 @@ var _ = Describe("OAuth2 User Impersonation", func() {
 		})
 
 		// Scenario US1.3 from specs/037-oauth2-user-impersonation/spec.md
-		It("issues local-policy base claims and the subject email, without credential leakage", func() {
+		It("issues local-policy base claims and the subject email, without credential leakage", example("impersonation.issue.claims"), func() {
 			resp := postImpersonation(baseRequest())
 			Expect(resp).To(matchers.HaveStatusCode(http.StatusOK))
 			claims := decodeJWTClaims(decodeBody(resp)["access_token"].(string))

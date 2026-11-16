@@ -179,7 +179,7 @@ var _ = Describe("Continuing consent for local refresh", func() {
 				})
 
 				// S4 from specs/049-fix-refresh-consent/spec.md.
-				It("rejects the old chain when credential deletion makes the client public", func() {
+				It("rejects the old chain when credential deletion makes the client public", example("token-issuance-and-refresh.consent.credentials-deleted"), func() {
 					deleteAt(admin, "/api/agents/"+agent.ID.String()+"/client-credentials", "")
 					secret = ""
 					expectDenied()

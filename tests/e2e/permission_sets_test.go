@@ -503,7 +503,7 @@ var _ = Describe("Permission Sets (019)", func() {
 		})
 
 		// US2.S1 from specs/019-permission-sets/spec.md
-		It("renders mandatory sets locked and optional sets togglable on consent screen", func() {
+		It("renders mandatory sets locked and optional sets togglable on consent screen", example("consent-and-delegation.consent-screen.permission-sets"), func() {
 			// US2.S1 — consent-info returns permission_sets with correct requirement_type
 			resp, err := enduserServer.AuthenticatedGET(
 				fmt.Sprintf("/api/consent/agents/%s", agentID),
@@ -563,7 +563,7 @@ var _ = Describe("Permission Sets (019)", func() {
 		})
 
 		// US2.S3 from specs/019-permission-sets/spec.md
-		It("omits connect button for service with an active session", func() {
+		It("omits connect button for service with an active session", example("consent-and-delegation.consent-screen.connected-providers"), func() {
 			// US2.S3 — active_session_service_ids includes the service when the user has an active session
 			// Seed an active session for the GitHub service.
 			Expect(testStorage.UserSessions().Create(context.Background(), fixtures.SessionForService(userPrincipal, githubServiceID))).To(Succeed())
@@ -1062,7 +1062,7 @@ var _ = Describe("Permission Sets (019)", func() {
 		// (create response and get response). Token exchange with granted_permission_sets
 		// in the response (US4.S2) requires a signed JWT client assertion and is covered
 		// at unit level by TestResolveEffectiveScopes_SRCeiling (T046).
-		It("stores granted_permission_sets in UserGrant on consent submission", func() {
+		It("stores granted_permission_sets in UserGrant on consent submission", example("consent-and-delegation.grant.record"), func() {
 			// FR-020: Seed active sessions for both services.
 			Expect(testStorage.UserSessions().Create(context.Background(), fixtures.SessionForService(userPrincipal, githubServiceID))).To(Succeed())
 			Expect(testStorage.UserSessions().Create(context.Background(), fixtures.SessionForService(userPrincipal, googleServiceID))).To(Succeed())
@@ -1190,7 +1190,7 @@ var _ = Describe("Permission Sets (019)", func() {
 		})
 
 		// US4.S3 from specs/019-permission-sets/spec.md
-		It("upserts UserGrant with new granted_permission_sets on re-consent", func() {
+		It("upserts UserGrant with new granted_permission_sets on re-consent", example("consent-and-delegation.grant.one-per-user-and-agent"), func() {
 			// US4.S3
 			// FR-020: Seed active sessions for both services before any grant submission.
 			Expect(testStorage.UserSessions().Create(context.Background(), fixtures.SessionForService(userPrincipal, githubServiceID))).To(Succeed())
@@ -1298,7 +1298,7 @@ var _ = Describe("Permission Sets (019)", func() {
 			})
 
 			// US4.S5 from specs/019-permission-sets/spec.md
-			It("redirects to consent when an included optional service session was deleted", func() {
+			It("redirects to consent when an included optional service session was deleted", example("consent-and-delegation.reconsent.missing-provider-session"), func() {
 				Expect(testStorage.UserSessions().DeleteByPrincipalAndService(context.Background(), id.Principal(userPrincipal), id.MustParseServiceID(googleServiceID))).To(Succeed())
 
 				expectConsent(authorize())
@@ -1313,7 +1313,7 @@ var _ = Describe("Permission Sets (019)", func() {
 			})
 
 			// US4.S6 from specs/019-permission-sets/spec.md
-			It("proceeds after the user deselects the disconnected optional service on consent", func() {
+			It("proceeds after the user deselects the disconnected optional service on consent", example("consent-and-delegation.reconsent.deselect-provider"), func() {
 				Expect(testStorage.UserSessions().DeleteByPrincipalAndService(context.Background(), id.Principal(userPrincipal), id.MustParseServiceID(googleServiceID))).To(Succeed())
 				consentURL, err := url.Parse(authorize())
 				Expect(err).ToNot(HaveOccurred())
@@ -1602,7 +1602,7 @@ var _ = Describe("Permission Sets (019)", func() {
 		})
 
 		// Edge case: empty permission set submission rejected for agents with mandatory PSes
-		It("rejects grant submission with empty granted_permission_sets when agent has mandatory PSes", func() {
+		It("rejects grant submission with empty granted_permission_sets when agent has mandatory PSes", example("consent-and-delegation.grant.mandatory-required"), func() {
 			// Edge case: submitting an empty granted_permission_sets map is rejected (422)
 			// when the agent has mandatory permission set requirements.
 			// Create a PS and agent for this test

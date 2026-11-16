@@ -325,7 +325,7 @@ var _ = Describe("US5: Signing Key Management (local mode)", func() {
 	})
 
 	// Scenario 5.5 from specs/025-oauth2-server/spec.md
-	It("cannot remove last key", func() {
+	It("cannot remove last key", example("token-issuance-and-refresh.signing-keys.last-key"), func() {
 		// Only auto-generated key exists; try to delete it
 		listResp, _ := helpers.HTTPClient().Get(adminServer.BaseURL() + "/api/oauth2-server/signing-keys")
 		var listBody map[string]interface{}

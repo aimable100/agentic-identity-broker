@@ -144,7 +144,7 @@ var _ = Describe("Session Token Grant Submission", func() {
 
 	// SR-014 from specs/031-unified-session-token/spec.md — expired token is rejected
 	Describe("when consent is submitted with an expired session_token", func() {
-		It("rejects with 400 Bad Request", func() {
+		It("rejects with 400 Bad Request", example("consent-and-delegation.session-token.expired"), func() {
 			agent := createAgent()
 			token := buildExpiredToken(agent.ID, principalStr)
 
@@ -190,7 +190,7 @@ var _ = Describe("Session Token Grant Submission", func() {
 
 	// SR-014 agent binding from specs/031-unified-session-token/spec.md
 	Describe("when session_token was created for a different agent", func() {
-		It("rejects with 400 Bad Request", func() {
+		It("rejects with 400 Bad Request", example("consent-and-delegation.session-token.other-agent"), func() {
 			agent := createAgent()
 			differentAgentID := id.NewAgentID()
 			token := buildToken(differentAgentID, principalStr,
