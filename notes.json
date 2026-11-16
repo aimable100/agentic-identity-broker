@@ -234,8 +234,8 @@
       "pr": 403,
       "branch": "repo-assist/fix-issue-367-authorization-readiness-17a1d83b98b8ce0c",
       "status": "blocked",
-      "updated_at": "2026-11-12",
-      "note": "Prior merge publication rejected: 9689 KB > 4096 KB. Live head 493a935 still dirty; DCO/pipeline pass only old head. Semantic human-only/ADR046 integration guidance in PR comment. Do not repeat oversized push; maintainer recovery required."
+      "updated_at": "2026-11-16",
+      "note": "161f3b62 review fixes submitted: diagnostics/logging, resolved-agent reuse, consent table tests, ADR048. check/build/test/race/focused E2E pass; verify timed out at govulncheck. Main/ADR045+046 integration still blocked by prior oversized merge; do not retry."
     },
     {
       "issue": 212,
