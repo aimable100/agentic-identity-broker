@@ -51,7 +51,9 @@ average it away in prose.
 
 ## Write a page
 
-1. Name the capability as a job of a person or system, not as an endpoint or a feature number.
+1. Find the capability in `specs/capability-map.md`. It lists the specs to read and the parts of
+   them that later specs replaced. If the capability is new, name it as a job of a person or
+   system, not as an endpoint or a feature number, and add it to the map.
    Read the specs, ADRs, contracts, and scenarios for it.
 2. Select key examples. A page needs the few examples that let a reader predict the rest. It is
    not a list of every scenario. Leave edge-case matrices in the tests.

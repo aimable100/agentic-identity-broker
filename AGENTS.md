@@ -61,6 +61,7 @@ Read the source that governs the change. The summaries here do not replace the c
 `.specify/templates/overrides/spec-template.md` | Spec template: required sections, including concrete example journeys (Principle XIV)
 `.specify/examples/specification-by-example.md` | Worked example journey and Wireloom render command (Principle XIV)
 `.specify/templates/overrides/tasks-template.md` | Tasks template: mandatory Phase 2 design and Phase N compliance tasks
+`specs/capability-map.md` | Capability map: every feature spec grouped by the capability it describes today, with replaced parts. Update it when you add a spec.
 `docs/specification/` | Living documentation: capability pages checked against acceptance evidence (pilot). Read `.agents/skills/living-docs/SKILL.md` before you change a page or a scenario that carries `livingdoc.Example`.
 
 New feature directories use a `YYYYMMDD-HHMMSS` timestamp prefix; older ones use a three-digit `NNN` prefix.
