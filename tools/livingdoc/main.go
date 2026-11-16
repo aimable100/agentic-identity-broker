@@ -9,7 +9,10 @@
 //
 // Usage:
 //
-//	livingdoc -evidence <dir> [-report <file>] [-strict] <page.md>...
+//	livingdoc -evidence <dir> [-report <file>] [-status <file>] [-strict] <page.md>...
+//
+// The status file maps each cited example to its worst verdict. The
+// documentation site reads it to render the example badges.
 //
 // Exit codes:
 //
@@ -19,6 +22,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -30,10 +34,11 @@ import (
 func main() {
 	evidenceDir := flag.String("evidence", "", "directory with recorded evidence")
 	reportPath := flag.String("report", "", "also write the Markdown report to this file")
+	statusPath := flag.String("status", "", "also write the verdict of each example to this JSON file")
 	strict := flag.Bool("strict", false, "fail when a cited example did not run")
 	flag.Parse()
 	if *evidenceDir == "" || flag.NArg() == 0 {
-		fmt.Fprintln(os.Stderr, "Usage: livingdoc -evidence <dir> [-report <file>] [-strict] <page.md>...")
+		fmt.Fprintln(os.Stderr, "Usage: livingdoc -evidence <dir> [-report <file>] [-status <file>] [-strict] <page.md>...")
 		os.Exit(2)
 	}
 	records, err := evidence.ReadDir(*evidenceDir)
@@ -60,6 +65,16 @@ func main() {
 	fmt.Print(report)
 	if *reportPath != "" {
 		if err := os.WriteFile(*reportPath, []byte(report), 0o600); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
+	}
+	if *statusPath != "" {
+		encoded, err := json.MarshalIndent(status(results), "", "  ")
+		if err == nil {
+			err = os.WriteFile(*statusPath, encoded, 0o600)
+		}
+		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(2)
 		}

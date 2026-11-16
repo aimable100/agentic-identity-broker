@@ -118,7 +118,7 @@ living-docs *flags:
     filter='/^example:/'
     case " {{flags}} " in *" -strict "*) ;; *) filter="$filter && !docker" ;; esac
     LIVING_DOCS_EVIDENCE_DIR="$out/evidence" ginkgo --succinct --procs={{GINKGO_BACKEND_PROCS}} --label-filter="$filter" ./tests/e2e/
-    go run ./tools/livingdoc -evidence "$out/evidence" -report "$out/report.md" {{flags}} docs/living/*.md
+    go run ./tools/livingdoc -evidence "$out/evidence" -report "$out/report.md" -status "$out/status.json" {{flags}} docs/living/*.md
 
 # Run the backend E2E acceptance suite with coverage report
 test-e2e-backend-coverage: web-build

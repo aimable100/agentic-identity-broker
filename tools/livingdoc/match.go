@@ -111,6 +111,20 @@ func failing(results []Result, strict bool) bool {
 	return false
 }
 
+var severity = map[string]int{verdictPassed: 0, verdictNotRun: 1, verdictUnbound: 2, verdictStale: 3, verdictFailed: 4}
+
+// status returns the worst verdict among the citations of each example.
+func status(results []Result) map[string]string {
+	worst := map[string]string{}
+	for _, result := range results {
+		current, seen := worst[result.Claim.Example]
+		if !seen || severity[result.Verdict] > severity[current] {
+			worst[result.Claim.Example] = result.Verdict
+		}
+	}
+	return worst
+}
+
 func canonicalDoc(doc *DocExchange) string {
 	return canonical(doc.Method, doc.Target, doc.RequestHeader, doc.RequestBody, doc.Status, doc.ResponseHeader, doc.ResponseBody)
 }

@@ -18,6 +18,10 @@ and maintain the prose. You never decide that an example is correct: only record
 - A page cites an example in two ways. An inline marker in code font, `example:<id>`, says the
   preceding claim is proven by that scenario. A fenced `http` block with `example="<id>"` in its
   info string shows one request and its response.
+- The documentation site renders a marker as a badge that links to the scenario, and an example
+  block as a request and response card (`assets/docusaurus/src/remark/living-docs.mjs`). The badge
+  shows the verdict from `test-results/living-docs/status.json` when `just living-docs` ran before
+  the site build. Put a marker after the punctuation of the sentence it proves, not in parentheses.
 - `tools/livingdoc` gives each citation a verdict:
 
 | Verdict | Meaning | What to do |

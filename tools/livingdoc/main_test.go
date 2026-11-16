@@ -144,3 +144,20 @@ func TestFailing_NotRunFailsOnlyWhenStrict(t *testing.T) {
 		t.Error("stale must always fail")
 	}
 }
+
+func TestStatus_ReportsWorstVerdictPerExample(t *testing.T) {
+	got := status([]Result{
+		{Claim: Claim{Example: "a"}, Verdict: verdictPassed},
+		{Claim: Claim{Example: "a"}, Verdict: verdictStale},
+		{Claim: Claim{Example: "a"}, Verdict: verdictNotRun},
+		{Claim: Claim{Example: "b"}, Verdict: verdictPassed},
+		{Claim: Claim{Example: "c"}, Verdict: verdictNotRun},
+		{Claim: Claim{Example: "c"}, Verdict: verdictPassed},
+	})
+	want := map[string]string{"a": verdictStale, "b": verdictPassed, "c": verdictNotRun}
+	for example, verdict := range want {
+		if got[example] != verdict {
+			t.Errorf("%s: got %q, want %q", example, got[example], verdict)
+		}
+	}
+}
