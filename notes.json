@@ -2,7 +2,7 @@
   "version": 1,
   "cursors": {
     "labelling_after": null,
-    "investigation_after": 354
+    "investigation_after": 356
   },
   "issues": [
     {
@@ -128,8 +128,8 @@
     {
       "number": 418,
       "state": "commented",
-      "updated_at": "2026-11-11",
-      "note": "Prior finite audit-event mapping posted; author now has active PR #488. Avoid duplicate implementation; await review/merge and verify remaining acceptance afterward."
+      "updated_at": "2026-11-16",
+      "note": "Author PR #488 merged Nov 15; current checkout predates it. Verify merged source and remaining acceptance before recommending closure; no duplicate implementation or repeat comment."
     },
     {
       "number": 430,
@@ -220,6 +220,12 @@
       "state": "commented",
       "updated_at": "2026-11-15",
       "note": "Posted startStorageSpan reuse and missing-method inventory, including partially covered repos. Preserve transaction/locking/timeouts and expected outcomes; extend failed-repository matrix. Focused existing race tests pass; no missing spans implemented."
+    },
+    {
+      "number": 356,
+      "state": "commented",
+      "updated_at": "2026-11-16",
+      "note": "Posted shared buildTracerProvider exporter seam and non-identity batch/isolation test plan. #340 merged; reuse identityPrincipalPolicy, keep constructor raw and ExtProc sync identity intact. Existing principal/provider race tests pass; no policy implementation. Maintenance-only fix candidate."
     }
   ],
   "fixes": [
@@ -321,38 +327,38 @@
     },
     {
       "area": "repo_assist_prs",
-      "checked_at": "2026-11-15",
-      "result": "Read all nine live Repo Assist PRs, comments and review threads. Heads unchanged; eight drafts and non-draft #424. #403/#432 dirty and publication-size blocked; no new revision request, push or repeated blocker comment.",
+      "checked_at": "2026-11-16",
+      "result": "Read all nine live Repo Assist PRs, comments and review threads. Heads unchanged; eight drafts and non-draft #424. #403/#432 dirty and publication-size blocked; no new revision request or repeat push/comment.",
       "follow_up": "Maintainer recovery/classifications; #490 exact-contract approval, closing-footer removal and authorized external pipeline start."
     },
     {
       "area": "ci",
-      "checked_at": "2026-11-15",
+      "checked_at": "2026-11-16",
       "result": "Read both checks and statuses for nine PRs. Older eight DCO/pipelines/test stages pass; classifications fail #403/#420/#448. #490 CodeQL/CI gate pass, build/tests skipped and external pipeline-start failure persists.",
       "follow_up": "No full-green claim; unavailable classification writes and external pipeline start remain maintainer actions."
     },
     {
       "area": "hygiene",
-      "checked_at": "2026-11-15",
-      "result": "All 66 open issues and all open PRs labelled; Task 1 fell back to Task 2. Reread monthly checklist/comments and outstanding issue-comment threads; no new acknowledgements/check-offs. #367 historical request already covered by #403.",
+      "checked_at": "2026-11-16",
+      "result": "All 66 open issues and all open PRs labelled; Task 1 fell back to Task 2. Monthly checklist/comments and outstanding issue-comment threads show no new acknowledgements/check-offs. #367 historical request already covered by #403.",
       "follow_up": null
     },
     {
       "area": "tests",
-      "checked_at": "2026-11-15",
-      "result": "Uncached just test package override with race detection passed TestStartStorageSpan_RecordsResult, TestStorageSpans_FailedRepositoryCalls (1.054s) and TestSessionHealthMetrics* (1.073s). Existing behavior only; no new implementation, build, static/full gate or PostgreSQL integration.",
+      "checked_at": "2026-11-16",
+      "result": "Uncached race-enabled just test package override passed TestPrincipal* in telemetry and ID, plus HTTP signal export/path regressions and gRPC provider initialization. Existing behavior only; no span-policy implementation, full gate, build or E2E claimed.",
       "follow_up": null
     },
     {
       "area": "code",
-      "checked_at": "2026-11-15",
-      "result": "Resumed after #350; investigated untouched #352/#354 and skipped active #353 fix. Posted metric dual-emission/single-snapshot callback plan and complete storage-span helper coverage plan. Source unchanged; retain as maintenance-only fix candidates.",
-      "follow_up": "Resume after #354, prioritizing untouched #356 principal exporter policy. #357 already investigated; preserve existing dependency/design gates."
+      "checked_at": "2026-11-16",
+      "result": "Resumed after #354; investigated untouched #356. #340 complete via #363; provider branches converge at buildTracerProvider but no exporter policy or SpanAttribute. Posted shared-policy and non-identity batch/isolation acceptance plan. Repository source unchanged.",
+      "follow_up": "Resume after #356; skip #357 already investigated and active fixes. #431 is assigned and dependency migration needs coordination; verify merged #488 acceptance for #418."
     },
     {
       "area": "release",
-      "checked_at": "2026-11-15",
-      "result": "Latest release v0.1.146 includes Go 1.27.4 security remediation #486. Investigation-only maintenance warrants no release PR; remove stale claim remediation remains open.",
+      "checked_at": "2026-11-16",
+      "result": "Latest release v0.1.146 includes Go 1.27.4 security remediation #486. Investigation-only maintenance warrants no release PR.",
       "follow_up": null
     }
   ],
@@ -374,8 +380,8 @@
     },
     {
       "task": 2,
-      "item": "Resume investigation after #354",
-      "note": "Untouched #356 principal exporter policy is next. Retain #352 dual-name/single-query gauge migration and #354 complete storage helper coverage as fix candidates. Preserve #350 AWS/approval work, #243 drift/status and machine/tag gates."
+      "item": "Resume investigation after #356",
+      "note": "Skip previously investigated #357 and active fixes; verify merged #488 acceptance for #418. Retain #356 shared principal exporter policy, #352 dual-name gauge and #354 complete storage-span coverage as maintenance-only fix candidates. Preserve machine/tag gates."
     },
     {
       "task": 3,
