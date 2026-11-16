@@ -178,7 +178,7 @@ var _ = Describe("Permission Sets (019)", func() {
 
 	Describe("US1: Admin Manages Permission Sets", func() {
 		// US1.S1 from specs/019-permission-sets/spec.md
-		It("creates a permission set and returns its generated ID", func() {
+		It("creates a permission set and returns its generated ID", example("permission-sets.define.create"), func() {
 			// US1.S1
 			body := map[string]interface{}{
 				"name":        "GitHub Read Access",
@@ -205,7 +205,7 @@ var _ = Describe("Permission Sets (019)", func() {
 		})
 
 		// US1.S2 from specs/019-permission-sets/spec.md
-		It("returns name, description, and service_scope entries for GET by ID", func() {
+		It("returns name, description, and service_scope entries for GET by ID", example("permission-sets.define.read"), func() {
 			// US1.S2
 			// Create first
 			createBody := map[string]interface{}{
@@ -244,7 +244,7 @@ var _ = Describe("Permission Sets (019)", func() {
 		})
 
 		// US1.S3 from specs/019-permission-sets/spec.md
-		It("reflects updated values after PUT with modified scopes", func() {
+		It("reflects updated values after PUT with modified scopes", example("permission-sets.define.update"), func() {
 			// US1.S3
 			createBody := map[string]interface{}{
 				"name":        "PS for PUT test",
@@ -290,7 +290,7 @@ var _ = Describe("Permission Sets (019)", func() {
 		})
 
 		// US1.S4 from specs/019-permission-sets/spec.md
-		It("removes the permission set and returns 404 on subsequent GET", func() {
+		It("removes the permission set and returns 404 on subsequent GET", example("permission-sets.delete.unused"), func() {
 			// US1.S4
 			createBody := map[string]interface{}{
 				"name":        "PS to delete",
@@ -329,7 +329,7 @@ var _ = Describe("Permission Sets (019)", func() {
 		})
 
 		// US1.S5 from specs/019-permission-sets/spec.md
-		It("rejects DELETE with 409 when permission set is referenced by an agent", func() {
+		It("rejects DELETE with 409 when permission set is referenced by an agent", example("permission-sets.delete.referenced-by-agent"), func() {
 			// US1.S5
 			createBody := map[string]interface{}{
 				"name":        "PS referenced by agent",
@@ -380,7 +380,7 @@ var _ = Describe("Permission Sets (019)", func() {
 		})
 
 		// US1.S6 from specs/019-permission-sets/spec.md
-		It("filters permission set list by service_id", func() {
+		It("filters permission set list by service_id", example("permission-sets.define.filter-by-service"), func() {
 			// US1.S6
 			// Create two permission sets: one for GitHub, one for Google
 			psGitHub := map[string]interface{}{
@@ -788,7 +788,7 @@ var _ = Describe("Permission Sets (019)", func() {
 		})
 
 		// US3.S1 from specs/019-permission-sets/spec.md
-		It("persists agent permission_sets list in declaration order", func() {
+		It("persists agent permission_sets list in declaration order", example("permission-sets.agent.declaration-order"), func() {
 			// US3.S1
 			// Create second PS
 			r2, err := adminServer.DirectRequest(
@@ -835,7 +835,7 @@ var _ = Describe("Permission Sets (019)", func() {
 		})
 
 		// US3.S2 from specs/019-permission-sets/spec.md
-		It("rejects agent registration with non-existent permission_set_id with 400", func() {
+		It("rejects agent registration with non-existent permission_set_id with 400", example("permission-sets.agent.unknown-permission-set"), func() {
 			// US3.S2
 			nonExistentID := "ffffffff-ffff-ffff-ffff-ffffffffffff"
 			agentBody := map[string]interface{}{
@@ -898,7 +898,7 @@ var _ = Describe("Permission Sets (019)", func() {
 		})
 
 		// US3.S4 from specs/019-permission-sets/spec.md
-		It("returns service_requirements and permission_sets independently in agent response", func() {
+		It("returns service_requirements and permission_sets independently in agent response", example("permission-sets.agent.independent-fields"), func() {
 			// US3.S4
 			agentBody := map[string]interface{}{
 				"client_id":    "agent-both-fields",
@@ -934,7 +934,7 @@ var _ = Describe("Permission Sets (019)", func() {
 		})
 
 		// US3.S5 from specs/019-permission-sets/spec.md
-		It("rejects agent creation when SR service_id is not covered by any PS with 400 — FR-019", func() {
+		It("rejects agent creation when SR service_id is not covered by any PS with 400 — FR-019", example("permission-sets.coverage.uncovered-service"), func() {
 			// US3.S5 — FR-019 coverage invariant
 			// Create a second service ID not covered by validPSID
 			uncoveredServiceID := googleServiceID

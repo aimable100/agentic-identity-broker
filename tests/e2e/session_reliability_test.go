@@ -129,7 +129,7 @@ var _ = Describe("Third-Party Session Reliability", func() {
 	}
 
 	// US5-S6 from specs/013-token-exchange/spec.md
-	It("[US5-S6] survives a transient provider outage during refresh without demanding re-authentication", func() {
+	It("[US5-S6] survives a transient provider outage during refresh without demanding re-authentication", example("token-exchange.refresh.transient-outage"), func() {
 		ctx := context.Background()
 		Expect(testStorage.UserSessions().Create(ctx, fixtures.ExpiredGitHubSessionForPrincipal(principal))).To(Succeed())
 		mockUpstream.WithTransientTokenFailures(http.StatusServiceUnavailable, 1).WithAccessToken("recovered-after-outage")

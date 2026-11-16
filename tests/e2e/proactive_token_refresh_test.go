@@ -238,7 +238,7 @@ var _ = Describe("Proactive Token Refresh", func() {
 			})
 
 			// US1-S2 from specs/029-proactive-token-refresh/spec.md
-			It("should return the old token before committing background renewal", func() {
+			It("should return the old token before committing background renewal", example("token-exchange.refresh.near-expiry"), func() {
 				original := storedSession(principal)
 				oldExpiry := *original.AccessTokenExpiresAt
 				Expect(proactiveExchangeBody(proactiveExchange(enduser, proactiveExchangeForm(upstream, principal, agent)), http.StatusOK)["access_token"]).To(Equal("github-token-xyz"))

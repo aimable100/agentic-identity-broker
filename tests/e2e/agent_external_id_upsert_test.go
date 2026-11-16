@@ -461,7 +461,7 @@ var _ = Describe("Admin agent create-or-update by external ID", func() {
 		})
 
 		// Scenario US2.7 from specs/055-agent-external-id-upsert/spec.md
-		It("should return 409 for canonical and client ID conflicts on both branches", func() {
+		It("should return 409 for canonical and client ID conflicts on both branches", example("resource-identifiers.assign.unique"), func() {
 			clientID := id.ClientID("analyst-upstream")
 			other.ClientID = &clientID
 			Expect(store.Agents().Update(ctx, other)).To(Succeed())
