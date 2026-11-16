@@ -15,7 +15,7 @@ cannot read them as a description of the product.
 
 ## Decision
 
-- A living-documentation page under `docs/living/` describes one capability as it behaves today,
+- A living-documentation page under `docs/specification/` describes one capability as it behaves today,
   in free prose with concrete examples, in the manner of *Specification by Example*.
 - A page cites an example by a stable identifier. The acceptance scenario that proves the example
   carries the same identifier through `livingdoc.Example`. No second fixture layer exists: pages
@@ -26,7 +26,7 @@ cannot read them as a description of the product.
   fail the check. `just living-docs` runs both steps.
 - A language model can write and maintain the prose under `.agents/skills/living-docs/SKILL.md`.
   It has no part in the check. The check is deterministic.
-- The pilot covers one page, `docs/living/agent-registration.md`, and HTTP evidence from the
+- The pilot covers one page, `docs/specification/agent-registration.md`, and HTTP evidence from the
   backend suite. The check is not part of `just verify` or CI during the pilot.
 
 ## Consequences

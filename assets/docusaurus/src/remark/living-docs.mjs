@@ -1,4 +1,4 @@
-// Remark plugin for living-documentation pages (docs/living/).
+// Remark plugin for living-documentation pages (docs/specification/).
 //
 // It turns `example:<id>` inline markers into badges that link to the bound
 // acceptance scenario, and fenced http blocks with example="<id>" into

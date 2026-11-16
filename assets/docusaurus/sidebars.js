@@ -56,7 +56,7 @@ const sidebars = {
     {
       type: 'category',
       label: 'Specification',
-      items: ['living/agent-registration'],
+      items: ['specification/agent-registration'],
     },
     {
       type: 'category',

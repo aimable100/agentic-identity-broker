@@ -1,6 +1,6 @@
 // Package livingdoc binds acceptance scenarios to living-documentation
 // examples and records the evidence that the livingdoc checker compares
-// with the pages under docs/living/.
+// with the pages under docs/specification/.
 package livingdoc
 
 import (

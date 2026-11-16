@@ -34,7 +34,7 @@ Read the governing feature's `spec.md`, `plan.md`, and `tasks.md` under `specs/`
 
 ## Living Documentation Examples
 
-A scenario with `livingdoc.Example("<id>")` is the evidence for an example on a page under `docs/living/`.
+A scenario with `livingdoc.Example("<id>")` is the evidence for an example on a page under `docs/specification/`.
 `tools/livingdoc` compares the page with the HTTP exchanges that the scenario performs.
 If you change such a scenario or the behavior it covers, run `just living-docs` and update the page in the same change.
 Read `.agents/skills/living-docs/SKILL.md` first. Do not remove or rename an example without the page.
@@ -55,7 +55,7 @@ tests/e2e/
     *.go                          Agents, grants, principals, OAuth2 config, services, sessions,
                                   encryption, and multi-agent fixtures
   helpers/                        Shared HTTP/JWT/upstream/JWKS/PKCE/signing-key utilities
-  livingdoc/                      Example decorator and evidence recorder for docs/living/
+  livingdoc/                      Example decorator and evidence recorder for docs/specification/
   matchers/                       Custom Gomega matchers for OAuth2, telemetry, and claims
   pages/                          Page objects for frontend E2E tests
     page.go                        Base navigation and screenshot methods

@@ -61,7 +61,7 @@ Read the source that governs the change. The summaries here do not replace the c
 `.specify/templates/overrides/spec-template.md` | Spec template: required sections, including concrete example journeys (Principle XIV)
 `.specify/examples/specification-by-example.md` | Worked example journey and Wireloom render command (Principle XIV)
 `.specify/templates/overrides/tasks-template.md` | Tasks template: mandatory Phase 2 design and Phase N compliance tasks
-`docs/living/` | Living documentation: capability pages checked against acceptance evidence (pilot). Read `.agents/skills/living-docs/SKILL.md` before you change a page or a scenario that carries `livingdoc.Example`.
+`docs/specification/` | Living documentation: capability pages checked against acceptance evidence (pilot). Read `.agents/skills/living-docs/SKILL.md` before you change a page or a scenario that carries `livingdoc.Example`.
 
 New feature directories use a `YYYYMMDD-HHMMSS` timestamp prefix; older ones use a three-digit `NNN` prefix.
 For feature work, read its `spec.md`, `plan.md`, and `tasks.md` before implementation.
@@ -254,7 +254,7 @@ Use `just` as the command runner. Run `just --list` for the full listing.
 | `just test-integration-infra` | Infra-backed integration suites (Docker/Podman required) |
 | `just test-integration-all` | Both integration layers |
 | `just cdk-test` | CDK unit tests |
-| `just living-docs` | Check `docs/living/` pages against the acceptance scenarios bound to their examples |
+| `just living-docs` | Check `docs/specification/` pages against the acceptance scenarios bound to their examples |
 | `just render-wireframes <spec.md>` | Render Wireloom wireframes in a spec to SVG (after `just install-tools`) |
 
 After Go, test, or infrastructure changes, run `just check`. Then run the smallest matching test command.

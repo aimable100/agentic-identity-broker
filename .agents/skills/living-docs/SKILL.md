@@ -1,12 +1,12 @@
 ---
 name: living-docs
-description: "Write, extend, or repair a living-documentation page under docs/living/. Use when asked for living documentation, specification by example pages, or a capability page; when `just living-docs` reports stale, failed, unbound, or not-run examples; or when a change alters behavior that a page under docs/living/ describes."
+description: "Write, extend, or repair a living-documentation page under docs/specification/. Use when asked for living documentation, specification by example pages, or a capability page; when `just living-docs` reports stale, failed, unbound, or not-run examples; or when a change alters behavior that a page under docs/specification/ describes."
 alwaysApply: false
 ---
 
 # Living documentation
 
-A page under `docs/living/` describes one capability as it behaves today, in free prose with
+A page under `docs/specification/` describes one capability as it behaves today, in free prose with
 concrete examples. `just living-docs` checks every example against the acceptance suite. You write
 and maintain the prose. You never decide that an example is correct: only recorded evidence does.
 
