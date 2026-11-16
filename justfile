@@ -129,6 +129,9 @@ living-docs *flags: web-build
     ginkgo --succinct --procs={{GINKGO_EXTPROC_PROCS}} --label-filter="$filter" ./tests/e2e/extproc/ || failed=1
     if [ "$browser" = true ]; then
         E2E_FRONTEND_MODE=built ginkgo --succinct --procs={{GINKGO_FRONTEND_PROCS}} --output-interceptor-mode=none --label-filter="$filter" ./tests/e2e/frontend/ || failed=1
+    else
+        # Select no scenario: the suite starts no browser and records its examples as not run.
+        ginkgo --succinct --procs=1 --output-interceptor-mode=none --label-filter="$filter && browser-suite-not-requested" ./tests/e2e/frontend/ || failed=1
     fi
     packages=$(grep -rl --include='*_test.go' 'evidence\.ForTest(' tests/integration internal cmd 2>/dev/null | xargs -r -n1 dirname | sort -u | sed 's#^#./#')
     if [ -n "$packages" ]; then
