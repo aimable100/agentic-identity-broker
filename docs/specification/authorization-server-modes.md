@@ -138,8 +138,7 @@ Content-Type: application/json
 }
 ```
 
-The access token is the upstream token. Its `x_agent_id` claim holds the Research Assistant's
-UUID, and the broker checked that before it passed the token on.
+The access token in this response comes from the upstream server.
 
 ### Proxy mode has no place for an agent without an upstream client
 
@@ -201,7 +200,7 @@ The token endpoint gives the same answer for the same agent. `example:authorizat
 ### A CIMD client is addressed by its URL only
 
 A `CIMDClient` has a UUID like every agent, but the UUID is not its `client_id`. A request that
-uses the UUID is refused before the broker fetches any document: `example:authorization-server-modes.client-id.cimd-agent-by-uuid`
+uses the UUID is refused: `example:authorization-server-modes.client-id.cimd-agent-by-uuid`
 
 ```http example="authorization-server-modes.client-id.cimd-agent-by-uuid"
 GET /oauth2/authorize?client_id=770e8400-e29b-41d4-a716-446655440002&redirect_uri=https://cimd-fr005.test.invalid/callback&response_type=code&state=xyz HTTP/1.1
@@ -238,7 +237,7 @@ Location: http://127.0.0.1:…/oauth/authorize?client_id=upstream-client-abc&red
 
 The user also consents to a `LocalClient`. For that agent the same endpoint of the same broker
 issues an authorization code itself and returns it to the agent's redirect URI. The agent
-exchanges the code at the broker for a token that the broker signed. `example:authorization-server-modes.hybrid.local-agent`
+exchanges the code at the broker for an access token. `example:authorization-server-modes.hybrid.local-agent`
 
 ```http example="authorization-server-modes.hybrid.local-agent"
 GET /oauth2/authorize?client_id=660e8400-e29b-41d4-a716-446655440001&code_challenge=…&code_challenge_method=S256&redirect_uri=http%3A%2F%2Flocalhost%3A9999%2Fcallback&response_type=code&state=hybrid-local-state HTTP/1.1
@@ -313,8 +312,7 @@ So in `hybrid` mode, when the broker cannot get the upstream keys, the endpoint 
 `503 Service Unavailable` and does not fall back to the broker's own keys alone. `example:authorization-server-modes.jwks.upstream-unavailable`
 
 A key ID must mean one key. When a key of the broker and a key of the upstream server carry the
-same `kid`, the endpoint also answers `503 Service Unavailable`. The broker drops or renames
-neither key. `example:authorization-server-modes.jwks.kid-conflict`
+same `kid`, the endpoint also answers `503 Service Unavailable`. `example:authorization-server-modes.jwks.kid-conflict`
 
 ## Not yet on this page
 

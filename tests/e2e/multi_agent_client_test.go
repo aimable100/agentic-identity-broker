@@ -121,7 +121,7 @@ var _ = Describe("Multi-Agent Client Delegation", func() {
 			})
 
 			// US1 Scenario 2 from specs/021-multi-agent-clientid/spec.md
-			It("should resolve client_id against agent.id not agent.client_id", Label("US1"), func() {
+			It("should resolve client_id against agent.id not agent.client_id", Label("US1"), example("client-registration-and-authentication.client-id.agent-uuid"), func() {
 				// Given: Agent registered with client_id="shared-upstream" but internal ID is a UUID
 				// Active grant for the default principal
 				grant := fixtures.ActiveGrant(
