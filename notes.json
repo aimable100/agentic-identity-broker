@@ -2,7 +2,7 @@
   "version": 1,
   "cursors": {
     "labelling_after": null,
-    "investigation_after": 418
+    "investigation_after": 471
   },
   "issues": [
     {
@@ -226,6 +226,12 @@
       "state": "commented",
       "updated_at": "2026-11-16",
       "note": "Posted shared buildTracerProvider exporter seam and non-identity batch/isolation test plan. #340 merged; reuse identityPrincipalPolicy, keep constructor raw and ExtProc sync identity intact. Existing principal/provider race tests pass; no policy implementation. Maintenance-only fix candidate."
+    },
+    {
+      "number": 471,
+      "state": "awaiting_clarification",
+      "updated_at": "2026-11-17",
+      "note": "Mapped current effective resource derivation and domain/both-adapter session guards. Asked creation-pinned vs live audience default and exact intentional-divergence marker. Require atomic sibling writes; five existing audience-update race tests pass. No service-account implementation."
     }
   ],
   "fixes": [
@@ -327,38 +333,38 @@
     },
     {
       "area": "repo_assist_prs",
-      "checked_at": "2026-11-16",
-      "result": "Read all nine live Repo Assist PR details, comments, reviews and threads. #403 review fixes now published at 71c02faa; main integration still dirty. #432 unchanged and dirty. Eight drafts and non-draft #424. No duplicate push/comment.",
-      "follow_up": "Maintainer size-blocked integrations/classifications; #403/#490 authorized external pipeline start; #490 exact-contract approval and closing-footer removal."
+      "checked_at": "2026-11-17",
+      "result": "Read details, comments, reviews, review threads, checks and statuses for all nine open Repo Assist PRs. Heads unchanged; eight drafts and non-draft #424. #403/#432 remain dirty and publication-size blocked. No new human activity or repeat push/comment.",
+      "follow_up": "Maintainer integrations/classifications; authorized external pipeline starts for #403/#490; exact tagging contract and closing-footer correction for #490."
     },
     {
       "area": "ci",
-      "checked_at": "2026-11-16",
-      "result": "Both checks and statuses read for all nine PRs: seven external pipelines/test stages pass; #403 and #490 cannot start due to accountable-user association. DCO passes where present; classification failures #403/#420/#448. #488 checks and statuses pass.",
-      "follow_up": "No code change for infrastructure-only pipeline failures; retain existing comments and monthly actions."
+      "checked_at": "2026-11-17",
+      "result": "Both checks and statuses read for all nine: seven external pipelines/test stages pass; #403/#490 pipeline-start failures still report no accountable user. DCO passes where present; classification failures remain #403/#420/#448. No new code-caused CI failure.",
+      "follow_up": "No code-only workaround for infrastructure failures; existing comments retain actionable guidance."
     },
     {
       "area": "hygiene",
-      "checked_at": "2026-11-16",
-      "result": "All 66 open issues labelled. Inspected unlabelled #493 body and submitted documentation label. Other open PRs labelled. No monthly maintainer comments/check-offs beyond recorded completions.",
+      "checked_at": "2026-11-17",
+      "result": "All 66 open issues and all 29 open PRs have labels; no label changes needed. Reread monthly checklist/comments and outstanding comment threads: no new human acknowledgements or check-offs.",
       "follow_up": null
     },
     {
       "area": "tests",
-      "checked_at": "2026-11-16",
-      "result": "On release/v0.2 at 3b3c0b85, just test with explicit package/name override and -count=1 passed focused CIMD audit regressions under race detection in five owning packages. No local full gate/build/E2E run; returned to original main checkout clean.",
+      "checked_at": "2026-11-17",
+      "result": "Maintained just test package/name override with -count=1 passed five existing thirdparty audience-update tests under race detection (7 leaf cases). Memory package was also compiled but matched no tests. No new behavior, PostgreSQL, static, build, E2E or full-gate pass claimed.",
       "follow_up": null
     },
     {
       "area": "code",
-      "checked_at": "2026-11-16",
-      "result": "Resumed after #356; skipped prior investigations, assigned migration and active fixes. Verified merged #488 patch and release source against all six #418 audit families/tests. Main lacks events; asked whether closure targets release or propagation. No source edits.",
-      "follow_up": "Resume after #418; do not duplicate merged release-branch implementation."
+      "checked_at": "2026-11-17",
+      "result": "Resumed after #418; skipped prior/assigned work. Read #441 approval gate, #452/#453 triggers and workflow blockers. Investigated untouched #471 against #478: mapped resource derivation and both-adapter guards; asked audience lifetime/divergence contract. No source changes.",
+      "follow_up": "Resume after #471; retain machine sub-issue questions and active fixes without duplicate comments."
     },
     {
       "area": "release",
-      "checked_at": "2026-11-16",
-      "result": "Latest release remains v0.1.146. #488 merged into release/v0.2, not main; investigation and triage do not warrant a release PR, and scheduled maintenance-only cap prohibits new PRs.",
+      "checked_at": "2026-11-17",
+      "result": "Latest release remains v0.1.146. Investigation-only maintenance run does not warrant a release PR; new PR limit is zero.",
       "follow_up": null
     }
   ],
@@ -380,8 +386,8 @@
     },
     {
       "task": 2,
-      "item": "Resume investigation after #418",
-      "note": "Await #418 closure target: #488 fixes release/v0.2, not main. Skip prior investigations and active fixes; #431 is assigned. Retain #356 principal exporter policy, #352 dual-name gauge and #354 complete storage spans as capacity-deferred candidates."
+      "item": "Resume investigation after #471",
+      "note": "Await #471 audience-default lifetime and intentional-divergence contract, plus #418 release/main closure target. Skip prior investigations and active fixes. #356/#352/#354 remain capacity-deferred candidates."
     },
     {
       "task": 3,
