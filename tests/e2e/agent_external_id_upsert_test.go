@@ -618,7 +618,7 @@ var _ = Describe("Admin agent create-or-update by external ID", func() {
 			Expect(dirty).To(BeTrue())
 		}
 		// Scenario US3.1 from specs/055-agent-external-id-upsert/spec.md
-		It("should block the migration on duplicates and report the value and agent IDs", func() {
+		It("should block the migration on duplicates and report the value and agent IDs", example("storage-and-encryption.migrations.external-id-blocked"), func() {
 			setID(legacy[0], string(selector))
 			setID(legacy[1], string(selector))
 			expectBlocked(legacy[0], legacy[1])
@@ -627,14 +627,14 @@ var _ = Describe("Admin agent create-or-update by external ID", func() {
 			Expect(readObject(resp, http.StatusOK)["external_id"]).To(Equal(string(selector)))
 		})
 		// Scenario US3.2 from specs/055-agent-external-id-upsert/spec.md
-		It("should block the migration on empty values and report both categories", func() {
+		It("should block the migration on empty values and report both categories", example("storage-and-encryption.migrations.external-id-empty"), func() {
 			setID(legacy[0], string(selector))
 			setID(legacy[1], string(selector))
 			setID(legacy[2], "")
 			expectBlocked(legacy...)
 		})
 		// Scenario US3.3 from specs/055-agent-external-id-upsert/spec.md
-		It("should succeed after deliberate remediation and then enforce uniqueness", func() {
+		It("should succeed after deliberate remediation and then enforce uniqueness", example("storage-and-encryption.migrations.external-id-remediated"), func() {
 			setID(legacy[0], string(selector))
 			setID(legacy[1], string(selector))
 			setID(legacy[2], "")
@@ -663,7 +663,7 @@ var _ = Describe("Admin agent create-or-update by external ID", func() {
 			Expect(snapshot()).To(Equal(before))
 		})
 		// Scenario US3.4 from specs/055-agent-external-id-upsert/spec.md
-		It("should preserve agents and relationships across rollback and reapply", func() {
+		It("should preserve agents and relationships across rollback and reapply", example("storage-and-encryption.migrations.external-id-rollback"), func() {
 			setID(legacy[2], nil)
 			before := snapshot()
 			Expect(postgres.MigrateTo(0)).To(Succeed())

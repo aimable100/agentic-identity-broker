@@ -17,7 +17,9 @@ and maintain the prose. You never decide that an example is correct: only record
     `example("<id>")` as a decorator of the `It`, next to any `Label(...)`;
   - in a plain Go test, such as those under `tests/integration/`, call
     `evidence.ForTest(t, "<id>")` first in the test (package
-    `tools/livingdoc/evidence`).
+    `tools/livingdoc/evidence`). Call it in the function that makes the assertions and
+    that skips when a tool is missing. A parent test does not count as skipped when its
+    subtests skip, so a binding on such a parent reports a false pass.
 - With `LIVING_DOCS_EVIDENCE_DIR` set, each bound test records its outcome to that directory. A
   scenario of the backend suite `tests/e2e/` also records every HTTP exchange that it makes through
   a `bootstrap.TestServer` method or through `helpers.HTTPClient()`. Requests made with another

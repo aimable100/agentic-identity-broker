@@ -530,7 +530,6 @@ func TestHelmTemplate_SessionSweep(t *testing.T) {
 
 	// US1-S7 and US1-S11 from specs/053-session-auto-refresh/spec.md
 	t.Run("fails to render with an invalid sweep configuration", func(t *testing.T) {
-		evidence.ForTest(t, "deployment.sweep.identity-required")
 		tests := []struct {
 			name    string
 			args    []string
@@ -549,6 +548,7 @@ func TestHelmTemplate_SessionSweep(t *testing.T) {
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
+				evidence.ForTest(t, "deployment.sweep.identity-required")
 				output, err := runHelmTemplate(t, tt.args...)
 				require.Error(t, err, output)
 				require.Contains(t, output, tt.wantErr)

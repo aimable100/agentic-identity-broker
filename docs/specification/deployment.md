@@ -105,11 +105,9 @@ always present: `example:deployment.health.response`
 }
 ```
 
-- `status` is one of `starting`, `healthy`, `shutting_down`, and `unhealthy`.
-- `timestamp` is the time of the server.
-- `uptime_seconds` grows while the server runs.
-
-The JSON above is an illustration of the shape; the test checks the members and not a full body.
+`status` is one of `starting`, `healthy`, `shutting_down`, and `unhealthy`, and
+`uptime_seconds` grows while the server runs. The JSON above illustrates the shape; the test
+checks the members and not a full body.
 A server that is not `healthy` is meant to answer `503 Service Unavailable`, so that a probe
 fails. No test on this page drives a real server into that state.
 
@@ -131,13 +129,8 @@ the broker binary. The migration image starts `migrate`.
 
 The Dockerfiles are `build/docker/Dockerfile` and `build/docker/Dockerfile.migrate`. They copy a
 binary that was built before, so the build of the image does not compile Go code. This section
-is commentary: no test on this page builds or starts an image.
-
-```shell
-# Illustration: maintained commands
-just docker-build
-just docker-run
-```
+is commentary: no test on this page builds or starts an image. The maintained build commands
+are `just docker-build-broker` and `just docker-build-migrate`.
 
 ## The Helm chart
 
@@ -254,18 +247,9 @@ timeout that is not shorter than the Job deadline, a client certificate without 
 lookahead that is not a positive ISO 8601 duration. `example:deployment.sweep.identity-required`
 
 Literal headers are written into the manifest, so they must not hold a secret. A header from a
-file is different: the CronJob gets only the path of the file, and the value is read when the
-job runs. `example:deployment.sweep.file-headers`
-
-```yaml
-# Illustration: a bearer token from a mounted file
-sessionSweep:
-  enabled: true
-  headersFromFile:
-    Authorization:
-      path: /var/run/secrets/session-sweep/token
-      prefix: "Bearer "
-```
+file is different: the CronJob gets only the path of the file, such as
+`/var/run/secrets/session-sweep/token` for an `Authorization` header with the prefix `Bearer `,
+and the value is read when the job runs. `example:deployment.sweep.file-headers`
 
 ### The sweep pod is not a broker pod
 
