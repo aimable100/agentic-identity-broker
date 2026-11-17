@@ -124,21 +124,22 @@ living-docs *flags: web-build
         esac
     done
     case " {{flags}} " in *" -strict "*) ;; *) filter="$filter && !docker" ;; esac
-    failed=0
-    ginkgo --succinct --procs={{GINKGO_BACKEND_PROCS}} --label-filter="$filter" ./tests/e2e/ || failed=1
-    ginkgo --succinct --procs={{GINKGO_EXTPROC_PROCS}} --label-filter="$filter" ./tests/e2e/extproc/ || failed=1
+    # A failing run is not fatal here: a bound test that fails is recorded as failed, and a suite
+    # that cannot start leaves its examples unbound. The checker turns both into a failed check.
+    warn() { echo "living-docs: $1 exited with an error; the checker decides the result" >&2; }
+    ginkgo --succinct --procs={{GINKGO_BACKEND_PROCS}} --label-filter="$filter" ./tests/e2e/ || warn "backend suite"
+    ginkgo --succinct --procs={{GINKGO_EXTPROC_PROCS}} --label-filter="$filter" ./tests/e2e/extproc/ || warn "ExtProc suite"
     if [ "$browser" = true ]; then
-        E2E_FRONTEND_MODE=built ginkgo --succinct --procs={{GINKGO_FRONTEND_PROCS}} --output-interceptor-mode=none --label-filter="$filter" ./tests/e2e/frontend/ || failed=1
+        E2E_FRONTEND_MODE=built ginkgo --succinct --procs={{GINKGO_FRONTEND_PROCS}} --output-interceptor-mode=none --label-filter="$filter" ./tests/e2e/frontend/ || warn "browser suite"
     else
         # Select no scenario: the suite starts no browser and records its examples as not run.
-        ginkgo --succinct --procs=1 --output-interceptor-mode=none --label-filter="$filter && browser-suite-not-requested" ./tests/e2e/frontend/ || failed=1
+        ginkgo --succinct --procs=1 --output-interceptor-mode=none --label-filter="$filter && browser-suite-not-requested" ./tests/e2e/frontend/ || warn "browser suite"
     fi
     packages=$(grep -rl --include='*_test.go' 'evidence\.ForTest(' tests/integration internal cmd 2>/dev/null | xargs -r -n1 dirname | sort -u | sed 's#^#./#')
     if [ -n "$packages" ]; then
-        go test $packages > "$out/go-test.log" 2>&1 || { failed=1; tail -n 30 "$out/go-test.log"; }
+        go test -tags=integration $packages > "$out/go-test.log" 2>&1 || { warn "go test (see $out/go-test.log)"; grep -E '^(--- FAIL|FAIL)' "$out/go-test.log" >&2 || true; }
     fi
-    go run ./tools/livingdoc -evidence "$out/evidence" -report "$out/report.md" -status "$out/status.json" "${checker_flags[@]}" docs/specification/*.md || failed=1
-    exit $failed
+    go run ./tools/livingdoc -evidence "$out/evidence" -report "$out/report.md" -status "$out/status.json" "${checker_flags[@]}" docs/specification/*.md
 
 # Run the backend E2E acceptance suite with coverage report
 test-e2e-backend-coverage: web-build

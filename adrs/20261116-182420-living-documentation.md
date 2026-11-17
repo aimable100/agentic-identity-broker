@@ -18,7 +18,7 @@ cannot read them as a description of the product.
 - A living-documentation page under `docs/specification/` describes one capability as it behaves today,
   in free prose with concrete examples, in the manner of *Specification by Example*.
 - A page cites an example by a stable identifier. The acceptance scenario that proves the example
-  carries the same identifier through `livingdoc.Example`. No second fixture layer exists: pages
+  carries the same identifier through `example(...)`. No second fixture layer exists: pages
   do not drive execution.
 - When evidence recording is on, the suite records the state of each such scenario and the HTTP
   exchanges of its test clients. `tools/livingdoc` compares the pages with that evidence. A
@@ -26,17 +26,23 @@ cannot read them as a description of the product.
   fail the check. `just living-docs` runs both steps.
 - A language model can write and maintain the prose under `.agents/skills/living-docs/SKILL.md`.
   It has no part in the check. The check is deterministic.
-- The pilot covers one page, `docs/specification/agent-registration.md`, and HTTP evidence from the
-  backend suite. The check is not part of `just verify` or CI during the pilot.
+- One page exists for each capability in `specs/capability-map.md`. Evidence comes from the
+  backend, ExtProc, and browser acceptance suites and from plain Go tests bound with
+  `evidence.ForTest`. Only the backend suite records HTTP exchanges; the other sources prove
+  prose claims. A page shows a screen with a maintained screenshot of the browser suite.
+- The check is not part of `just verify` or CI while this decision is Proposed.
 
 ## Consequences
 
 - A behavior change that contradicts a page fails `just living-docs` with a diff.
 - Scenarios gain one decorator each. Normal test runs do not record and are unaffected.
-- Examples bound to Docker-backed scenarios report "not run" unless Docker is available.
+- Examples bound to tests that need Docker, Helm, or a browser report "not run" where those are
+  missing. A claim that only a unit test proves is marked the same way as one that an acceptance
+  scenario proves.
 - Recorded bodies are stored as sent. Pages and fixtures must keep to synthetic data.
-- Open before acceptance: evidence for browser journeys and decoded token claims, the ExtProc
-  and frontend suites, a CI gate, and whether feature specs cite examples by the same identifiers.
+- Open before acceptance: recorded evidence other than HTTP exchanges (decoded token claims,
+  gateway requests, telemetry), a CI gate with Docker, Helm, and a browser, and whether feature
+  specs cite examples by the same identifiers.
 
 ## Alternatives
 

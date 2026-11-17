@@ -23,9 +23,9 @@ function goTestFiles(dir) {
   });
 }
 
-export function findBindings(repoRoot, testsDir) {
+export function findBindings(repoRoot, testDirs) {
   const bindings = {};
-  for (const file of goTestFiles(path.join(repoRoot, testsDir))) {
+  for (const file of [testDirs].flat().flatMap((dir) => goTestFiles(path.join(repoRoot, dir)))) {
     fs.readFileSync(file, 'utf8').split('\n').forEach((line, index) => {
       for (const match of line.matchAll(BINDING)) {
         bindings[match[1]] ??= {file: path.relative(repoRoot, file).split(path.sep).join('/'), line: index + 1};
@@ -70,9 +70,9 @@ export function parseExchange(text) {
 
 const attribute = (name, value) => ({type: 'mdxJsxAttribute', name, value});
 
-export default function livingDocs({repoRoot, testsDir = 'tests', statusFile, sourceUrl}) {
+export default function livingDocs({repoRoot, testDirs = ['tests', 'internal', 'cmd'], statusFile, sourceUrl}) {
   return (tree) => {
-    const bindings = findBindings(repoRoot, testsDir);
+    const bindings = findBindings(repoRoot, testDirs);
     const status = statusFile && fs.existsSync(statusFile) ? JSON.parse(fs.readFileSync(statusFile, 'utf8')) : {};
     const walk = (node) => {
       (node.children ?? []).forEach((child, index) => {
