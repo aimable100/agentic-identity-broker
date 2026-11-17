@@ -185,7 +185,7 @@ var _ = Describe("ExtProc Approval Cache Sync", func() {
 	})
 
 	// US2-S2 from specs/026-extproc-approval-sync/spec.md.
-	It("forwards a policy-allowed tool without approval broker calls", func() {
+	It("forwards a policy-allowed tool without approval broker calls", example("gateway-policy-authorization.permission-sets.granted"), func() {
 		env, broker, stop := startApprovalEnvironment(nil, time.Minute)
 		defer stop()
 		waitForBootstrap(broker)
@@ -197,7 +197,7 @@ var _ = Describe("ExtProc Approval Cache Sync", func() {
 	})
 
 	// US2-S3 from specs/026-extproc-approval-sync/spec.md.
-	It("enters the approval gate only after the permission-set boundary permits the tool", func() {
+	It("enters the approval gate only after the permission-set boundary permits the tool", example("gateway-policy-authorization.decisions.approval-required"), func() {
 		env, broker, stop := startApprovalEnvironment(nil, time.Minute)
 		defer stop()
 
@@ -399,7 +399,7 @@ var _ = Describe("ExtProc Approval Cache Sync", func() {
 	})
 
 	// Edge case from specs/026-extproc-approval-sync/spec.md.
-	It("denies batched approval-required calls and instructs a standalone retry", func() {
+	It("denies batched approval-required calls and instructs a standalone retry", example("gateway-policy-authorization.batch.approval-required"), func() {
 		env, broker, stop := startApprovalEnvironment(nil, time.Minute)
 		defer stop()
 		body := []byte(`[{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"create_issue","arguments":{"repo":"acme/app"}}}]`)
@@ -413,7 +413,7 @@ var _ = Describe("ExtProc Approval Cache Sync", func() {
 	})
 
 	// Edge case from specs/026-extproc-approval-sync/spec.md.
-	It("denies deferred CIBA decisions without creating an approval", example("tool-approvals.gateway.ciba-denied"), func() {
+	It("denies deferred CIBA decisions without creating an approval", example("tool-approvals.gateway.ciba-denied"), example("gateway-policy-authorization.decisions.ciba-required"), func() {
 		env, broker, stop := startApprovalEnvironment(nil, time.Minute)
 		defer stop()
 

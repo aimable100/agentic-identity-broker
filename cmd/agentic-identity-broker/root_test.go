@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/config"
+	"github.com/agentic-identity-broker/agentic-identity-broker/tools/livingdoc/evidence"
 	"github.com/lestrrat-go/jwx/v4/jwa"
 	"github.com/lestrrat-go/jwx/v4/jwk"
 	"github.com/lestrrat-go/jwx/v4/jwt"
@@ -290,6 +291,7 @@ func setBrokerConfigPath(t *testing.T, path string) {
 }
 
 func TestRunRejectsMalformedConfiguration(t *testing.T) {
+	evidence.ForTest(t, "configuration.startup.malformed-yaml")
 	path := filepath.Join(t.TempDir(), "broker.yaml")
 	if err := os.WriteFile(path, []byte("server: ["), 0o600); err != nil {
 		t.Fatal(err)
@@ -303,6 +305,7 @@ func TestRunRejectsMalformedConfiguration(t *testing.T) {
 }
 
 func TestRunRejectsInvalidServerPort(t *testing.T) {
+	evidence.ForTest(t, "configuration.startup.invalid-value")
 	adminPort := freeBrokerPort(t)
 	setBrokerConfigPath(t, writeBrokerConfig(t, -1, adminPort))
 

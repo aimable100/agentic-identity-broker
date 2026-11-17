@@ -22,7 +22,7 @@ const (
 	redacted    = "[redacted]"
 )
 
-var credentialHeaders = []string{"Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie"}
+var credentialHeaders = []string{"Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie", "X-Client-Assertion"}
 
 // ExchangeSource starts reporting HTTP exchanges of a suite to record.
 type ExchangeSource func(record func(evidence.Exchange))

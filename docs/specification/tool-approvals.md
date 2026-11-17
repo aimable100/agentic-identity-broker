@@ -154,24 +154,8 @@ the browser suite, which uses the user `user@example.com` and an agent named *Te
 
 ### Only the owner can decide, and only in time
 
-Bob cannot approve a request that was made for Alice: `example:tool-approvals.approve.other-user`
-
-```http example="tool-approvals.approve.other-user"
-POST /api/approvals/9b2f6c1e-3a4d-4e5f-8a6b-7c8d9e0f1a2b/approve HTTP/1.1
-X-Remote-User: bob@example.com
-Content-Type: application/json
-
-{
-  "persistence": "once"
-}
-
-HTTP/1.1 403 Forbidden
-
-{
-  "error": "forbidden",
-  "message": "you do not have access to this approval"
-}
-```
+Bob cannot approve a request that was made for Alice. The broker answers `403 Forbidden` with
+the message "you do not have access to this approval". `example:tool-approvals.approve.other-user`
 
 A pending ToolApproval has an expiry time. In the detail above it is ten minutes after creation.
 After that time the request is gone: `example:tool-approvals.review.expired`
@@ -336,7 +320,7 @@ Alice can also deny a pending request directly from this list. `example:tool-app
 
 ![Tool Authorizations page with one permanent approval and its Revoke action](../../tests/e2e/screenshots/tool_authorizations_permanent_list.png)
 
-The list comes from `GET /api/approvals/permanent`, which returns only the caller's own records. `example:tool-approvals.permanent.list`
+The list of permanent approvals comes from `GET /api/approvals/permanent`. `example:tool-approvals.permanent.list`
 Alice revokes one with `POST /api/approvals/…/revoke`. The broker answers `200 OK`, and the
 ToolApproval is now `denied`. `example:tool-approvals.permanent.revoke`
 
