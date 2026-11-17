@@ -254,7 +254,7 @@ and the recovery link. Its body is a JSON-RPC URL-elicitation error with the sam
 ```text
 HTTP/1.1 403 Forbidden
 content-type: application/json
-www-authenticate: Bearer error="insufficient_scope", error_description="User session is unavailable. Please re-authenticate.", error_uri="https://broker.example.com/api/third-party/550e8400-e29b-41d4-a716-446655440000/oauth2/authorize?redirect_uri=https%3A%2F%2Fbroker.example.com%2Fsessions"
+www-authenticate: Bearer error="insufficient_scope", error_description="mock exchange error", error_uri="https://broker.example.com/api/third-party/550e8400-e29b-41d4-a716-446655440000/oauth2/authorize?redirect_uri=https%3A%2F%2Fbroker.example.com%2Fsessions"
 ```
 
 ```json
@@ -263,20 +263,22 @@ www-authenticate: Bearer error="insufficient_scope", error_description="User ses
   "id": null,
   "error": {
     "code": -32042,
-    "message": "User session is unavailable. Please re-authenticate.",
+    "message": "mock exchange error",
     "data": {
       "elicitations": [
         {
           "mode": "url",
           "elicitationId": "770e8400-e29b-41d4-a716-446655440001",
           "url": "https://broker.example.com/api/third-party/550e8400-e29b-41d4-a716-446655440000/oauth2/authorize?redirect_uri=https%3A%2F%2Fbroker.example.com%2Fsessions",
-          "message": "User session is unavailable. Please re-authenticate."
+          "message": "mock exchange error"
         }
       ]
     }
   }
 }
 ```
+
+The description is the text that the broker sent; the test broker sends `mock exchange error`.
 
 The tested request is an A2A call, not an MCP call. The challenge does not depend on the
 protocol of the request.

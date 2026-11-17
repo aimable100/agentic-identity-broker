@@ -358,6 +358,8 @@ func waitForBrokerHealth(t *testing.T, done <-chan struct{}, runErr *error, clie
 }
 
 func TestRunServesBothPortsAndShutsDownOnSIGTERM(t *testing.T) {
+	evidence.ForTest(t, "deployment.servers.two-ports")
+	evidence.ForTest(t, "deployment.shutdown.sigterm")
 	enduserPort := freeBrokerPort(t)
 	adminPort := freeBrokerPort(t)
 	for adminPort == enduserPort {
@@ -449,6 +451,7 @@ func TestRunServesBothPortsAndShutsDownOnSIGTERM(t *testing.T) {
 }
 
 func TestRunAtomicBindFailure(t *testing.T) {
+	evidence.ForTest(t, "deployment.startup.all-or-nothing")
 	for _, occupiedServer := range []string{"enduser", "admin"} {
 		t.Run(occupiedServer, func(t *testing.T) {
 			occupied, err := net.Listen("tcp", "127.0.0.1:0")
