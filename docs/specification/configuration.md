@@ -161,7 +161,7 @@ configuration.
 Two settings control the broker's own log. `log.level` accepts `debug`, `info`, `warn`, and
 `error`. Other values, such as `verbose`, `trace`, or an empty value, are rejected. `example:configuration.log.level`
 `log.format` accepts `text` and `json`, and rejects other values, such as `xml`. `example:configuration.log.format`
-The defaults are `info` and `text`. `example:configuration.precedence.layers`
+Without a value from any layer, the level is `info`. `example:configuration.precedence.layers`
 
 ## What the broker reports about its configuration
 

@@ -215,8 +215,8 @@ ExtProc reads one document from the policy, by default `result` in the package
 Allow and deny are shown above. `example:gateway-policy-authorization.policy.allow-and-deny`
 
 For `approval_required`, the gateway does not forward the call. It creates a pending
-**ToolApproval** at the broker and answers the agent with a link where the user can decide. `example:gateway-policy-authorization.decisions.approval-required`
-The page "Tool approvals" describes that flow. It needs the tool approval settings of ExtProc.
+**ToolApproval** at the broker and answers the agent itself. `example:gateway-policy-authorization.decisions.approval-required`
+The page "Tool approvals" describes that answer and the rest of the flow. It needs the tool approval settings of ExtProc.
 Without them, `approval_required` is denied with `403` and the reason "approval_required is not
 yet supported". `example:gateway-policy-authorization.decisions.approval-without-gate`
 
