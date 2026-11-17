@@ -2,7 +2,7 @@
   "version": 1,
   "cursors": {
     "labelling_after": null,
-    "investigation_after": 471
+    "investigation_after": 131
   },
   "issues": [
     {
@@ -232,6 +232,12 @@
       "state": "awaiting_clarification",
       "updated_at": "2026-11-17",
       "note": "Mapped current effective resource derivation and domain/both-adapter session guards. Asked creation-pinned vs live audience default and exact intentional-divergence marker. Require atomic sibling writes; five existing audience-update race tests pass. No service-account implementation."
+    },
+    {
+      "number": 131,
+      "state": "commented",
+      "updated_at": "2026-11-17",
+      "note": "Static keyboard propagation gap: Card handles descendant Enter/Space; Revoke stops clicks only. Posted sibling native link/button journey and shared locale/memoization plan. No browser audit or tests; maintenance-only candidate."
     }
   ],
   "fixes": [
@@ -332,39 +338,45 @@
       "follow_up": null
     },
     {
-      "area": "repo_assist_prs",
-      "checked_at": "2026-11-17",
-      "result": "Read details, comments, reviews, review threads, checks and statuses for all nine open Repo Assist PRs. Heads unchanged; eight drafts and non-draft #424. #403/#432 remain dirty and publication-size blocked. No new human activity or repeat push/comment.",
-      "follow_up": "Maintainer integrations/classifications; authorized external pipeline starts for #403/#490; exact tagging contract and closing-footer correction for #490."
-    },
-    {
-      "area": "ci",
-      "checked_at": "2026-11-17",
-      "result": "Both checks and statuses read for all nine: seven external pipelines/test stages pass; #403/#490 pipeline-start failures still report no accountable user. DCO passes where present; classification failures remain #403/#420/#448. No new code-caused CI failure.",
-      "follow_up": "No code-only workaround for infrastructure failures; existing comments retain actionable guidance."
-    },
-    {
-      "area": "hygiene",
-      "checked_at": "2026-11-17",
-      "result": "All 66 open issues and all 29 open PRs have labels; no label changes needed. Reread monthly checklist/comments and outstanding comment threads: no new human acknowledgements or check-offs.",
-      "follow_up": null
-    },
-    {
       "area": "tests",
       "checked_at": "2026-11-17",
       "result": "Maintained just test package/name override with -count=1 passed five existing thirdparty audience-update tests under race detection (7 leaf cases). Memory package was also compiled but matched no tests. No new behavior, PostgreSQL, static, build, E2E or full-gate pass claimed.",
       "follow_up": null
     },
     {
+      "area": "repo_assist_prs",
+      "checked_at": "2026-11-17",
+      "result": "Read all nine PR details/comments/reviews/threads and both check types (including page 2 for #490). Heads unchanged; eight drafts and non-draft #424. #403/#432 still dirty and size-blocked. No new human request, push or repeat issue reminder.",
+      "follow_up": "Maintainer integration/classifications; authorized external pipeline starts for #403/#490; exact tagging contract and closing-footer correction for #490."
+    },
+    {
+      "area": "ci",
+      "checked_at": "2026-11-17",
+      "result": "Seven external PR pipelines/test stages pass. #403/#490 still fail at pipeline start with no accountable user. DCO passes; classification failures remain #403/#420/#448. No new code-caused failure or code-only workaround.",
+      "follow_up": null
+    },
+    {
+      "area": "hygiene",
+      "checked_at": "2026-11-17",
+      "result": "All 66 open issues and 27 open PRs have labels. Reread monthly checklist/comments and tracked issue-comment threads: no new human acknowledgements or check-offs. No label edit needed; Task 1 falls back to Task 2.",
+      "follow_up": null
+    },
+    {
       "area": "code",
       "checked_at": "2026-11-17",
-      "result": "Resumed after #418; skipped prior/assigned work. Read #441 approval gate, #452/#453 triggers and workflow blockers. Investigated untouched #471 against #478: mapped resource derivation and both-adapter guards; asked audience lifetime/divergence contract. No source changes.",
-      "follow_up": "Resume after #471; retain machine sub-issue questions and active fixes without duplicate comments."
+      "result": "Resumed after #471; skipped previously investigated machine subissues and read parent #478. Wrapped to oldest untouched #131. Read Card/DelegationCard/tests, SessionCard, approval review, SPA bootstrap and docs locale config. Posted concrete keyboard/locale plan.",
+      "follow_up": "Resume after #131. Maintenance-only; no source changes or new PR. Preserve existing machine/tag contract gates."
+    },
+    {
+      "area": "qa",
+      "checked_at": "2026-11-17",
+      "result": "Static #131 finding: Card captures bubbling Enter/Space from descendant controls; Revoke stops only click events, and tests are mouse-only. SessionCard uses browser Intl locale with timestamp-only memoization; SPA lang remains English. No browser reproduction/audit.",
+      "follow_up": "Use native sibling navigation/revoke controls, multi-card keyboard/cancel-focus journey, shared explicit locale and memo dependencies. Frontend dependencies absent; no tests/build/full gate run."
     },
     {
       "area": "release",
       "checked_at": "2026-11-17",
-      "result": "Latest release remains v0.1.146. Investigation-only maintenance run does not warrant a release PR; new PR limit is zero.",
+      "result": "Latest release is now v0.1.147, published Nov 17 with storage client-ID fix and workflow/docs changes. This static investigation adds no release-worthy code; maintenance-only new PR limit remains zero.",
       "follow_up": null
     }
   ],
@@ -386,8 +398,8 @@
     },
     {
       "task": 2,
-      "item": "Resume investigation after #471",
-      "note": "Await #471 audience-default lifetime and intentional-divergence contract, plus #418 release/main closure target. Skip prior investigations and active fixes. #356/#352/#354 remain capacity-deferred candidates."
+      "item": "Resume investigation after #131",
+      "note": "Wrapped after #471 to untouched #131. Await existing audience/identity/design decisions; assess next untouched issue without repeating unanswered comments. #131 keyboard/locale work is capacity-deferred."
     },
     {
       "task": 3,
