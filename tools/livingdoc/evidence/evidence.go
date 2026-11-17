@@ -42,6 +42,8 @@ type Record struct {
 }
 
 // Write stores the record in dir under a name derived from its example and scenario.
+// A skipped record never replaces an existing one, so a suite can run in several
+// filtered passes into the same directory.
 func Write(dir string, record Record) error {
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("create evidence directory: %w", err)
@@ -51,8 +53,13 @@ func Write(dir string, record Record) error {
 		return fmt.Errorf("encode evidence for %q: %w", record.Example, err)
 	}
 	sum := sha256.Sum256([]byte(record.Example + "\x00" + record.Spec + "\x00" + record.Location))
-	name := hex.EncodeToString(sum[:8]) + ".json"
-	if err := os.WriteFile(filepath.Join(dir, name), encoded, 0o600); err != nil {
+	path := filepath.Join(dir, hex.EncodeToString(sum[:8])+".json")
+	if record.State == StateSkipped {
+		if _, err := os.Stat(path); err == nil {
+			return nil
+		}
+	}
+	if err := os.WriteFile(path, encoded, 0o600); err != nil {
 		return fmt.Errorf("write evidence for %q: %w", record.Example, err)
 	}
 	return nil

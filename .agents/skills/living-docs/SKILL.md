@@ -148,7 +148,8 @@ For a stale exchange, read the diff and find the change that caused it.
   that does, or restore the exchange.
 
 When a pull request changes behavior that a page describes, update the page in the same pull
-request.
+request. CI runs the check with Docker, Helm, and a browser as the job "Living
+specification"; its job summary shows the report with the diff of each stale exchange.
 
 ## Review a page
 

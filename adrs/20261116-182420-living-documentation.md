@@ -30,7 +30,8 @@ cannot read them as a description of the product.
   backend, ExtProc, and browser acceptance suites and from plain Go tests bound with
   `evidence.ForTest`. Only the backend suite records HTTP exchanges; the other sources prove
   prose claims. A page shows a screen with a maintained screenshot of the browser suite.
-- The check is not part of `just verify` or CI while this decision is Proposed.
+- CI runs `just living-docs -strict -browser` as the job "Living specification" for code and
+  documentation changes, and the CI gate requires it. The check is not part of `just verify`.
 
 ## Consequences
 
@@ -41,7 +42,7 @@ cannot read them as a description of the product.
   scenario proves.
 - Recorded bodies are stored as sent. Pages and fixtures must keep to synthetic data.
 - Open before acceptance: recorded evidence other than HTTP exchanges (decoded token claims,
-  gateway requests, telemetry), a CI gate with Docker, Helm, and a browser, and whether feature
+  gateway requests, telemetry), and whether feature
   specs cite examples by the same identifiers.
 
 ## Alternatives
