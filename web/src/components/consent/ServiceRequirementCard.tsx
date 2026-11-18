@@ -96,6 +96,7 @@ export const ServiceRequirementCard: React.FC<ServiceRequirementCardProps> = ({
             variant="secondary"
             size="sm"
             onClick={() => onLogin(serviceId)}
+            className="bg-success-hover hover:bg-success-dark focus:ring-success-dark"
           >
             Login
           </Button>

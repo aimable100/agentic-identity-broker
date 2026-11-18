@@ -712,22 +712,27 @@ func (s *OAuth2SessionService) initiateOAuth2Flow(
 	serviceID id.ServiceID,
 	redirectURI string,
 	consentStateID string,
-) (*InitiateFlowResult, error) {
-	s.logger.InfoContext(ctx, "initiating OAuth2 flow", "principal", principal, "service_id", serviceID)
+) (result *InitiateFlowResult, resultErr error) {
+	defer func() { s.auditCredentialSourceFailure(ctx, serviceID, credentialOperationInitiation, resultErr) }()
 	if len(redirectURI) >= maxProviderStateBytes {
 		return nil, ErrStateTokenTooLarge
 	}
 
-	// Fetch the service (with decrypted client secret via service manager)
-	service, err := s.providerService.GetForTokenAcquisition(ctx, serviceID)
+	service, err := s.providerService.GetForIdentityEvaluation(ctx, serviceID)
 	if err != nil {
-		failure := tokenAcquisitionError(ctx, OperationCodeExchange, err)
-		s.logger.ErrorContext(ctx, "failed to fetch service for authorization", "service_id", serviceID, "oauth2_session", failure.Metadata())
-		return nil, failure
+		return nil, sessionOperationError(ctx, OperationCodeExchange, DetailCredentialSourceUnavailable, identityReadError(err))
 	}
-	clientID, clientSecret, err := s.selectCredentials(ctx, service, credentialOperationInitiation, nil)
+	identity, err := s.resolveClientIdentity(ctx, service)
 	if err != nil {
-		return nil, err
+		return nil, sessionOperationError(ctx, OperationCodeExchange, DetailCredentialSourceUnavailable, err)
+	}
+	clientID := *identity.Identity
+	if service.CredentialSource == model.CredentialSourceFilesystem {
+		s.logger.InfoContext(ctx, "oauth2 credential files selected",
+			"event", "session.oauth2.credential_files_used",
+			"service_id", service.ID,
+			"operation", credentialOperationInitiation,
+			"outcome", credentialOutcomeUsed)
 	}
 
 	previous, err := s.sessionRepo.FindByPrincipalAndService(ctx, principal, serviceID)
@@ -735,7 +740,11 @@ func (s *OAuth2SessionService) initiateOAuth2Flow(
 		return nil, sessionOperationError(ctx, OperationSessionLookup, DetailRepositoryUnavailable, err)
 	}
 	if service.Discovery.ResourceURL != nil {
-		if _, err := s.tokenHTTPClient(service); err != nil {
+		tokenService, err := s.providerService.GetForTokenAcquisition(ctx, serviceID)
+		if err != nil {
+			return nil, tokenAcquisitionError(ctx, OperationCodeExchange, err)
+		}
+		if _, err := s.tokenHTTPClient(tokenService); err != nil {
 			return nil, fmt.Errorf("failed to initiate discovery-backed OAuth2 flow: %w", err)
 		}
 	}
@@ -765,9 +774,8 @@ func (s *OAuth2SessionService) initiateOAuth2Flow(
 		claims.SessionID = previous.ID
 		claims.SessionCallbackID = previous.CallbackID
 	}
-	if credentialSourceEligible(service) {
-		claims.UpstreamClientID = &clientID
-	}
+	claims.UpstreamClientID = identity.Identity
+	claims.UpstreamClientRevision = &identity.Revision
 
 	// Encrypt state token
 	stateToken, err := s.CreateStateToken(claims)
@@ -788,7 +796,6 @@ func (s *OAuth2SessionService) initiateOAuth2Flow(
 		return nil, failure
 	}
 	cfg.ClientID = clientID.String()
-	cfg.ClientSecret = clientSecret
 
 	// Generate authorization URL with PKCE
 	authURL := cfg.AuthCodeURL(stateToken, oauth2.S256ChallengeOption(verifier))
@@ -873,6 +880,7 @@ func (s *OAuth2SessionService) createSession(
 		}
 		current.CallbackID = uuid.NewString()
 		current.UpstreamClientID = claims.UpstreamClientID
+		current.UpstreamClientRevision = *claims.UpstreamClientRevision
 		current.EncryptedRefreshToken = encryptedRefresh
 		current.RefreshRejectedAt = nil
 		current.EncryptedAccessToken = encryptedAccess
@@ -897,22 +905,23 @@ func (s *OAuth2SessionService) createSession(
 	}
 
 	session = &storage.UserSession{
-		ID:                    id.NewSessionID(),
-		Principal:             principal,
-		ServiceID:             serviceID,
-		CallbackID:            uuid.NewString(),
-		ExpectedIssuerURI:     claims.IssuerURI,
-		ExpectedResource:      claims.Resource,
-		UpstreamClientID:      claims.UpstreamClientID,
-		EncryptedAccessToken:  encryptedAccess,
-		EncryptedRefreshToken: encryptedRefresh,
-		TokenType:             tokenType,
-		Scope:                 scope,
-		AccessTokenExpiresAt:  accessTokenExpiresAt,
-		EncryptionContext:     storage.EncryptionContext{ServiceID: serviceID},
-		InitiatedAt:           now,
-		CreatedAt:             now,
-		UpdatedAt:             now,
+		ID:                     id.NewSessionID(),
+		Principal:              principal,
+		ServiceID:              serviceID,
+		CallbackID:             uuid.NewString(),
+		ExpectedIssuerURI:      claims.IssuerURI,
+		ExpectedResource:       claims.Resource,
+		UpstreamClientID:       claims.UpstreamClientID,
+		UpstreamClientRevision: *claims.UpstreamClientRevision,
+		EncryptedAccessToken:   encryptedAccess,
+		EncryptedRefreshToken:  encryptedRefresh,
+		TokenType:              tokenType,
+		Scope:                  scope,
+		AccessTokenExpiresAt:   accessTokenExpiresAt,
+		EncryptionContext:      storage.EncryptionContext{ServiceID: serviceID},
+		InitiatedAt:            now,
+		CreatedAt:              now,
+		UpdatedAt:              now,
 	}
 
 	// The unique key chooses the winner even when both callbacks observed no session.
@@ -935,8 +944,8 @@ func (s *OAuth2SessionService) HandleCallback(
 	ctx context.Context,
 	principal id.Principal,
 	req *HandleCallbackRequest,
-) (*HandleCallbackResult, error) {
-	s.logger.DebugContext(ctx, "processing OAuth2 callback", "service_id", req.ServiceID, "principal", principal)
+) (result *HandleCallbackResult, resultErr error) {
+	defer func() { s.auditCredentialSourceFailure(ctx, req.ServiceID, credentialOperationExchange, resultErr) }()
 
 	// Validate sealed state before processing any provider response, including errors.
 
@@ -944,7 +953,6 @@ func (s *OAuth2SessionService) HandleCallback(
 	if err != nil {
 		if errors.Is(err, model.ErrCredentialSourceUnavailable) {
 			failure := sessionOperationError(ctx, OperationCodeExchange, DetailCredentialSourceUnavailable, err)
-			s.auditCredentialSourceFailure(ctx, req.ServiceID, credentialOperationExchange, failure)
 			return nil, failure
 		}
 		s.logger.ErrorContext(ctx, "state token validation failed", "service_id", req.ServiceID, "oauth2_session", NewErrorMetadata(OperationCodeExchange, DetailConfiguration))
@@ -957,12 +965,14 @@ func (s *OAuth2SessionService) HandleCallback(
 		return nil, &AuthorizationCallbackError{code: code}
 	}
 
-	// Fetch the service (with decrypted client secret via service manager)
-	service, err := s.providerService.GetForTokenAcquisition(ctx, req.ServiceID)
+	service, err := s.checkCallbackIdentity(ctx, claims)
 	if err != nil {
-		failure := tokenAcquisitionError(ctx, OperationCodeExchange, err)
-		s.logger.ErrorContext(ctx, "service not found during callback", "service_id", req.ServiceID, "oauth2_session", failure.Metadata())
-		return nil, failure
+		return nil, err
+	}
+	established := storage.UserSession{ServiceID: claims.ServiceID, UpstreamClientID: claims.UpstreamClientID, UpstreamClientRevision: *claims.UpstreamClientRevision}
+	service, err = s.providerForEstablishedIdentity(ctx, service, &established, OperationCodeExchange)
+	if err != nil {
+		return nil, err
 	}
 	if service.Discovery.ClientMethod == model.ClientBootstrapDCR && service.ID != req.ServiceID {
 		return nil, errors.New("DCR token identity does not match the requested service")
@@ -1004,6 +1014,9 @@ func (s *OAuth2SessionService) HandleCallback(
 	}
 	if service.IsCIMDConfidentialClient() {
 		s.auditCIMDTokenAcquisition(ctx, service.ID, "code_exchange", "success")
+	}
+	if _, err := s.checkCallbackIdentity(ctx, claims); err != nil {
+		return nil, err
 	}
 
 	// Extract scopes from token response or fall back to service scopes.
@@ -1056,8 +1069,22 @@ func (s *OAuth2SessionService) HandleCallback(
 // may be retried; ambiguous transport failures are not replayed. CIMD clients sign a
 // new assertion for every attempt, and DCR clients use their pinned method.
 // Selected credentials are reused across retries after validating the established identity.
-// A nil identity is valid only for legacy, never-transitioned stored services or excluded client modes.
+// A nil identity is valid only for legacy, never-transitioned stored services at revision 0.
 func (s *OAuth2SessionService) RefreshAccessToken(
+	ctx context.Context,
+	entity *model.ThirdpartyOAuth2ProviderEntity,
+	refreshToken string,
+	established *id.ClientID,
+) (resultToken *oauth2.Token, resultErr error) {
+	defer func() {
+		if entity != nil {
+			s.auditCredentialSourceFailure(ctx, entity.ID, credentialOperationRefresh, resultErr)
+		}
+	}()
+	return s.refreshAccessToken(ctx, entity, refreshToken, established)
+}
+
+func (s *OAuth2SessionService) refreshAccessToken(
 	ctx context.Context,
 	entity *model.ThirdpartyOAuth2ProviderEntity,
 	refreshToken string,
@@ -1449,27 +1476,29 @@ func (s *OAuth2SessionService) ListUserSessions(
 	for i, summary := range summaries {
 		ids[i] = summary.ServiceID
 	}
-	services, err := s.providerService.GetByIDs(ctx, ids)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load session services: %w", err)
-	}
-	servicesByID := make(map[id.ServiceID]*model.ThirdpartyOAuth2ProviderEntity, len(services))
+	services, loadErr := s.providerService.GetByIDsForIdentityEvaluation(ctx, ids)
+	identities := make(map[id.ServiceID]summaryIdentityEvaluation, len(services))
 	for _, service := range services {
-		servicesByID[service.ID] = service
+		if _, evaluated := identities[service.ID]; !evaluated {
+			identities[service.ID] = s.evaluateSummaryIdentity(ctx, service.ID, service, nil)
+		}
 	}
 	result := make([]*storage.UserSessionSummary, 0, len(summaries))
 	for _, summary := range summaries {
-		service := servicesByID[summary.ServiceID]
-		if service == nil {
-			s.logger.WarnContext(ctx, "service not found", "service_id", summary.ServiceID)
-			continue
+		evaluated, found := identities[summary.ServiceID]
+		if !found {
+			if loadErr == nil {
+				continue
+			}
+			evaluated = s.evaluateSummaryIdentity(ctx, summary.ServiceID, nil, loadErr)
+			identities[summary.ServiceID] = evaluated
 		}
 		agentCount, err := s.grantRepo.CountAgentsByPrincipalAndServiceID(ctx, principal, summary.ServiceID)
 		if err != nil {
 			s.logger.WarnContext(ctx, "failed to count agents", "service_id", summary.ServiceID, "err", err)
 			agentCount = 0
 		}
-		summary.ServiceDisplayName = service.DisplayName
+		evaluated.apply(summary)
 		summary.DependentAgentCount = agentCount
 		result = append(result, summary)
 	}
@@ -1618,15 +1647,12 @@ func (s *OAuth2SessionService) GetSessionWithAgents(
 		"service_id", serviceID,
 		"dependent_agent_count", len(dependentAgents))
 
-	serviceDisplayName := ""
-	if service, err := s.providerService.Get(ctx, serviceID); err != nil {
-		s.logger.WarnContext(ctx, "failed to load session service", "service_id", serviceID, "error", err)
-	} else {
-		serviceDisplayName = service.DisplayName
-	}
+	details := storage.NewUserSessionDetails(session, "", len(dependentAgents))
+	service, err := s.providerService.GetForIdentityEvaluation(ctx, serviceID)
+	s.evaluateSummaryIdentity(ctx, serviceID, service, err).apply(details.UserSessionSummary)
 
 	return &SessionWithAgents{
-		Session:         storage.NewUserSessionDetails(session, serviceDisplayName, len(dependentAgents)),
+		Session:         details,
 		DependentAgents: dependentAgents,
 	}, nil
 }
@@ -1664,6 +1690,8 @@ func (s *OAuth2SessionService) GetValidAccessToken(
 	principal id.Principal,
 	serviceID id.ServiceID,
 ) (resultSession *storage.UserSession, resultToken string, resultErr error) {
+	credentialPhase := credentialOperationAcquisition
+	defer func() { s.auditCredentialSourceFailure(ctx, serviceID, credentialPhase, resultErr) }()
 	defer func() {
 		if resultErr != nil && ctx.Err() != nil {
 			resultErr = callerCanceledError(ctx, OperationSessionLookup, resultErr)
@@ -1685,6 +1713,9 @@ func (s *OAuth2SessionService) GetValidAccessToken(
 	if session.RefreshRejected() {
 		return nil, "", refreshUnavailableError(ctx, session, nil)
 	}
+	if _, err := s.checkSessionIdentity(ctx, session, OperationSessionLookup); err != nil {
+		return nil, "", err
+	}
 	if session.HasValidAccessToken() {
 		accessToken, err := s.DecryptAccessToken(ctx, session)
 		if err != nil {
@@ -1696,6 +1727,7 @@ func (s *OAuth2SessionService) GetValidAccessToken(
 		return session, accessToken, nil
 	}
 
+	credentialPhase = credentialOperationRefresh
 	key := principal.String() + "|" + serviceID.String()
 	if err := ctx.Err(); err != nil {
 		return nil, "", sessionOperationError(ctx, OperationRefresh, DetailCallerCanceled, err)
@@ -1731,6 +1763,9 @@ func (s *OAuth2SessionService) GetValidAccessToken(
 		if current.RefreshRejected() {
 			return nil, "", refreshUnavailableError(ctx, current, nil)
 		}
+		if _, err := s.checkSessionIdentity(ctx, current, OperationRefresh); err != nil {
+			return nil, "", err
+		}
 		token, err := s.DecryptAccessToken(ctx, current)
 		if err != nil {
 			return nil, "", sessionOperationError(ctx, OperationRefresh, DetailDecryptionFailed, err)
@@ -1758,7 +1793,7 @@ func (s *OAuth2SessionService) refreshDueSession(ctx context.Context, principal 
 // A nil dueBy forces renewal. Otherwise dueBy runs after the session lock is acquired,
 // and the latest row must expire at or before its result.
 func (s *OAuth2SessionService) refreshLockedSession(ctx context.Context, principal id.Principal, serviceID id.ServiceID, dueBy func() time.Time, trigger RefreshTrigger) (*storage.UserSession, bool, *model.ThirdpartyOAuth2ProviderEntity, error) {
-	provider, providerErr := s.getRefreshProvider(ctx, serviceID)
+	var provider *model.ThirdpartyOAuth2ProviderEntity
 	refreshed := false
 	var rejected error
 	current, err := s.refreshRepo.WithLockedSession(ctx, principal, serviceID, func(ctx context.Context, current *storage.UserSession) (bool, error) {
@@ -1771,6 +1806,11 @@ func (s *OAuth2SessionService) refreshLockedSession(ctx context.Context, princip
 			}
 			return false, refreshUnavailableError(ctx, current, nil)
 		}
+		var identityErr error
+		provider, identityErr = s.checkSessionIdentity(ctx, current, OperationRefresh)
+		if identityErr != nil {
+			return false, identityErr
+		}
 		var threshold *time.Time
 		if dueBy != nil {
 			due := dueBy()
@@ -1782,8 +1822,9 @@ func (s *OAuth2SessionService) refreshLockedSession(ctx context.Context, princip
 		if !current.CanRefresh() {
 			return false, refreshUnavailableError(ctx, current, threshold)
 		}
-		if providerErr != nil {
-			return false, providerErr
+		provider, identityErr = s.providerForEstablishedIdentity(ctx, provider, current, OperationRefresh)
+		if identityErr != nil {
+			return false, identityErr
 		}
 		if err := s.refreshSessionTokens(ctx, current, provider); err != nil {
 			if sessionFailureMetadata(err).Detail() != DetailRefreshRejected {
@@ -1839,6 +1880,9 @@ func (s *OAuth2SessionService) checkUnrefreshableSweepCandidate(ctx context.Cont
 		if current == nil || current.RefreshRejected() || !current.AccessTokenExpiresBy(threshold) {
 			return false, nil
 		}
+		if _, err := s.checkSessionIdentity(ctx, current, OperationRefresh); err != nil {
+			return false, err
+		}
 		if !current.CanRefresh() {
 			return false, refreshUnavailableError(ctx, current, &threshold)
 		}
@@ -1863,19 +1907,6 @@ func (s *OAuth2SessionService) refreshOperationContext(ctx context.Context) (con
 	return context.WithTimeout(ctx, upstreamTimeout+s.config.RefreshStorageTimeout+time.Minute)
 }
 
-func (s *OAuth2SessionService) getRefreshProvider(ctx context.Context, serviceID id.ServiceID) (*model.ThirdpartyOAuth2ProviderEntity, error) {
-	service, err := s.providerService.GetForTokenAcquisition(ctx, serviceID)
-	if err != nil {
-		failure := tokenAcquisitionError(ctx, OperationRefresh, err)
-		s.logger.ErrorContext(ctx, "failed to fetch service for token refresh", "service_id", serviceID, "oauth2_session", failure.Metadata())
-		return nil, failure
-	}
-	if service.Discovery.ClientMethod == model.ClientBootstrapDCR && service.ID != serviceID {
-		return nil, errors.New("DCR token identity does not match the requested service")
-	}
-	return service, nil
-}
-
 // refreshSessionTokens exchanges the stored refresh token and encrypts the result.
 // The caller holds the session lock and persists the modified session atomically.
 // Precondition: session.CanRefresh() is true.
@@ -1896,7 +1927,12 @@ func (s *OAuth2SessionService) refreshSessionTokens(ctx context.Context, session
 		return sessionOperationError(ctx, OperationRefresh, DetailRefreshUnavailable, ErrRefreshNotAvailable)
 	}
 
-	newToken, err := s.RefreshAccessToken(ctx, service, refreshToken, session.UpstreamClientID)
+	newToken, err := s.refreshAccessToken(ctx, service, refreshToken, session.UpstreamClientID)
+	if ctx.Err() == nil && (err == nil || sessionFailureMetadata(err).Detail() == DetailRefreshRejected) {
+		if _, identityErr := s.checkSessionIdentity(ctx, session, OperationRefresh); identityErr != nil {
+			return identityErr
+		}
+	}
 	if err != nil {
 		if errors.Is(err, model.ErrCredentialSourceUnavailable) {
 			return err
@@ -1997,6 +2033,7 @@ func (s *OAuth2SessionService) ForceRefreshSession(
 	serviceID id.ServiceID,
 ) (summary *storage.UserSessionSummary, resultErr error) {
 	callerCtx := ctx
+	defer func() { s.auditCredentialSourceFailure(callerCtx, serviceID, credentialOperationRefresh, resultErr) }()
 	defer func() {
 		if resultErr != nil && callerCtx.Err() != nil {
 			resultErr = callerCanceledError(callerCtx, OperationRefresh, resultErr)
@@ -2024,7 +2061,10 @@ func (s *OAuth2SessionService) ForceRefreshSession(
 		s.logger.WarnContext(ctx, "failed to count agents after refresh", "service_id", serviceID, "oauth2_session", NewErrorMetadata(OperationRefresh, DetailRepositoryUnavailable).WithDependency(DependencySessionRepository))
 		agentCount = 0
 	}
-	return storage.NewUserSessionSummary(session, service.DisplayName, agentCount), nil
+	summary = storage.NewUserSessionSummary(session, "", agentCount)
+	currentService, err := s.providerService.GetForIdentityEvaluation(ctx, serviceID)
+	s.evaluateSummaryIdentity(ctx, serviceID, currentService, err).apply(summary)
+	return summary, nil
 }
 
 type sharedRefreshContextKey struct{}

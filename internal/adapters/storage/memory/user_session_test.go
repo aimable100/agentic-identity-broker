@@ -79,9 +79,6 @@ func TestUserSessionRepository_ListingExcludesTokenBlobs(t *testing.T) {
 	require.NoError(t, repo.Create(ctx, expired))
 	require.NoError(t, repo.Create(ctx, refreshTestSession(id.Principal("other@example.com"), id.NewServiceID())))
 
-	activeIDs, err := repo.ListActiveServiceIDsByPrincipal(ctx, principal)
-	require.NoError(t, err)
-	assert.Equal(t, []id.ServiceID{active.ServiceID}, activeIDs)
 	summaries, err := repo.ListSummariesByPrincipal(ctx, principal)
 	require.NoError(t, err)
 	require.Len(t, summaries, 2)

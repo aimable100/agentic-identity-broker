@@ -170,7 +170,7 @@ func newCredentialSessionHarness(t *testing.T, bindings map[string]ports.Credent
 		config.RetryBaseDelay = time.Millisecond
 	}, &http.Client{}, loggers...)
 	reader := &credentialReaderSpy{reader: credentialfile.New()}
-	service.WithCredentialFileReader(reader)
+	service.WithCredentialFileReader(reader).WithClientIdentityRepository(records)
 	return &credentialSessionHarness{service: service, providers: providers, records: records, sessions: sessions, reader: reader, endpoint: newCredentialTokenEndpoint(t)}
 }
 
@@ -325,20 +325,25 @@ func TestCredentialSelection_FilesystemUsesExactPairAndPersistsOnlyVerifiedSessi
 	require.NoError(t, err)
 	require.NotNil(t, claims.UpstreamClientID)
 	assert.Equal(t, id.ClientID("file client"), *claims.UpstreamClientID)
+	require.NotNil(t, claims.UpstreamClientRevision)
+	assert.Zero(t, *claims.UpstreamClientRevision)
 	ids, pairs := h.reader.counts()
 	assert.Equal(t, 1, ids)
 	assert.Zero(t, pairs)
 	session := h.callback(t, principal, provider.ID, flow.StateToken)
 	assert.Equal(t, claims.UpstreamClientID, session.UpstreamClientID)
+	assert.Equal(t, *claims.UpstreamClientRevision, session.UpstreamClientRevision)
 	persisted, err := h.sessions.Get(context.Background(), session.ID)
 	require.NoError(t, err)
 	assert.Equal(t, claims.UpstreamClientID, persisted.UpstreamClientID)
+	assert.Equal(t, *claims.UpstreamClientRevision, persisted.UpstreamClientRevision)
 	_, err = h.service.ForceRefreshSession(context.Background(), principal, provider.ID)
 	require.NoError(t, err)
 	h.expire(t, principal, provider.ID)
 	refreshed, _, err := h.service.GetValidAccessToken(context.Background(), principal, provider.ID)
 	require.NoError(t, err)
 	assert.Equal(t, claims.UpstreamClientID, refreshed.UpstreamClientID)
+	assert.Equal(t, *claims.UpstreamClientRevision, refreshed.UpstreamClientRevision)
 	requests := h.endpoint.captured(t)
 	require.Len(t, requests, 3)
 	for _, request := range requests {
@@ -346,10 +351,14 @@ func TestCredentialSelection_FilesystemUsesExactPairAndPersistsOnlyVerifiedSessi
 		assert.Equal(t, "file secret", request.secret)
 	}
 	ids, pairs = h.reader.counts()
-	assert.Equal(t, 1, ids)
+	assert.Equal(t, 10, ids, "initiation, callback, and refresh gates check identity; the explicit refresh summary adds one Display read")
 	assert.Equal(t, 3, pairs)
 	after, err := h.records.Get(context.Background(), provider.ID)
 	require.NoError(t, err)
+	identity := id.ClientID("file client")
+	before.ClientIdentity = &identity
+	assert.Zero(t, before.ClientIdentityRevision)
+	assert.Zero(t, after.ClientIdentityRevision)
 	assert.Equal(t, before, after)
 	assert.True(t, after.ClientID.IsZero())
 	assert.True(t, after.Secret.IsAbsent())
@@ -365,8 +374,11 @@ func TestCredentialSelection_FilesystemUsesExactPairAndPersistsOnlyVerifiedSessi
 	assert.NotContains(t, string(encoded), "upstream_client_id")
 	assert.NotContains(t, string(encoded), "file client")
 	newIDs, newPairs := h.reader.counts()
-	assert.Equal(t, ids, newIDs)
+	assert.Equal(t, ids+1, newIDs, "session listing performs one live client-ID Display read")
 	assert.Equal(t, pairs, newPairs)
+	afterDisplay, err := h.records.Get(context.Background(), provider.ID)
+	require.NoError(t, err)
+	assert.Equal(t, after, afterDisplay, "a same-identity Display observation changes no service fields")
 }
 
 func TestCredentialSelection_InitiationDoesNotRequireOrReadSecretFile(t *testing.T) {
@@ -383,7 +395,7 @@ func TestCredentialSelection_InitiationDoesNotRequireOrReadSecretFile(t *testing
 	assertCredentialSourceReason(t, err, model.CredentialSourceReasonNotFound)
 	assert.Empty(t, h.endpoint.captured(t))
 	ids, pairs = h.reader.counts()
-	assert.Equal(t, 1, ids)
+	assert.Equal(t, 2, ids, "callback checks identity before acquiring the pair")
 	assert.Equal(t, 1, pairs)
 }
 

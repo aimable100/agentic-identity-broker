@@ -249,6 +249,14 @@ func (cp *ConsentPage) SubmitConsent(ctx context.Context) error {
 	return nil
 }
 
+// SaveConsent submits changes to an existing grant.
+func (cp *ConsentPage) SaveConsent(_ context.Context) error {
+	if err := cp.getConsentActionButton("Save").Click(); err != nil {
+		return fmt.Errorf("failed to save consent: %w", err)
+	}
+	return nil
+}
+
 func (cp *ConsentPage) endDateInput() (playwright.Locator, error) {
 	input := cp.page().GetByLabel("End date", playwright.PageGetByLabelOptions{
 		Exact: playwright.Bool(true),
@@ -787,6 +795,17 @@ func (cp *ConsentPage) ExcludePermissionSetService(_ context.Context, permission
 	return cp.permissionSetCard(permissionSetName).GetByRole("switch", playwright.LocatorGetByRoleOptions{
 		Name: "Exclude " + serviceName,
 	}).Click()
+}
+
+// IsPermissionSetServiceIncluded checks an optional service's selected switch.
+func (cp *ConsentPage) IsPermissionSetServiceIncluded(_ context.Context, permissionSetName, serviceName string) (bool, error) {
+	checked, err := cp.permissionSetCard(permissionSetName).GetByRole("switch", playwright.LocatorGetByRoleOptions{
+		Name: "Exclude " + serviceName,
+	}).GetAttribute("aria-checked")
+	if err != nil {
+		return false, err
+	}
+	return checked == "true", nil
 }
 
 // IsPermissionSetServiceExcluded checks the per-service switch after a selection change.

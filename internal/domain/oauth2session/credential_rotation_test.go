@@ -52,6 +52,7 @@ func TestCredentialRotation_BrokerRetriesAndActualRefreshesAcquireFreshPairs(t *
 	provider := h.register(t, model.CredentialSourceFilesystem, "retry-service", "", "")
 	before, err := h.records.Get(context.Background(), provider.ID)
 	require.NoError(t, err)
+	assert.Zero(t, before.ClientIdentityRevision)
 	principal := id.Principal("retry@example.com")
 	flow := h.initiate(t, principal, provider.ID)
 	var publishOnce sync.Once
@@ -64,8 +65,11 @@ func TestCredentialRotation_BrokerRetriesAndActualRefreshesAcquireFreshPairs(t *
 		return http.StatusOK, nil
 	})
 	session := h.callback(t, principal, provider.ID, flow.StateToken)
+	identity := id.ClientID("rotation-client")
+	assert.Equal(t, &identity, session.UpstreamClientID)
+	assert.Zero(t, session.UpstreamClientRevision)
 	ids, pairs := h.reader.counts()
-	assert.Equal(t, 1, ids)
+	assert.Equal(t, 3, ids, "initiation and callback identity gates never read the secret")
 	assert.Equal(t, 2, pairs, "auth-style negotiation may issue multiple requests, but each broker attempt acquires exactly one pair")
 	requests := h.endpoint.captured(t)
 	require.GreaterOrEqual(t, len(requests), 2)
@@ -83,21 +87,25 @@ func TestCredentialRotation_BrokerRetriesAndActualRefreshesAcquireFreshPairs(t *
 	require.NoError(t, err)
 	assert.Equal(t, "credential-access", token)
 	assert.Equal(t, session.UpstreamClientID, refreshed.UpstreamClientID)
+	assert.Equal(t, session.UpstreamClientRevision, refreshed.UpstreamClientRevision, "same-ID secret rotation preserves session establishment evidence")
 	requests = h.endpoint.captured(t)
 	assert.Equal(t, "explicit-refresh-secret", requests[len(requests)-2].secret)
 	assert.Equal(t, "automatic-refresh-secret", requests[len(requests)-1].secret)
 	assert.Equal(t, "refresh_token", requests[len(requests)-1].form.Get("grant_type"))
 	ids, pairs = h.reader.counts()
-	assert.Equal(t, 1, ids)
+	assert.Equal(t, 10, ids, "refresh gates recheck live identity and the explicit refresh summary performs one Display read")
 	assert.Equal(t, 4, pairs)
 	cachedCount := len(requests)
 	_, _, err = h.service.GetValidAccessToken(context.Background(), principal, provider.ID)
 	require.NoError(t, err)
-	_, pairs = h.reader.counts()
+	ids, pairs = h.reader.counts()
+	assert.Equal(t, 11, ids, "even a still-valid token checks the current identity once")
 	assert.Equal(t, 4, pairs, "a still-valid token does not constitute an actual refresh")
 	assert.Len(t, h.endpoint.captured(t), cachedCount)
 	after, err := h.records.Get(context.Background(), provider.ID)
 	require.NoError(t, err)
+	before.ClientIdentity = &identity
+	assert.Zero(t, after.ClientIdentityRevision, "same-ID secret rotation must not increment the service revision")
 	assert.Equal(t, before, after)
 }
 
@@ -122,7 +130,7 @@ func TestCredentialRotation_ClientIdentityChangeStopsRetryBeforeAuthentication(t
 	assertCredentialSourceReason(t, err, model.CredentialSourceReasonIdentityMismatch)
 	assert.Nil(t, result)
 	ids, pairs := h.reader.counts()
-	assert.Equal(t, 1, ids)
+	assert.Equal(t, 2, ids, "the callback checks live identity before its first exchange attempt")
 	assert.Equal(t, 2, pairs, "the broker retry must acquire the changed identity and stop")
 	requests := h.endpoint.captured(t)
 	require.NotEmpty(t, requests, "the first attempt must reach the provider before publication")
@@ -147,15 +155,19 @@ func TestCredentialRotation_IndependentServicesUseCurrentProjectedGenerationsWit
 	require.NoError(t, err)
 	secondBefore, err := h.records.Get(context.Background(), second.ID)
 	require.NoError(t, err)
+	assert.Zero(t, firstBefore.ClientIdentityRevision)
+	assert.Zero(t, secondBefore.ClientIdentityRevision)
 	principal := id.Principal("independent@example.com")
 	for _, provider := range []*model.ThirdpartyOAuth2ProviderEntity{first, second} {
 		flow := h.initiate(t, principal, provider.ID)
-		h.callback(t, principal, provider.ID, flow.StateToken)
+		session := h.callback(t, principal, provider.ID, flow.StateToken)
+		assert.Zero(t, session.UpstreamClientRevision)
 	}
 	require.NoError(t, publishCredentialGeneration(firstBinding, "first-client", "rotated-first-secret"))
 	for _, provider := range []*model.ThirdpartyOAuth2ProviderEntity{first, second} {
 		flow := h.initiate(t, principal, provider.ID)
-		h.callback(t, principal, provider.ID, flow.StateToken)
+		session := h.callback(t, principal, provider.ID, flow.StateToken)
+		assert.Zero(t, session.UpstreamClientRevision, "reconnecting with a rotated secret keeps the identity revision")
 		_, err = h.service.ForceRefreshSession(context.Background(), principal, provider.ID)
 		require.NoError(t, err)
 	}
@@ -175,10 +187,15 @@ func TestCredentialRotation_IndependentServicesUseCurrentProjectedGenerationsWit
 	require.NoError(t, err)
 	secondAfter, err := h.records.Get(context.Background(), second.ID)
 	require.NoError(t, err)
+	firstIdentity, secondIdentity := id.ClientID("first-client"), id.ClientID("second-client")
+	firstBefore.ClientIdentity = &firstIdentity
+	secondBefore.ClientIdentity = &secondIdentity
+	assert.Zero(t, firstAfter.ClientIdentityRevision, "the rotated service keeps its identity revision")
+	assert.Zero(t, secondAfter.ClientIdentityRevision, "the unrelated service keeps its identity revision")
 	assert.Equal(t, firstBefore, firstAfter)
 	assert.Equal(t, secondBefore, secondAfter)
 	ids, pairs := h.reader.counts()
-	assert.Equal(t, 4, ids)
+	assert.Equal(t, 18, ids, "each connection and refresh evaluates identity, including one Display read per explicit refresh summary")
 	assert.Equal(t, 6, pairs)
 }
 
@@ -259,7 +276,11 @@ func TestCredentialRotation_SourceLossAfterSuccessfulUseNeverUsesLastKnownPair(t
 				assertCredentialSourceReason(t, attemptOperation(), model.CredentialSourceReasonNotFound)
 				assert.Len(t, h.endpoint.captured(t), 1)
 				_, pairs := h.reader.counts()
-				assert.Equal(t, 2, pairs)
+				failedPairs := 1
+				if file == "client secret" {
+					failedPairs++
+				}
+				assert.Equal(t, failedPairs, pairs, "an identity read failure must not acquire a secret")
 				require.NoError(t, publishCredential(binding.ClientIDFile, "recovery-client"))
 				require.NoError(t, publishCredential(binding.ClientSecretFile, "restored-secret"))
 				require.NoError(t, attemptOperation())
@@ -267,7 +288,7 @@ func TestCredentialRotation_SourceLossAfterSuccessfulUseNeverUsesLastKnownPair(t
 				require.Len(t, requests, 2)
 				assert.Equal(t, "restored-secret", requests[1].secret)
 				_, pairs = h.reader.counts()
-				assert.Equal(t, 3, pairs)
+				assert.Equal(t, failedPairs+1, pairs)
 			})
 		}
 	}
@@ -307,7 +328,7 @@ func TestCredentialRotation_PublicationAfterValidationUsesOnlyAcquiredPairAndChe
 				if !acquiredMatches {
 					acquiredID, nextID = "client-B", "client-A"
 				}
-				binding := projectedCredentialPair(t, acquiredID, "acquired-secret")
+				binding := projectedCredentialPair(t, "client-A", "acquired-secret")
 				h := newCredentialSessionHarness(t, map[string]ports.CredentialFileBinding{"publication-service": binding})
 				provider := h.register(t, model.CredentialSourceFilesystem, "publication-service", "", "")
 				principal := id.Principal("publication@example.com")
@@ -318,6 +339,12 @@ func TestCredentialRotation_PublicationAfterValidationUsesOnlyAcquiredPairAndChe
 				}
 				var publication sync.Once
 				var publicationError error
+				h.reader.beforePair = func(attempt int) error {
+					if !acquiredMatches && attempt == 1 {
+						return publishCredentialGeneration(binding, acquiredID, "acquired-secret")
+					}
+					return nil
+				}
 				h.reader.afterPair = func() error {
 					publication.Do(func() { publicationError = publishCredentialGeneration(binding, nextID, "published-secret") })
 					return publicationError
@@ -336,7 +363,7 @@ func TestCredentialRotation_PublicationAfterValidationUsesOnlyAcquiredPairAndChe
 				}
 				err := attemptOperation()
 				if acquiredMatches {
-					require.NoError(t, err)
+					assertCredentialSourceReason(t, err, model.CredentialSourceReasonIdentityMismatch)
 					requests := h.endpoint.captured(t)
 					require.Len(t, requests, 1)
 					assert.Equal(t, "client-A", requests[0].clientID)
@@ -356,7 +383,11 @@ func TestCredentialRotation_PublicationAfterValidationUsesOnlyAcquiredPairAndChe
 					assert.Equal(t, "published-secret", requests[0].secret)
 				}
 				_, pairs := h.reader.counts()
-				assert.Equal(t, 2, pairs)
+				if acquiredMatches {
+					assert.Equal(t, 1, pairs, "the changed identity blocks the subsequent attempt before pair acquisition")
+				} else {
+					assert.Equal(t, 2, pairs)
+				}
 			})
 		}
 	}

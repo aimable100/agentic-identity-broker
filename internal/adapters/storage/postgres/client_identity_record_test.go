@@ -46,3 +46,22 @@ func TestSessionClientRevisionMapping(t *testing.T) {
 	*session.UpstreamClientID = "mutated"
 	assert.Equal(t, "reports", *record.UpstreamClientID)
 }
+
+func TestClientIdentityLegacyMappingDoesNotBackfill(t *testing.T) {
+	entity := newTestEntity()
+	record, err := entityToRecord(entity)
+	require.NoError(t, err)
+	assert.Nil(t, record.ClientIdentity)
+	assert.Zero(t, record.ClientIdentityRevision)
+	found, err := recordToEntity(record)
+	require.NoError(t, err)
+	assert.Equal(t, entity.ClientID, found.ClientID)
+	assert.Nil(t, found.ClientIdentity)
+	assert.Zero(t, found.ClientIdentityRevision)
+	session := recordToSession(&userSessionRecord{})
+	assert.Nil(t, session.UpstreamClientID)
+	assert.Zero(t, session.UpstreamClientRevision)
+	body, err := json.Marshal(found)
+	require.NoError(t, err)
+	assert.NotContains(t, string(body), "client_identity")
+}

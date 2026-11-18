@@ -85,15 +85,21 @@ const (
 )
 ```
 
+Gate source failures return `*ports.SessionUsabilityError` with the failing `ServiceID` and wrapped cause. Its error text is constant. Its `slog.LogValuer` exposes only bounded session-lookup failure metadata, never the cause.
+
+The evaluator does not log returned Gate errors. Authorization handles them as an error decision and records the failure. `GrantConsent` returns them to the HTTP grant handler, which records the canonical failure once. Cancellation records no source failure.
+
+Provider usability reads use `GetForIdentityEvaluation` or the batched `GetByIDsForIdentityEvaluation`. Both return independently owned configuration with an absent secret. The batch method preserves repository batching and missing-provider omission without decrypting credentials.
+
 Consent and session usability displays may read the current client-ID file (Proposed ADR 048 partially supersedes ADR 041's no-file-read rule for these surfaces only). They never read a secret file. Administrative service create/update/get/list metadata operations retain the no-file-read rule; an explicit session sweep is not a service-metadata operation.
 
 Session list storage reads remain metadata-only: extend their internal projection with `UpstreamClientID` and `UpstreamClientRevision`, excluded from JSON, alongside the existing reauthentication/refreshability metadata. Do not fetch encrypted token blobs or decrypt secrets merely to adapt a summary to `RequiresReauthentication`'s full-session input. Share the private identity-status rule with a metadata helper inside `oauth2session` for summary evaluation; the cross-domain evaluator interface remains unchanged. This is an internal projection adaptation, not a new public field or persisted concept.
 
 | Consumer | Mode | Effect |
 |---|---|---|
-| `oauth2.AuthorizationService.anyDelegatedSessionUnusable` | Gate | Adds reason `session_reauthentication_required`, which leads to the existing consent redirect. |
+| `oauth2.AuthorizationService.anyRequiredSessionUnusable` | Gate | Evaluates included and mandatory service sessions together, using the existing consent redirect when reconnection is required. |
 | `consent.Service.GrantConsent` mandatory-service validation (`ValidateSubmission`) | Gate | A superseded session does not satisfy a mandatory service. |
-| `consent.Service.GetAgentConsentDetail` | Display | Reads sessions through `ListActiveByPrincipal` instead of the ID-only `ListActiveServiceIDsByPrincipal`, so identity can be evaluated. `IsConnected = false` for sessions that require reauthentication. |
+| `consent.Service.GetAgentConsentDetail` | Display | Reads sessions through `ListActiveByPrincipal` so identity can be evaluated. `IsConnected = false` for sessions that require reauthentication. |
 | `oauth2session.ListUserSessions`, `GetSessionWithAgents`, `ForceRefreshSession` summary | Display | Set `UserSessionSummary.RequiresReauthentication`. |
 
 Token acquisition, refresh, callback, sweep, and initiation call the private operations directly and always fail closed.

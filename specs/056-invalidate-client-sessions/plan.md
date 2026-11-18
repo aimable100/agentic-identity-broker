@@ -31,7 +31,7 @@ All Technical Context unknowns are resolved in [research.md](research.md).
 
 ## Constitution Check
 
-*GATE: Approval is recorded and the acceptance-test recovery checkpoint is complete. Runtime enforcement remains incomplete; T070's observability design gate remains open before further logging changes.*
+*GATE: Approval, acceptance recovery, and observability design are complete. Runtime enforcement and non-container functional validation pass. T069 remains open for the security gate; container execution is unverified.*
 
 **Design Preconditions (BLOCKING)**:
 
@@ -52,7 +52,7 @@ Checked entries below record design coverage, not completed runtime implementati
 - [x] **E2E Red Phase**: Realistic assertions on status, `error`, `error_uri`, `Location`, and `requires_reauthentication`, with no placeholders.
 - [x] **Frontend Playwright E2E**: Consent and sessions-page journeys in `tests/e2e/frontend/`.
 - [x] **Frontend Screenshots**: Capture configuration covers four journey states plus separate failure/retry and cancellation/retry states, named below. Actual captures remain part of implementation validation.
-- [ ] **Observability Design**: Phase 2g (T070) verifies the event contract and required safety tests before further logging changes. No new span or metric instrument is planned.
+- [x] **Observability Design**: Phase 2g (T070) specifies event levels, closed value sets, committed-writer attribution, single failure ownership, and safety tests before further logging changes. No new span or metric instrument is planned.
 
 **Implementation Considerations**:
 
@@ -74,7 +74,7 @@ Checked entries below record design coverage, not completed runtime implementati
 | FR-003, AS-1.1, AS-1.7 | Two recording channels (research R1). All variants are covered (R2). |
 | FR-004, FR-005, AS-1.3–AS-1.5, SC-005 | Identity check under the session lock. Callback revision check. Existing callback-ID compare-and-set. A monotonic revision makes rollback a new revision. |
 | FR-006 | Reasons `identity_mismatch`, `identity_superseded`, and `identity_missing` map to `credential_identity_changed` and `invalid_grant` with ADR 044's `error_uri`. Source failures give `server_error`. |
-| FR-007, FR-014, AS-2.1 | `anyDelegatedSessionUnusable` gives reason `session_reauthentication_required`, which leads to the existing consent redirect. No push or navigation. |
+| FR-007, FR-014, AS-2.1 | `anyRequiredSessionUnusable` checks included and mandatory services together and uses the existing consent redirect when reconnection is required. No push or navigation. |
 | FR-008, AS-2.5 | `requires_reauthentication` and `connectionStatus: not_connected`. The existing Login and sign-in actions are reused. |
 | FR-009, FR-010, AS-2.2–AS-2.4 | Existing service authorize, callback, and return-state flows. A new connection seals the current `{E,R}`. A failed callback changes nothing. |
 | FR-011, AS-3.1, AS-3.3 | Evidence is per service. Grants are untouched. Only included services are checked. |
@@ -143,7 +143,7 @@ internal/
 │   │   ├── service.go                      # GetValidAccessToken, refreshLockedSession, HandleCallback, listing
 │   │   └── sweep.go                        # superseded candidates counted as failed
 │   ├── thirdparty/service.go               # identity state read without decryption
-│   ├── oauth2/service.go                   # anyDelegatedSessionUnusable via evaluator
+│   ├── oauth2/service.go                   # anyRequiredSessionUnusable via evaluator
 │   ├── consent/service.go                  # IsConnected and mandatory validation via evaluator
 │   └── tokenexchange/session_diagnostic.go # identity_superseded → credential_identity_changed
 ├── adapters/
@@ -270,7 +270,7 @@ Approved DEC-005's authoritative procedure is [ADR 048-client-identity-revisions
 **Integration Tests**:
 
 - `tests/integration/migrations/client_identity_revision_migration_test.go`: 049/050 apply, roll back, reapply, DOWN refusal, and lock-contention abort.
-- Postgres repository tests in `internal/adapters/storage/postgres/` and `tests/integration/storage/infra/client_identity_revision_test.go`: the update recording rule within version and discovery preconditions, observation compare-and-set under concurrency (exactly one increment, atomic source/version/canonical-ID/revision fencing, obsolete values discarded after source/binding changes), explicit-column reads, and parity with memory for the row-lock/transaction-derived `identityChanged` outcome. Reproduce the paused filesystem metadata PUT/intervening observation race against real PostgreSQL: successful PUT preserves observation evidence at unchanged administrative version and returns false; errors/rollback supply no successful audit outcome.
+- Postgres repository tests in `internal/adapters/storage/postgres/client_identity_record_test.go` and `internal/adapters/storage/postgres/client_identity_*_integration_test.go`: the update recording rule within version and discovery preconditions, observation compare-and-set under concurrency (exactly one increment, atomic source/version/canonical-ID/revision fencing, obsolete values discarded after source/binding changes), explicit-column reads, and parity with memory for the row-lock/transaction-derived `identityChanged` outcome. Reproduce the paused filesystem metadata PUT/intervening observation race against real PostgreSQL: successful PUT preserves observation evidence at unchanged administrative version and returns false; errors/rollback supply no successful audit outcome.
 
 **Test Coverage Goals**: All new domain branches. Both adapters at parity. E2E coverage of 100% of the 16 acceptance scenarios. Frontend E2E for all UI states.
 

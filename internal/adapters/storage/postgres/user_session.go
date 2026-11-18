@@ -425,21 +425,6 @@ func (r *PostgresUserSessionRepository) ListSummariesByPrincipal(ctx context.Con
 	return summaries, nil
 }
 
-func (r *PostgresUserSessionRepository) ListActiveServiceIDsByPrincipal(ctx context.Context, principal id.Principal) ([]id.ServiceID, error) {
-	if principal.IsZero() {
-		return nil, errors.New("principal required")
-	}
-	queryCtx, cancel := context.WithTimeout(ctx, r.adapter.timeouts.Read)
-	defer cancel()
-	ids := make([]id.ServiceID, 0)
-	err := r.adapter.db.SelectContext(queryCtx, &ids, `SELECT service_id FROM user_sessions WHERE principal = $1
-		AND `+usableSessionPredicate+` ORDER BY created_at DESC`, principal)
-	if err != nil {
-		return nil, r.wrapError(err, "ListActiveServiceIDsByPrincipal")
-	}
-	return ids, nil
-}
-
 // ListActiveByPrincipal retrieves only sessions that do not require reauthentication.
 // Used for FR-020 consent submission validation.
 func (r *PostgresUserSessionRepository) ListActiveByPrincipal(ctx context.Context, principal id.Principal) ([]*storage.UserSession, error) {

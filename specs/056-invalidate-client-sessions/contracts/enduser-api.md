@@ -1,8 +1,8 @@
 # Contract Delta: End-User API (`api/enduser/openapi.yaml`)
 
-**Status**: Proposed. Approval item API-001 in [plan.md](../plan.md). Nothing here is applied to `api/enduser/openapi.yaml` until the maintainer approves it.
+**Status**: API-001 approved by jbspeakr on 2026-11-05 ([approval](https://github.com/zalando-incubator/agentic-identity-broker/pull/412#issuecomment-6658788612)). The canonical OpenAPI contains this cutover.
 
-**Version (Proposed API-001)**: `info.version` `1.2.0` → `2.0.0` on the existing routes. ADR 046 already defines the reauthentication fields. This proposal changes their identity-related behavior and the manual-refresh outcome; it does not add duplicate fields. No paths, parameters, or request bodies change. A major cutover makes changed released behavior explicit under Constitution Principles IV and X. The main alternative is new versioned endpoints; an additive minor bump does not describe this behavioral change.
+**Version (approved API-001)**: `info.version` `1.2.0` → `2.0.0` on the existing routes. The existing reauthentication fields remain. This cutover changes their identity-related behavior and the manual-refresh outcome, not request fields or response shapes. A major version makes the released behavior change explicit under Constitution Principles IV and X.
 
 ## 1. Schemas
 

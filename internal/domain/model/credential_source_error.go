@@ -20,6 +20,10 @@ const (
 	CredentialSourceReasonReadFailed         CredentialSourceReason = "read_failed"
 )
 
+func (r CredentialSourceReason) IsIdentity() bool {
+	return r == CredentialSourceReasonIdentityMissing || r == CredentialSourceReasonIdentityMismatch || r == CredentialSourceReasonIdentitySuperseded
+}
+
 type CredentialSourceError struct {
 	Reason CredentialSourceReason
 }

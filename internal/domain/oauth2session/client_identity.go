@@ -14,8 +14,16 @@ var _ ports.SessionUsabilityEvaluator = (*OAuth2SessionService)(nil)
 
 const maxIdentityObservationAttempts = 8
 
+type identityChangeChannel string
+
+const identityChangeFilesystem identityChangeChannel = "filesystem_observation"
+
 // A lost observation replaces service with fresh metadata, never decrypted credentials.
 func (s *OAuth2SessionService) resolveClientIdentity(ctx context.Context, service *model.ThirdpartyOAuth2ProviderEntity) (ports.ClientIdentityState, error) {
+	return s.resolveIdentity(ctx, service, true)
+}
+
+func (s *OAuth2SessionService) resolveIdentity(ctx context.Context, service *model.ThirdpartyOAuth2ProviderEntity, record bool) (ports.ClientIdentityState, error) {
 	for range maxIdentityObservationAttempts {
 		if err := ctx.Err(); err != nil {
 			return ports.ClientIdentityState{}, identityReadError(err)
@@ -37,7 +45,7 @@ func (s *OAuth2SessionService) resolveClientIdentity(ctx context.Context, servic
 		if !ok {
 			return ports.ClientIdentityState{}, model.NewCredentialSourceError(model.CredentialSourceReasonMissingBinding)
 		}
-		if s.credentialFileReader == nil || s.clientIdentityRepo == nil {
+		if s.credentialFileReader == nil || record && s.clientIdentityRepo == nil {
 			return ports.ClientIdentityState{}, identityReadError(nil)
 		}
 		value, err := s.credentialFileReader.ReadClientID(binding.ClientIDFile)
@@ -46,6 +54,14 @@ func (s *OAuth2SessionService) resolveClientIdentity(ctx context.Context, servic
 		}
 		if value == "" {
 			return ports.ClientIdentityState{}, model.NewCredentialSourceError(model.CredentialSourceReasonEmpty)
+		}
+		if !record {
+			identity := id.ClientID(value)
+			revision := service.ClientIdentityRevision
+			if service.ClientIdentity != nil && *service.ClientIdentity != identity {
+				revision++
+			}
+			return ports.ClientIdentityState{Identity: &identity, Revision: revision}, nil
 		}
 		state, applied, changed, err := s.clientIdentityRepo.RecordObservedClientIdentity(ctx, service.ID, id.ClientID(value), ports.ClientIdentityObservation{ServiceVersion: service.Version, CanonicalID: *service.CanonicalID, Revision: service.ClientIdentityRevision})
 		if err != nil {
@@ -59,7 +75,7 @@ func (s *OAuth2SessionService) resolveClientIdentity(ctx context.Context, servic
 					"event", "session.oauth2.client_identity_changed",
 					"service_id", service.ID,
 					"client_identity_revision", state.Revision,
-					"channel", "filesystem_observation")
+					"channel", identityChangeFilesystem)
 			}
 			return state, nil
 		}
@@ -80,6 +96,14 @@ func identityReadError(err error) error {
 		reason = sourceError.Reason
 	}
 	failure := model.NewCredentialSourceError(reason)
+	var repositoryError *storage.StorageError
+	if ports.IsNotFoundErr(err) {
+		err = errors.Join(ErrServiceNotFound, err)
+	}
+	if errors.As(err, &repositoryError) || errors.Is(err, ErrServiceNotFound) {
+		// Keep repository causes inspectable behind a credential-free error message.
+		return NewOperationError(NewErrorMetadata(OperationUnknown, DetailCredentialSourceUnavailable), errors.Join(failure, err))
+	}
 	switch {
 	case errors.Is(err, context.Canceled):
 		return errors.Join(failure, context.Canceled)
@@ -88,6 +112,15 @@ func identityReadError(err error) error {
 	default:
 		return failure
 	}
+}
+
+func identityOperationError(ctx context.Context, operation Operation, err error) *OperationError {
+	cause := identityReadError(err)
+	var repositoryError *storage.StorageError
+	if errors.As(cause, &repositoryError) && !ports.IsNotFoundErr(cause) {
+		return tokenAcquisitionError(ctx, operation, cause)
+	}
+	return sessionOperationError(ctx, operation, DetailCredentialSourceUnavailable, cause)
 }
 
 func sessionIdentityStatus(session *storage.UserSession, service *model.ThirdpartyOAuth2ProviderEntity, current ports.ClientIdentityState) error {
@@ -109,6 +142,64 @@ func sessionIdentityStatus(session *storage.UserSession, service *model.Thirdpar
 	return nil
 }
 
+func (s *OAuth2SessionService) checkSessionIdentity(ctx context.Context, session *storage.UserSession, operation Operation) (*model.ThirdpartyOAuth2ProviderEntity, error) {
+	service, err := s.providerService.GetForIdentityEvaluation(ctx, session.ServiceID)
+	if err == nil {
+		var state ports.ClientIdentityState
+		state, err = s.resolveClientIdentity(ctx, service)
+		if err == nil {
+			err = sessionIdentityStatus(session, service, state)
+		}
+	}
+	if err != nil {
+		return nil, identityOperationError(ctx, operation, err)
+	}
+	return service, nil
+}
+
+func (s *OAuth2SessionService) providerForEstablishedIdentity(ctx context.Context, service *model.ThirdpartyOAuth2ProviderEntity, session *storage.UserSession, operation Operation) (*model.ThirdpartyOAuth2ProviderEntity, error) {
+	if service.CredentialSource == model.CredentialSourceFilesystem || service.IsPublicClient() || service.IsCIMDConfidentialClient() {
+		return service, nil
+	}
+	service, err := s.providerService.GetForTokenAcquisition(ctx, session.ServiceID)
+	if err != nil {
+		return nil, tokenAcquisitionError(ctx, operation, err)
+	}
+	if operation == OperationRefresh && service.Discovery.ClientMethod == model.ClientBootstrapDCR && service.ID != session.ServiceID {
+		return nil, errors.New("DCR token identity does not match the requested service")
+	}
+	identity, err := s.resolveClientIdentity(ctx, service)
+	if err == nil {
+		err = sessionIdentityStatus(session, service, identity)
+	}
+	if err != nil {
+		return service, sessionOperationError(ctx, operation, DetailCredentialSourceUnavailable, identityReadError(err))
+	}
+	return service, nil
+}
+
+func (s *OAuth2SessionService) checkCallbackIdentity(ctx context.Context, claims *OAuth2StateTokenClaims) (*model.ThirdpartyOAuth2ProviderEntity, error) {
+	if claims.UpstreamClientID == nil || claims.UpstreamClientID.IsZero() || claims.UpstreamClientRevision == nil || *claims.UpstreamClientRevision < 0 {
+		return nil, sessionOperationError(ctx, OperationCodeExchange, DetailCredentialSourceUnavailable, model.NewCredentialSourceError(model.CredentialSourceReasonIdentityMissing))
+	}
+	return s.checkSessionIdentity(ctx, &storage.UserSession{ServiceID: claims.ServiceID, UpstreamClientID: claims.UpstreamClientID, UpstreamClientRevision: *claims.UpstreamClientRevision}, OperationCodeExchange)
+}
+
+func (s *OAuth2SessionService) checkDryRunIdentity(ctx context.Context, session *storage.UserSession) error {
+	service, err := s.providerService.GetForIdentityEvaluation(ctx, session.ServiceID)
+	if err == nil {
+		var state ports.ClientIdentityState
+		state, err = s.resolveIdentity(ctx, service, false)
+		if err == nil {
+			err = sessionIdentityStatus(session, service, state)
+		}
+	}
+	if err != nil {
+		return identityOperationError(ctx, OperationRefresh, err)
+	}
+	return nil
+}
+
 func (s *OAuth2SessionService) RequiresReauthentication(ctx context.Context, sessions []*storage.UserSession, mode ports.UsabilityMode) (map[id.ServiceID]bool, error) {
 	result := make(map[id.ServiceID]bool, len(sessions))
 	type evaluatedIdentity struct {
@@ -121,23 +212,28 @@ func (s *OAuth2SessionService) RequiresReauthentication(ctx context.Context, ses
 			continue
 		}
 		evaluated, ok := identities[session.ServiceID]
+		if ok && evaluated.service == nil {
+			result[session.ServiceID] = true
+			continue
+		}
 		if !ok {
 			service, err := s.providerService.GetForIdentityEvaluation(ctx, session.ServiceID)
 			if err != nil {
 				failure := identityReadError(err)
 				if mode != ports.UsabilityDisplay {
-					return nil, failure
+					return nil, &ports.SessionUsabilityError{ServiceID: session.ServiceID, Err: failure}
 				}
-				s.auditCredentialSourceFailure(ctx, session.ServiceID, "usability_display", failure)
+				s.auditCredentialSourceFailure(ctx, session.ServiceID, credentialOperationDisplay, failure)
 				result[session.ServiceID] = true
+				identities[session.ServiceID] = evaluatedIdentity{}
 				continue
 			}
 			state, err := s.resolveClientIdentity(ctx, service)
 			if err != nil {
 				if mode != ports.UsabilityDisplay {
-					return nil, err
+					return nil, &ports.SessionUsabilityError{ServiceID: session.ServiceID, Err: err}
 				}
-				s.auditCredentialSourceFailure(ctx, session.ServiceID, "usability_display", err)
+				s.auditCredentialSourceFailure(ctx, session.ServiceID, credentialOperationDisplay, err)
 				state = ports.ClientIdentityState{Identity: service.ClientIdentity, Revision: service.ClientIdentityRevision}
 				if service.CredentialSource != model.CredentialSourceFilesystem {
 					clientID := service.ClientID

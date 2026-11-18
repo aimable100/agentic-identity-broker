@@ -1,8 +1,8 @@
 # Contract Delta: Admin API (`api/admin/openapi.yaml`)
 
-**Status**: Proposed. Approval item API-002 in [plan.md](../plan.md).
+**Status**: API-002 approved by jbspeakr on 2026-11-05 ([approval](https://github.com/zalando-incubator/agentic-identity-broker/pull/412#issuecomment-6658788612)). The canonical OpenAPI contains this cutover.
 
-**Version (Proposed API-002)**: `info.version` `2.1.1` → `3.0.0`, a major cutover on the existing routes. No path, parameter, schema, status code, or error code changes. The PUT request and response shape is unchanged, but sweep response classification changes observably: identity-invalid candidates previously counted as `refreshed` (including dry runs) now count as `failed`. This is not description-only. Constitution IV/X requires a major version or new endpoint for changed released behavior; no evidence establishes this baseline as unreleased. The main alternative is a new sweep operation retaining the old classification on the existing route; a major cutover avoids maintaining a second sweep contract. API-001 separately versions the End-User effects.
+**Version (approved API-002)**: `info.version` `2.1.1` → `3.0.0` on the existing routes. No path, parameter, schema, status code, or error code changes. Sweep classification changes observably: identity-invalid candidates count as `failed`, not `refreshed`, including in dry runs. This is a major behavioral cutover under Constitution Principles IV and X. API-001 separately versions the End-User effects.
 
 ## `PUT /api/services/{service-id}` — add a section after **Secret Rotation**
 

@@ -104,7 +104,7 @@ The state is internal and encrypted, and providers echo it opaquely. Its claims 
 |---|---|
 | `storage.UserSessionSummary` | Extends the existing `RequiresReauthentication` value with identity evaluation. Its deprecated `IsExpired` alias always has the same value. `AccessTokenExpired` remains an independent expiry signal; no rejection timestamp is exposed. |
 | `consent.ServiceRequirementStatus.IsConnected` | True only for a session that does not require reauthentication under ADR 046 and is identity-usable; an expired access token with a stored, not-rejected refresh token remains refreshable. |
-| Authorization decision `anyDelegatedSessionUnusable` | Adds reason `session_reauthentication_required` when an included service's session is not identity-usable. |
+| Authorization decision `anyRequiredSessionUnusable` | Checks included and mandatory service sessions together, requiring the existing consent redirect when a relevant session is not identity-usable. |
 
 ## Persistence
 

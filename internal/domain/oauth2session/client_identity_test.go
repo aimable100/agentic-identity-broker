@@ -100,7 +100,9 @@ func identityService(t *testing.T, get func(context.Context, id.ServiceID) (*mod
 	var logs bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&logs, nil))
 	providers := thirdparty.NewThirdpartyOAuth2ProviderService(identityProviderRepository{get: get}, identityEncryption{}, identityBranchKeys{}, nil, false, logger)
-	return &OAuth2SessionService{providerService: providers, logger: logger, config: Config{CredentialFiles: map[string]ports.CredentialFileBinding{"first": {ClientIDFile: "first-file"}, "second": {ClientIDFile: "second-file"}}}}, &logs
+	service := NewOAuth2SessionService(providers, nil, nil, nil, nil, identityEncryption{}, nil, nil, Config{CredentialFiles: map[string]ports.CredentialFileBinding{"first": {ClientIDFile: "first-file"}, "second": {ClientIDFile: "second-file"}}}, logger)
+	t.Cleanup(func() { assert.NoError(t, service.Close(context.Background())) })
+	return service, &logs
 }
 
 func TestResolveClientIdentityDiscardLostObservation(t *testing.T) {

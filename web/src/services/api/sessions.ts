@@ -32,8 +32,8 @@ export interface SessionSummary {
   initiated_at: string;
 
   /**
-   * The broker cannot obtain another access token: the provider rejected the stored refresh
-   * token, or the access token expired without one. The user must log in again.
+   * The provider rejected the stored refresh token, access expired without one, or the
+   * establishing client identity or revision is unusable. The user must sign in again.
    */
   requires_reauthentication: boolean;
 

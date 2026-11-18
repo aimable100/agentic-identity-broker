@@ -68,6 +68,7 @@ type MockUpstreamOAuth2Server struct {
 	metadataCalled          bool
 	jwksCalled              bool
 	successfulTokenResp     bool
+	authorizationError      string
 	errorCode               string
 	errorDescription        string
 	responseDelay           time.Duration
@@ -164,6 +165,13 @@ func (m *MockUpstreamOAuth2Server) WithErrorResponseAndDescription(errorCode, de
 	m.successfulTokenResp = false
 	m.errorCode = errorCode
 	m.errorDescription = description
+	return m
+}
+
+func (m *MockUpstreamOAuth2Server) WithAuthorizationError(code string) *MockUpstreamOAuth2Server {
+	m.requestMutex.Lock()
+	defer m.requestMutex.Unlock()
+	m.authorizationError = code
 	return m
 }
 
@@ -429,6 +437,15 @@ func (m *MockUpstreamOAuth2Server) handleAuthorize(w http.ResponseWriter, r *htt
 			params.Set("state", state)
 		}
 
+		w.Header().Set("Location", redirectURI+"?"+params.Encode())
+		w.WriteHeader(http.StatusFound)
+		return
+	}
+	m.requestMutex.RLock()
+	authorizationError := m.authorizationError
+	m.requestMutex.RUnlock()
+	if authorizationError != "" {
+		params := url.Values{"error": {authorizationError}, "state": {state}}
 		w.Header().Set("Location", redirectURI+"?"+params.Encode())
 		w.WriteHeader(http.StatusFound)
 		return

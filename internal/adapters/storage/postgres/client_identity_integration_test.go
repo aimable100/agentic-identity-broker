@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/id"
+	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/model"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/storage"
+	"github.com/agentic-identity-broker/agentic-identity-broker/internal/ports"
 	"github.com/agentic-identity-broker/agentic-identity-broker/tests/storagecontracts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -55,4 +57,42 @@ func TestPostgresSessionClientRevisionEstablishment(t *testing.T) {
 		assert.Equal(t, expected, summaries[0].UpstreamClientRevision)
 		assert.Equal(t, session.UpstreamClientID, summaries[0].UpstreamClientID)
 	}
+}
+
+func createClientIdentityProvider(t *testing.T, repo *PostgresThirdpartyOAuth2ProviderRepository, filesystem bool) *model.ThirdpartyOAuth2ProviderEntity {
+	t.Helper()
+	provider := newTestEntity()
+	provider.ID = id.NewServiceID()
+	provider.CanonicalID = new("reports-" + provider.ID.String())
+	provider.ProtectedResources = []string{"https://reports.example.com/" + provider.ID.String()}
+	if filesystem {
+		provider.CredentialSource = model.CredentialSourceFilesystem
+		provider.ClientID = ""
+		provider.Secret = model.NewAbsentSecret()
+	}
+	require.NoError(t, repo.Create(context.Background(), provider))
+	return provider
+}
+
+func clientIdentityObservation(provider *model.ThirdpartyOAuth2ProviderEntity) ports.ClientIdentityObservation {
+	return ports.ClientIdentityObservation{
+		ServiceVersion: provider.Version,
+		CanonicalID:    *provider.CanonicalID,
+		Revision:       provider.ClientIdentityRevision,
+	}
+}
+
+func createClientIdentitySession(t *testing.T, repo *PostgresUserSessionRepository, provider *model.ThirdpartyOAuth2ProviderEntity) *storage.UserSession {
+	t.Helper()
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	session := &storage.UserSession{
+		ID: id.NewSessionID(), Principal: id.Principal(id.NewSessionID().String()), ServiceID: provider.ID,
+		CallbackID: "original", UpstreamClientID: new(provider.ClientID), UpstreamClientRevision: provider.ClientIdentityRevision,
+		EncryptedAccessToken: []byte("access-ciphertext"), EncryptedRefreshToken: []byte("refresh-ciphertext"), TokenType: "Bearer",
+		AccessTokenExpiresAt: new(now.Add(time.Hour)), Scope: []string{"read"}, EncryptionContext: storage.EncryptionContext{ServiceID: provider.ID},
+		InitiatedAt: now, CreatedAt: now, UpdatedAt: now,
+	}
+	_, err := repo.CreateIfAbsent(context.Background(), session)
+	require.NoError(t, err)
+	return session
 }

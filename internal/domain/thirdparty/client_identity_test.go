@@ -66,3 +66,61 @@ func TestGetForIdentityEvaluationUnavailable(t *testing.T) {
 		})
 	}
 }
+
+func TestGetByIDsForIdentityEvaluation(t *testing.T) {
+	ctx := context.Background()
+	serviceID, missingID := id.NewServiceID(), id.NewServiceID()
+	identity := id.ClientID("current")
+	stored := minimalValidEntity(serviceID, model.NewEncryptedSecret([]byte("opaque-secret")))
+	stored.ClientIdentity = &identity
+	stored.ClientIdentityRevision = 4
+	rows := []*model.ThirdpartyOAuth2ProviderEntity{stored}
+	repo := &MockRepository{}
+	repo.On("GetByIDs", ctx, []id.ServiceID{serviceID, missingID}).Return(rows, nil).Once()
+	encryption := &functionFieldEncryption{decryptFn: func(context.Context, []byte, map[string]string) ([]byte, error) {
+		t.Fatal("identity evaluation must not decrypt secrets")
+		return nil, nil
+	}}
+	service := NewThirdpartyOAuth2ProviderService(repo, encryption, newNoopBranchKeyManager(), nil, false, slog.New(slog.DiscardHandler))
+	got, err := service.GetByIDsForIdentityEvaluation(ctx, []id.ServiceID{serviceID, missingID})
+	require.NoError(t, err)
+	require.Len(t, got, 1, "missing providers stay omitted")
+	assert.Equal(t, serviceID, got[0].ID)
+	assert.True(t, got[0].Secret.IsAbsent())
+	assert.Equal(t, stored.ClientIdentity, got[0].ClientIdentity)
+	assert.Equal(t, int64(4), got[0].ClientIdentityRevision)
+	*got[0].ClientIdentity = "mutated"
+	assert.Equal(t, id.ClientID("current"), *stored.ClientIdentity)
+	assert.Same(t, stored, rows[0])
+	assert.True(t, stored.Secret.IsEncrypted())
+	repo.AssertExpectations(t)
+}
+
+func TestGetByIDsForIdentityEvaluationUnavailable(t *testing.T) {
+	for _, problem := range []string{"repository", "nil", "wrong ID"} {
+		t.Run(problem, func(t *testing.T) {
+			ctx := context.Background()
+			ids := []id.ServiceID{id.NewServiceID()}
+			rows := []*model.ThirdpartyOAuth2ProviderEntity{nil}
+			var repositoryError error
+			switch problem {
+			case "repository":
+				repositoryError = ports.ErrNotFound
+			case "wrong ID":
+				rows[0] = &model.ThirdpartyOAuth2ProviderEntity{ID: id.NewServiceID()}
+			}
+			repo := &MockRepository{}
+			repo.On("GetByIDs", ctx, ids).Return(rows, repositoryError).Once()
+			service := NewThirdpartyOAuth2ProviderService(repo, &functionFieldEncryption{}, newNoopBranchKeyManager(), nil, false, slog.New(slog.DiscardHandler))
+			got, err := service.GetByIDsForIdentityEvaluation(ctx, ids)
+			require.Error(t, err)
+			assert.Nil(t, got)
+			if repositoryError != nil {
+				assert.ErrorIs(t, err, repositoryError)
+			} else {
+				assert.ErrorIs(t, err, ErrProviderConfiguration)
+			}
+			repo.AssertExpectations(t)
+		})
+	}
+}

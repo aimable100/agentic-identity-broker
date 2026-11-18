@@ -360,21 +360,6 @@ func (r *InMemoryUserSessionRepository) ListSummariesByPrincipal(_ context.Conte
 	return summaries, nil
 }
 
-func (r *InMemoryUserSessionRepository) ListActiveServiceIDsByPrincipal(_ context.Context, principal id.Principal) ([]id.ServiceID, error) {
-	if principal.IsZero() {
-		return nil, errors.New("principal required")
-	}
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	ids := make([]id.ServiceID, 0)
-	for _, session := range r.sessions {
-		if session.Principal == principal && !session.RequiresReauthentication() {
-			ids = append(ids, session.ServiceID)
-		}
-	}
-	return ids, nil
-}
-
 // ListActiveByPrincipal retrieves only sessions that do not require reauthentication.
 func (r *InMemoryUserSessionRepository) ListActiveByPrincipal(ctx context.Context, principal id.Principal) ([]*storage.UserSession, error) {
 	if principal.IsZero() {
