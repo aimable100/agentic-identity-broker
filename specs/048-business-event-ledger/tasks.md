@@ -36,9 +36,9 @@ unvalidated. Do not require saved red-run output, logs, or CI links as proof of 
 - [X] T001 Write `adrs/048-business-events-as-typed-log-records.md` with Context, Decision, Consequences, Alternatives, status Proposed (Principle II)
 - [ ] T002 [P] During `/speckit-implement`, add `048-business-events-as-typed-log-records` to the ADR index in `ARCHITECTURE.md` alongside the implementation. The `AGENTS.md` index entry already exists (Principle II).
 - [X] T003 [P] Amend `coding-standards/LOGGING.md` section 8 and its binding sources (STD-LOGGING-8; Principle XV)
-- [X] T004 Preserve the original maintainer approvals in `plan.md` and record approval of REVIEW-048 and revised DB-048 separately before implementation. The user explicitly approved both outstanding items in this conversation on 2026-11-18 (Principle II).
+- [X] T004 Preserve the original maintainer approvals in `specs/048-business-event-ledger/plan.md` and record approval of REVIEW-048 and revised DB-048 separately before implementation. The user explicitly approved both outstanding items on 2026-11-18 and subsequently requested principal and agent indexes; record that request as superseding the retention-only index scope (Principle II).
 
-**Checkpoint**: Original approvals remain recorded. REVIEW-048 and revised DB-048 were explicitly approved on 2026-11-18. The standard amendments remain bounded by their Approval Items; no principal-policy exception is proposed.
+**Checkpoint**: Original approvals remain recorded. REVIEW-048 and revised DB-048 were explicitly approved on 2026-11-18; the user's subsequent principal/agent index request supersedes retention-only index scope. The standard amendments remain bounded by their Approval Items; no principal-policy exception is proposed.
 
 ---
 
@@ -84,9 +84,9 @@ Its only production Go additions are T017's minimal scaffold, which lets the E2E
 
 **Constitution Reference**: Principle IX
 
-- [X] T013 Document `business_events`, the sole retention index, no foreign keys, and the migration name in `specs/048-business-event-ledger/data-model.md` (Principle IX)
-- [ ] T031 Write migration-specific PostgreSQL tests in `tests/integration/migrations/business_events_test.go` before T014. Assert the ledger columns, defaults, nullable principals, CHECK constraints, and `(recorded_at, id)` index. Verify apply, rollback, and reapply against production migrations. Verify rollback removes the ledger table and preserves unrelated tables and representative data. Tests must compile before the migration exists. Verify semantic failures where Docker is available. Otherwise, the first run may occur in CI (Principles VIII, IX).
-- [ ] T014 After T031 and T004, create atomic `migrations/049_create_business_events.up.sql` and `migrations/049_create_business_events.down.sql` from `specs/048-business-event-ledger/data-model.md`. Preserve `id UUID PRIMARY KEY`, `event TEXT NOT NULL`, `occurred_at TIMESTAMPTZ NOT NULL`, and `recorded_at TIMESTAMPTZ NOT NULL DEFAULT now()`. Preserve nullable `principal TEXT`, `actor TEXT`, and `trace_id TEXT`, plus `attributes JSONB NOT NULL DEFAULT '{}'::jsonb`. Quote constraints exactly in SQL: `CHECK (event <> '')` and `CHECK (jsonb_typeof(attributes) = 'object')`. Add only `idx_business_events_recorded` on `(recorded_at, id)`, with no foreign keys. The down migration removes only this table. Migration `048` is occupied, so the ledger uses `049`. Keep the existing ADR filename unchanged (Principle IX).
+- [X] T013 Document `business_events`, the retention index, the principal and agent history indexes, no foreign keys, and the migration name in `specs/048-business-event-ledger/data-model.md` (Database Requirements; Principle IX; explicit user index request).
+- [ ] T031 Write migration-specific PostgreSQL tests in `tests/integration/migrations/business_events_test.go` before T014. Assert the ledger columns, defaults, nullable principals, and CHECK constraints. Assert B-tree index definitions: `idx_business_events_recorded` on `(recorded_at, id)`, `idx_business_events_principal` on `(principal, occurred_at DESC, id DESC)`, and `idx_business_events_agent` on `((attributes->>'agent_id'), occurred_at DESC, id DESC)`. Inspect catalog definitions, including expression and sort direction, without forcing a planner choice on small fixtures. Exercise principal and agent equality filters with tied occurrence timestamps and deterministic newest-first ID ordering; include absent-principal and absent-agent rows. Verify apply, rollback, and reapply against production migrations. Verify rollback removes the table and its indexes while preserving unrelated tables and representative data. Tests must compile before the migration exists. Verify semantic failures where Docker is available; otherwise the first run may occur in CI (Database Requirements; Principles VIII, IX).
+- [ ] T014 After T031 and T004, create atomic `migrations/049_create_business_events.up.sql` and `migrations/049_create_business_events.down.sql` from `specs/048-business-event-ledger/data-model.md`. Preserve `id UUID PRIMARY KEY`, `event TEXT NOT NULL`, `occurred_at TIMESTAMPTZ NOT NULL`, and `recorded_at TIMESTAMPTZ NOT NULL DEFAULT now()`. Preserve nullable `principal TEXT`, `actor TEXT`, and `trace_id TEXT`, plus `attributes JSONB NOT NULL DEFAULT '{}'::jsonb`. Quote constraints exactly in SQL: `CHECK (event <> '')` and `CHECK (jsonb_typeof(attributes) = 'object')`. Add `idx_business_events_recorded` on `(recorded_at, id)`, `idx_business_events_principal` on `(principal, occurred_at DESC, id DESC)`, and `idx_business_events_agent` on `((attributes->>'agent_id'), occurred_at DESC, id DESC)`. Add no agent column, UUID cast, foreign key, or reader API. The down migration removes only this table and its indexes. Migration `048` is occupied, so the ledger uses `049`; recheck availability before implementation. Keep the existing ADR filename unchanged (Database Requirements; Principle IX).
 
 **Checkpoint**: Schema designed and migration files present.
 
@@ -113,8 +113,8 @@ Not applicable. The feature changes no UI.
 
 **Constitution Reference**: Principle XV
 
-- [X] T022 Read `coding-standards/LOGGING.md` and `coding-standards/OPENTELEMETRY.md`; list every new log record, span, and metric instrument in `contracts/observability.md`
-- [X] T023 [P] Confirm that the feature adds no span attribute namespace, so `OPENTELEMETRY.md` section 4.1 does not change. The new meter scope `business_events` needs the section 2 amendment of T025 (STD-OTEL-2)
+- [X] T022 Read `coding-standards/LOGGING.md` and `coding-standards/OPENTELEMETRY.md`; list every new log record, span, and metric instrument in `specs/048-business-event-ledger/contracts/observability.md` (Principle XV).
+- [X] T023 [P] Confirm that the feature adds no span attribute namespace, so `coding-standards/OPENTELEMETRY.md` section 4.1 does not change. The new meter scope `business_events` needs the section 2 amendment of T025 (STD-OTEL-2).
 - [X] T024 Identify the credential-handling path and the principals that need a safety test (`specs/048-business-event-ledger/contracts/observability.md`, Safety tests; SR-001, SR-002; Principle XV)
 - [ ] T025 Amend `coding-standards/LOGGING.md`: name the ledger handler and its failure-record path in the section 1 handler-chain rule (STD-LOGGING-1). Add the typed-definition rule to section 2.2, the guard test to section 9, and one line to the section 10 checklist (STD-LOGGING-2.2). Include the section 2.2 clarification that the PR description records event renames under `Breaking changes`, and generated release notes link to it without copying its contents. Remove the sentence "until they merge, no record is persisted" from section 8. Add the scope `business_events`, owned by the ledger handler, to the scope table in `coding-standards/OPENTELEMETRY.md` section 2 (STD-OTEL-2). State each change and its rationale in the pull request description (Principle XV)
 
@@ -244,7 +244,7 @@ test is T020.
 - [ ] T070 [P] Verify `charts/agentic-identity-broker/values.yaml`, `templates/configmap.yaml`, `values.schema.json`, and `README.md` contain all five keys with matching defaults and ranges (Principle VII).
 
 **Database & Persistence** (Principle IX):
-- [ ] T071 [P] Verify migration numbering and atomicity in `migrations/049_create_business_events.up.sql` and `.down.sql`. Verify schema-specific apply, rollback, reapply, constraints, index, and unrelated-data preservation in `tests/integration/migrations/business_events_test.go` (Principle IX).
+- [ ] T071 [P] Verify migration numbering and atomicity in `migrations/049_create_business_events.up.sql` and `migrations/049_create_business_events.down.sql`. Verify schema-specific apply, rollback, reapply, constraints, all three secondary index definitions (`idx_business_events_recorded`, `idx_business_events_principal`, and `idx_business_events_agent`, including the agent expression and history sort directions), filter/order behavior, and unrelated-data preservation in `tests/integration/migrations/business_events_test.go` (Database Requirements; Principle IX).
 - [ ] T072 [P] Verify both adapters have method coverage in `internal/adapters/storage/memory/business_event_test.go`, `internal/adapters/storage/postgres/business_event_test.go`, and `tests/integration/storage/infra/business_event_test.go`. Verify `internal/ports/storage.go` has no ledger reader or update operation (Principle IX; FR-010, FR-011).
 
 **Security** (Principles I, III):
@@ -372,6 +372,7 @@ The HTTP acceptance gate T056 remains serial because it needs US1’s real event
 | SC-003 | T018–T019, T055 |
 | SC-004 | T084, T053, T080 |
 | SC-005 | T007, T010, T020, T029, T033, T036, T044–T045, T056, T068 |
+| Database Requirements: principal and agent indexes | T013, T031 before T014, T061, T071; explicit user request on 2026-11-18 |
 
 ## Implementation Strategy
 
@@ -405,7 +406,7 @@ No further event, reader API, UI, SSF delivery, principal erasure, scheduler abs
 
 ### Documentation-only status — 2026-11-18
 
-- The user explicitly approved REVIEW-048 and revised DB-048. Approval records and documentation refinements remain.
+- The user explicitly approved REVIEW-048 and revised DB-048. The subsequent request to create principal and agent indexes supersedes retention-only index scope; `spec.md`, `plan.md`, `data-model.md`, and `research.md` now include both indexes alongside retention. Implementation remains pending.
 - The user required removal of all implementation changes. The scaffold, generated ID addition, SQL migrations, Helm configuration, example YAML, and feature tests were removed. Their tasks are unchecked.
 - Earlier build, lint, and compilation results applied to the removed implementation and do not validate the current feature.
 - Migration `048` is occupied; the design reserves `049_create_business_events`, subject to checking availability when implementation starts.

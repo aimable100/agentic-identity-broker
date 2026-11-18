@@ -388,7 +388,9 @@ Keys, defaults, flag names, and a YAML example are in [contracts/configuration.m
 - One new table, added by one migration with up and down scripts and migration tests (Principle IX).
 - Promoted columns: ID, event identifier, record time, storage time, principal, actor, trace ID.
   All other attributes are one JSON document.
-- One index on storage time for retention. Query indexes belong to the future production readers.
+- Retain the storage-time index for retention and add indexes for principal and agent history,
+  each ordered by record time and ID. Index the canonical `agent_id` JSON attribute without
+  promoting it to a column. These indexes add no production reader port or endpoint.
 - Table, column, and index names are in [data-model.md](./data-model.md).
 
 ### Security Requirements *(mandatory for security-critical features)*

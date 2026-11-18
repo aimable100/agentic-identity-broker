@@ -73,10 +73,12 @@ window on a crash and non-deterministic tests. Deferred until high-volume events
 `recorded_at`, `principal`, `actor`, `trace_id`. All other attributes in one `JSONB` column. No
 partitioning. Details in [data-model.md](./data-model.md).
 
-**Rationale**: The retention query needs `(recorded_at, id)`. Principal and trace columns retain
-the record's canonical identity and correlation facts; no principal-query index or read contract
-is introduced without a production reader. JSONB lets new event attributes arrive without a
-migration (FR-004). The first event is low volume; batched deletion keeps the migration atomic.
+**Rationale**: The retention query needs `(recorded_at, id)`. At the user's explicit request on
+2026-11-18, principal and agent history also receive B-tree indexes with `occurred_at DESC, id DESC`
+as ordering keys. The principal index uses the policy-rendered column; the agent expression index
+uses `attributes->>'agent_id'`, keeping the flexible document without adding a column or UUID cast.
+These indexes introduce no read port or endpoint. JSONB lets new event attributes arrive without
+a migration (FR-004). The first event is low volume; batched deletion keeps the migration atomic.
 
 **Alternatives**: Per-type columns or per-type JSON Schema (PR #381): each new event needs a
 schema change. Range partitioning by day with partition drop: the primary key must include the

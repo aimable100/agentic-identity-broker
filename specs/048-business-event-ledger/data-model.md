@@ -105,11 +105,25 @@ CREATE TABLE business_events (
 
 CREATE INDEX idx_business_events_recorded
     ON business_events (recorded_at, id);
+
+CREATE INDEX idx_business_events_principal
+    ON business_events (principal, occurred_at DESC, id DESC);
+
+CREATE INDEX idx_business_events_agent
+    ON business_events ((attributes->>'agent_id'), occurred_at DESC, id DESC);
 ```
 
 Down migration: `DROP TABLE business_events;`. The migration is atomic and holds no data from
 other tables, so apply and rollback can repeat without loss elsewhere. Both adapters store nil
 `Attributes` as an empty object, so `chk_business_events_attributes_object` holds.
+
+The principal and agent B-tree indexes support equality filtering followed by newest-first
+history ordered by `(occurred_at DESC, id DESC)`. Principal filters use the stored policy-rendered
+value, not a raw identity. Agent filters use `attributes->>'agent_id'`; no UUID cast, foreign key,
+or promoted agent column is added. Events without an agent attribute remain valid. These indexes
+are included at the user's explicit request on 2026-11-18; they do not introduce a reader contract
+or authorize disclosure. Migration tests assert all three secondary index definitions and exercise
+principal and agent filters with tied occurrence timestamps, absent principals, and absent agent IDs.
 
 | Column | Source in the log record | Used by |
 |---|---|---|
@@ -178,6 +192,7 @@ retention when `recorded_at` is older than the retention period.
 
 Onboarded in this feature: grant revocation only, well below one event per user per day. For the
 later events (grants, sessions, approvals), 10,000 active users at 5 events per user per day
-give about 4.5 million rows in 90 days. Start with a plain table and the retention index; add
-query indexes only when a production reader defines its queries and measured needs.
+give about 4.5 million rows in 90 days. Start with a plain table, the retention index, and the
+principal and agent history indexes requested by the user. Further query indexes need a
+production reader's query contract and measured needs.
 Token issuance and exchange are not onboarded before SC-004 is measured.

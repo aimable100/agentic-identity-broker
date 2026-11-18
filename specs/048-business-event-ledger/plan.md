@@ -38,7 +38,7 @@ pull request.
 | STD-LOGGING-1 | Amendment of LOGGING.md section 1: the handler chain has a ledger branch, and the ledger handler sends its failure record through a context handler to the operational sinks | Task T025 | Approved by jbspeakr on 2026-11-12, as described here. T025 writes the text; a change beyond this description needs a new approval |
 | STD-LOGGING-2.2 | Amend LOGGING.md section 2.2 for the typed definition and the PR-description changelog record for event renames. Add the guard test in section 9 and one line for the typed-definition rule to the section 10 review checklist | Task T025 | Approved by jbspeakr on 2026-11-12, as described here. Extension for the section 10 line approved by jbspeakr on 2026-11-12. T025 writes the text; a change beyond this description needs a new approval |
 | STD-OTEL-2 | Amendment of OPENTELEMETRY.md section 2: add the instrumentation scope `business_events`, owned by the ledger handler | Task T025 | Approved by jbspeakr on 2026-11-12, as described here. T025 writes the text; a change beyond this description needs a new approval |
-| DB-048 | Table `business_events` and retention index | [data-model.md](./data-model.md) | Original table and two-index design approved by jbspeakr on 2026-11-12. Revised scope with only the retention index approved explicitly by the user in this conversation on 2026-11-18 |
+| DB-048 | Table `business_events`, retention index, and principal/agent history indexes | [data-model.md](./data-model.md) | Original table and two-index design approved by jbspeakr on 2026-11-12. Retention-only revision approved by the user on 2026-11-18; superseded for index scope by the user's subsequent explicit request, "we should create indexes on principal and agent". Preserve retention and add both history indexes; no reader is introduced. |
 | CFG-BE | Configuration keys `business_events.*` | [contracts/configuration.md](./contracts/configuration.md) | Approved by jbspeakr on 2026-11-12 |
 | REVIEW-048 | Ledger behind principal policy with typed-marker preservation; authoritative visibility; append/retention-only ports; retention recovery; duplicate-key precedence; CLI precedence; safe instrument-initialization warnings | `048-business-events-as-typed-log-records` Decisions 3, 7, 10; contracts/ports.md; contracts/configuration.md; contracts/observability.md; research R3, R10–R12, R14; spec SC-005 | Approved explicitly by the user in this conversation on 2026-11-18: "I approve the outstanding approvals. complete the documented prerequisites" |
 
@@ -201,7 +201,7 @@ ports, and empty methods needed to compile acceptance tests. T018–T020 define 
 HTTP acceptance scenarios, using PostgreSQL inspection in test code, not a production reader.
 T031 defines migration-specific schema assertions before T014 creates the SQL. Both tasks belong
 to Phase 2d. The existing general migration lifecycle test does not assert the new table's
-columns, constraints, or retention index.
+columns, constraints, or retention, principal, and agent index definitions.
 T084 writes the SC-004 performance test after T017 and before Phase 2.5. Its enabled-block
 persistence assertions must detect the missing ledger behavior. Verify semantic failure where
 Docker is available; otherwise its first run may occur in CI after implementation. T053 runs
@@ -421,7 +421,7 @@ Not applicable. No UI change.
 - `internal/config/` and `cmd/agentic-identity-broker/`: defaults, range validation, all five CLI flags, and file/environment/CLI precedence (T035). Tests precede T042. T037 verifies missing behavior where the runtime is available; recorded red-run output is not required.
 
 **Integration Tests**:
-- `tests/integration/migrations/`: migration `049` apply, rollback, repeat.
+- `tests/integration/migrations/`: migration `049` apply, rollback, repeat; assert all three secondary index definitions from `data-model.md`, including the agent JSONB expression and history sort keys. Verify principal/agent equality filtering and deterministic ordering for tied occurrence times, with absent-principal and absent-agent fixtures remaining valid.
 - `tests/integration/storage/infra/business_event_test.go`: PostgreSQL adapter against testcontainers, inspected with explicit-column SQL: `Append` with a committed transaction in context (research R4), JSONB round trip, concurrent retention deletes, both `CHECK` constraints, nil attributes stored as `{}`, and `Timeout` errors for an expired context deadline (Principle IX). For T029, a test transaction locks the first 1,000 of 2,500 expired rows with `SELECT id ... FOR UPDATE`. The test starts `DeleteRecordedBefore` in a goroutine. It polls `pg_stat_activity` with `pg_blocking_pids` until that delete waits on the test transaction. The test transaction deletes the locked IDs and commits. The adapter call then returns zero, with 1,500 expired rows and all newer rows still present (SC-005). T029 specifies the SQL, bounded waits, and transaction/goroutine cleanup.
   T029 also appends fixed occurrence times ending in `.123456789` and `.999999999`, including a non-UTC offset.
   Read `occurred_at` and `recorded_at` with explicit-column SQL. Compare `occurred_at` by instant to
