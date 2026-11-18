@@ -45,6 +45,9 @@ describe('SessionCard', () => {
 
       // Verify service name
       expect(screen.getByText('Google Drive')).toBeInTheDocument();
+      expect(
+        screen.getByRole('article', { name: 'Session: Google Drive' }),
+      ).toBeInTheDocument();
 
       // Verify component renders
       expect(container).toBeInTheDocument();

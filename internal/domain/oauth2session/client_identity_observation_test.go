@@ -228,3 +228,151 @@ func TestClientIdentityLostOrFailedObservationNeverAuditsAChange(t *testing.T) {
 		})
 	}
 }
+
+type pairObservationReader func(string, string) (string, string, error)
+
+func (pairObservationReader) ReadClientID(string) (string, error) {
+	panic("pair selection must not reread the client ID independently")
+}
+
+func (r pairObservationReader) ReadPair(clientIDPath, secretPath string) (string, string, error) {
+	return r(clientIDPath, secretPath)
+}
+
+func TestSelectCredentialsDiscardsLostPairObservation(t *testing.T) {
+	for _, target := range []string{"stored", "new binding", "same binding new generation", "source round trip", "new revision"} {
+		t.Run(target, func(t *testing.T) {
+			canonical := "first"
+			initial := &model.ThirdpartyOAuth2ProviderEntity{ID: id.NewServiceID(), CanonicalID: &canonical, Version: 2, CredentialSource: model.CredentialSourceFilesystem, ClientIdentity: identityPointer("current-client"), ClientIdentityRevision: 4}
+			initial.Secret = model.NewAbsentSecret()
+			current := initial.Copy()
+			current.Version++
+			switch target {
+			case "stored":
+				current.CredentialSource = model.CredentialSourceStored
+				current.ClientID = "current-client"
+				current.Secret = model.NewPlaintextSecret("current-secret")
+				current.CredentialSourceTransitioned = true
+			case "new binding":
+				value := "second"
+				current.CanonicalID = &value
+			case "source round trip":
+				current.Version++
+				current.CredentialSourceTransitioned = true
+			case "new revision":
+				current.Version = initial.Version
+				current.ClientIdentityRevision++
+			}
+			gets, reads, observations := 0, 0, 0
+			service, logs := identityService(t, func(_ context.Context, got id.ServiceID) (*model.ThirdpartyOAuth2ProviderEntity, error) {
+				gets++
+				require.Equal(t, initial.ID, got)
+				return current.Copy(), nil
+			})
+			service.config.CredentialFiles = map[string]ports.CredentialFileBinding{
+				"first":  {ClientIDFile: "first-file", ClientSecretFile: "first-secret-file"},
+				"second": {ClientIDFile: "second-file", ClientSecretFile: "second-secret-file"},
+			}
+			service.credentialFileReader = pairObservationReader(func(path, secretPath string) (string, string, error) {
+				reads++
+				if reads == 1 {
+					assert.Equal(t, "first-file", path)
+					assert.Equal(t, "first-secret-file", secretPath)
+					return "retired-client", "retired-secret", nil
+				}
+				wantPath := "first-file"
+				wantSecretPath := "first-secret-file"
+				if target == "new binding" {
+					wantPath = "second-file"
+					wantSecretPath = "second-secret-file"
+				}
+				assert.Equal(t, wantPath, path)
+				assert.Equal(t, wantSecretPath, secretPath)
+				return "current-client", "current-secret", nil
+			})
+			service.WithClientIdentityRepository(identityObservationRepository{observe: func(_ context.Context, got id.ServiceID, observed id.ClientID, expected ports.ClientIdentityObservation) (ports.ClientIdentityState, bool, bool, error) {
+				observations++
+				assert.Equal(t, initial.ID, got)
+				if observations == 1 {
+					assert.Equal(t, id.ClientID("retired-client"), observed)
+					assert.Equal(t, ports.ClientIdentityObservation{ServiceVersion: 2, CanonicalID: "first", Revision: 4}, expected)
+					return ports.ClientIdentityState{Identity: identityPointer("retired-client"), Revision: 5}, false, true, nil
+				}
+				assert.Equal(t, id.ClientID("current-client"), observed)
+				assert.Equal(t, ports.ClientIdentityObservation{ServiceVersion: current.Version, CanonicalID: *current.CanonicalID, Revision: current.ClientIdentityRevision}, expected)
+				return ports.ClientIdentityState{Identity: current.ClientIdentity, Revision: current.ClientIdentityRevision}, true, false, nil
+			}})
+			clientID, secret, err := service.selectCredentials(context.Background(), initial, credentialOperationRefresh, identityPointer("current-client"))
+			if target == "new revision" {
+				require.Error(t, err)
+				var source *model.CredentialSourceError
+				require.ErrorAs(t, err, &source)
+				assert.Equal(t, model.CredentialSourceReasonIdentitySuperseded, source.Reason)
+				assert.Empty(t, clientID)
+				assert.Empty(t, secret)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, id.ClientID("current-client"), clientID)
+				assert.Equal(t, "current-secret", secret)
+			}
+			assert.Equal(t, 1, gets)
+			wantReads := 2
+			if target == "stored" {
+				wantReads = 1
+			}
+			assert.Equal(t, wantReads, reads)
+			assert.Equal(t, wantReads, observations)
+			assert.NotContains(t, logs.String(), "session.oauth2.client_identity_changed")
+			for _, forbidden := range []string{"retired-client", "retired-secret", "current-client", "current-secret", "first-file", "second-file"} {
+				assert.NotContains(t, logs.String(), forbidden)
+			}
+		})
+	}
+}
+
+func TestSelectCredentialsPairObservationFailsClosed(t *testing.T) {
+	for _, problem := range []string{"missing repository", "failed observation", "contention"} {
+		t.Run(problem, func(t *testing.T) {
+			canonical := "first"
+			entity := &model.ThirdpartyOAuth2ProviderEntity{ID: id.NewServiceID(), CanonicalID: &canonical, Version: 2, CredentialSource: model.CredentialSourceFilesystem, ClientIdentity: identityPointer("client-sentinel"), ClientIdentityRevision: 4}
+			entity.Secret = model.NewAbsentSecret()
+			gets, reads, observations := 0, 0, 0
+			service, logs := identityService(t, func(context.Context, id.ServiceID) (*model.ThirdpartyOAuth2ProviderEntity, error) {
+				gets++
+				return entity.Copy(), nil
+			})
+			service.credentialFileReader = pairObservationReader(func(string, string) (string, string, error) {
+				reads++
+				return "client-sentinel", "secret-sentinel", nil
+			})
+			if problem != "missing repository" {
+				service.WithClientIdentityRepository(identityObservationRepository{observe: func(context.Context, id.ServiceID, id.ClientID, ports.ClientIdentityObservation) (ports.ClientIdentityState, bool, bool, error) {
+					observations++
+					if problem == "failed observation" {
+						return ports.ClientIdentityState{}, false, false, fmt.Errorf("secret-sentinel at first-file")
+					}
+					return ports.ClientIdentityState{}, false, false, nil
+				}})
+			}
+			clientID, secret, err := service.selectCredentials(context.Background(), entity, credentialOperationRefresh, identityPointer("client-sentinel"))
+			require.ErrorIs(t, err, model.ErrCredentialSourceUnavailable)
+			assert.Empty(t, clientID)
+			assert.Empty(t, secret)
+			assert.Empty(t, logs.String(), "the returning helper does not own the failed use")
+			assert.NotContains(t, err.Error(), "secret-sentinel")
+			assert.NotContains(t, err.Error(), "first-file")
+			if problem == "contention" {
+				var source *model.CredentialSourceError
+				require.ErrorAs(t, err, &source)
+				assert.Equal(t, model.CredentialSourceReasonGenerationChanged, source.Reason)
+				assert.Equal(t, maxIdentityObservationAttempts, reads)
+				assert.Equal(t, reads, observations)
+				assert.Equal(t, reads, gets)
+			} else {
+				assert.LessOrEqual(t, reads, 1)
+				assert.LessOrEqual(t, observations, 1)
+				assert.Zero(t, gets)
+			}
+		})
+	}
+}

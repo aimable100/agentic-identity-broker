@@ -86,7 +86,13 @@ export const SessionCard: React.FC<SessionCardProps> = ({
   const needsLogin = session.requires_reauthentication;
 
   return (
-    <Card padding="default" border="subtle" hover="lift">
+    <Card
+      as="article"
+      aria-label={`Session: ${session.service_display_name}`}
+      padding="default"
+      border="subtle"
+      hover="lift"
+    >
       {/* Header: Service name and Terminate button */}
       <div className="mb-3 flex items-start justify-between gap-2">
         <div className="flex-1">

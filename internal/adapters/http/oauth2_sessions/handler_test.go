@@ -1,15 +1,19 @@
 package oauth2_sessions
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/agentic-identity-broker/agentic-identity-broker/internal/adapters/credentialfile"
 	encryptionnoop "github.com/agentic-identity-broker/agentic-identity-broker/internal/adapters/encryption/noop"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/adapters/storage/memory"
 	domainencryption "github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/encryption"
@@ -19,6 +23,7 @@ import (
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/principal"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/storage"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/thirdparty"
+	"github.com/agentic-identity-broker/agentic-identity-broker/internal/ports"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/testutil"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -27,18 +32,21 @@ import (
 
 func TestRefreshSessionIdentityDenials(t *testing.T) {
 	for _, tc := range []struct {
-		name       string
-		identity   *id.ClientID
-		rejected   bool
-		unreadable bool
-		status     int
-		code       string
+		name        string
+		identity    *id.ClientID
+		rejected    bool
+		unreadable  bool
+		missingFile bool
+		reason      string
+		status      int
+		code        string
 	}{
-		{name: "missing identity", status: http.StatusConflict, code: "refresh_unavailable"},
-		{name: "mismatched identity", identity: new(id.ClientID("previous-client")), status: http.StatusConflict, code: "refresh_unavailable"},
-		{name: "superseded revision", identity: new(id.ClientID("current-client")), status: http.StatusConflict, code: "refresh_unavailable"},
+		{name: "missing identity", reason: "identity_missing", status: http.StatusConflict, code: "refresh_unavailable"},
+		{name: "mismatched identity", identity: new(id.ClientID("previous-client")), reason: "identity_mismatch", status: http.StatusConflict, code: "refresh_unavailable"},
+		{name: "superseded revision", identity: new(id.ClientID("current-client")), reason: "identity_superseded", status: http.StatusConflict, code: "refresh_unavailable"},
 		{name: "rejection takes precedence", identity: new(id.ClientID("previous-client")), rejected: true, status: http.StatusConflict, code: "refresh_rejected"},
-		{name: "unavailable source", unreadable: true, status: http.StatusInternalServerError, code: "internal_error"},
+		{name: "unavailable binding", unreadable: true, reason: "missing_binding", status: http.StatusInternalServerError, code: "internal_error"},
+		{name: "unavailable identity file", unreadable: true, missingFile: true, reason: "not_found", status: http.StatusInternalServerError, code: "internal_error"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -49,7 +57,8 @@ func TestRefreshSessionIdentityDenials(t *testing.T) {
 				_, _ = w.Write([]byte(`{"access_token":"unexpected-new-token","token_type":"Bearer","expires_in":3600}`))
 			}))
 			t.Cleanup(upstream.Close)
-			logger := slog.New(slog.DiscardHandler)
+			var logs bytes.Buffer
+			logger := slog.New(slog.NewJSONHandler(&logs, nil))
 			encryptor := testutil.NewTestEncryptionAdapter(t)
 			providers := memory.NewInMemoryThirdpartyOAuth2ProviderRepository()
 			provider := &model.ThirdpartyOAuth2ProviderEntity{
@@ -90,9 +99,20 @@ func TestRefreshSessionIdentityDenials(t *testing.T) {
 			_, err = sessions.CreateIfAbsent(ctx, session)
 			require.NoError(t, err)
 			providerService := thirdparty.NewThirdpartyOAuth2ProviderService(providers, encryptor, &encryptionnoop.BranchKeyManager{}, nil, true, logger)
-			service := oauth2session.NewOAuth2SessionService(providerService, sessions, sessions, memory.NewUserGrantRepository(), memory.NewAgentRepository(), encryptor, upstream.Client(), nil, oauth2session.DefaultConfig(), logger).WithClientIdentityRepository(providers)
+			config := oauth2session.DefaultConfig()
+			identityPath := filepath.Join(t.TempDir(), "sensitive-client-id-file")
+			secretPath := filepath.Join(t.TempDir(), "sensitive-client-secret-file")
+			if tc.missingFile {
+				config.CredentialFiles = map[string]ports.CredentialFileBinding{
+					"reports": {ClientIDFile: identityPath, ClientSecretFile: secretPath},
+				}
+			}
+			service := oauth2session.NewOAuth2SessionService(providerService, sessions, sessions, memory.NewUserGrantRepository(), memory.NewAgentRepository(), encryptor, upstream.Client(), nil, config, logger).
+				WithCredentialFileReader(credentialfile.New()).WithClientIdentityRepository(providers)
+			t.Cleanup(func() { require.NoError(t, service.Close(context.Background())) })
 			router := chi.NewRouter()
 			router.Post("/api/third-party/{serviceId}/session/refresh", NewHandler(service, logger).RefreshSession)
+			logs.Reset()
 			req := httptest.NewRequest(http.MethodPost, "/api/third-party/"+provider.ID.String()+"/session/refresh", nil)
 			req = req.WithContext(principal.WithPrincipal(ctx, session.Principal))
 			response := httptest.NewRecorder()
@@ -101,6 +121,38 @@ func TestRefreshSessionIdentityDenials(t *testing.T) {
 			var body map[string]any
 			require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
 			assert.Equal(t, tc.code, body["error"])
+			if tc.unreadable {
+				assert.Equal(t, map[string]any{"error": "internal_error", "message": "failed to refresh session"}, body)
+			}
+			if !tc.rejected {
+				records := strings.Split(strings.TrimSpace(logs.String()), "\n")
+				require.Len(t, records, 1, "a denied refresh must emit only its owning failure record")
+				var record map[string]any
+				require.NoError(t, json.Unmarshal([]byte(records[0]), &record))
+				assert.Equal(t, "session.oauth2.credential_source_failed", record["event"])
+				level := "WARN"
+				if tc.unreadable {
+					level = "ERROR"
+				}
+				assert.Equal(t, level, record["level"])
+				assert.Equal(t, provider.ID.String(), record["service_id"])
+				assert.Equal(t, "refresh", record["operation"])
+				assert.Equal(t, "failed", record["outcome"])
+				assert.Equal(t, tc.reason, record["reason"])
+				assert.Equal(t, map[string]any{
+					"operation": "refresh", "failure_detail": "credential_source_unavailable",
+					"error_kind": "infrastructure", "dependency": "credential_source",
+					"http_status_code": float64(0), "oauth_error_code": "",
+				}, record["oauth2_session"])
+				assert.NotContains(t, record, "error")
+			}
+			for _, sensitive := range []string{
+				"old-access-token", "old-refresh-token", "unexpected-new-token",
+				"previous-client", "current-client", identityPath, secretPath,
+				filepath.Base(identityPath), filepath.Base(secretPath),
+			} {
+				assert.NotContains(t, logs.String(), sensitive)
+			}
 			assert.NotContains(t, body, "access_token")
 			assert.Empty(t, response.Header().Get("WWW-Authenticate"))
 			assert.Zero(t, providerCalls.Load())

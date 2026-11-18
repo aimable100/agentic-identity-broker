@@ -57,30 +57,51 @@ func (s *OAuth2SessionService) selectCredentials(
 				"outcome", credentialOutcomeUsed)
 		}
 	}()
-	if err := candidate.ValidateOutboundCredentials(); err != nil {
-		return "", "", sessionOperationError(ctx, errorOperation, DetailConfiguration, errors.Join(ErrInvalidConfiguration, err))
-	}
-
-	clientID = candidate.ClientID
-	if candidate.CredentialSource == model.CredentialSourceFilesystem {
-		binding, ok := s.config.CredentialFiles[*candidate.CanonicalID]
-		if !ok {
-			return "", "", model.NewCredentialSourceError(model.CredentialSourceReasonMissingBinding)
+	for attempt := 0; ; attempt++ {
+		if attempt == maxIdentityObservationAttempts {
+			return "", "", model.NewCredentialSourceError(model.CredentialSourceReasonGenerationChanged)
 		}
-		if s.credentialFileReader == nil {
-			return "", "", model.NewCredentialSourceError(model.CredentialSourceReasonReadFailed)
+		if err := candidate.ValidateOutboundCredentials(); err != nil {
+			return "", "", sessionOperationError(ctx, errorOperation, DetailConfiguration, errors.Join(ErrInvalidConfiguration, err))
 		}
-		var selectedID string
-		selectedID, clientSecret, err = s.credentialFileReader.ReadPair(binding.ClientIDFile, binding.ClientSecretFile)
-		if err != nil {
-			return "", "", err
+		clientID = candidate.ClientID
+		if candidate.CredentialSource == model.CredentialSourceFilesystem {
+			binding, ok := s.config.CredentialFiles[*candidate.CanonicalID]
+			if !ok {
+				return "", "", model.NewCredentialSourceError(model.CredentialSourceReasonMissingBinding)
+			}
+			if s.credentialFileReader == nil || s.clientIdentityRepo == nil {
+				return "", "", model.NewCredentialSourceError(model.CredentialSourceReasonReadFailed)
+			}
+			if err := ctx.Err(); err != nil {
+				return "", "", identityReadError(err)
+			}
+			var selectedID string
+			selectedID, clientSecret, err = s.credentialFileReader.ReadPair(binding.ClientIDFile, binding.ClientSecretFile)
+			if err != nil {
+				return "", "", err
+			}
+			clientID = id.ClientID(selectedID)
+			_, applied, err := s.recordClientIdentityObservation(ctx, &candidate, clientID)
+			if err != nil {
+				return "", "", err
+			}
+			if !applied {
+				clientID, clientSecret = "", ""
+				fresh, err := s.providerService.GetForTokenAcquisition(ctx, candidate.ID)
+				if err != nil {
+					return "", "", identityReadError(err)
+				}
+				candidate = *fresh
+				continue
+			}
+		} else if !candidate.IsPublicClient() && !candidate.IsCIMDConfidentialClient() {
+			clientSecret, err = candidate.Secret.GetPlaintext()
+			if err != nil {
+				return "", "", sessionOperationError(ctx, errorOperation, DetailDecryptionFailed, fmt.Errorf("provider secret not in plaintext state; ensure entity was fetched via ThirdpartyOAuth2ProviderService.Get: %w", err))
+			}
 		}
-		clientID = id.ClientID(selectedID)
-	} else if !candidate.IsPublicClient() && !candidate.IsCIMDConfidentialClient() {
-		clientSecret, err = candidate.Secret.GetPlaintext()
-		if err != nil {
-			return "", "", sessionOperationError(ctx, errorOperation, DetailDecryptionFailed, fmt.Errorf("provider secret not in plaintext state; ensure entity was fetched via ThirdpartyOAuth2ProviderService.Get: %w", err))
-		}
+		break
 	}
 
 	if established == nil {
@@ -91,6 +112,9 @@ func (s *OAuth2SessionService) selectCredentials(
 		return "", "", model.NewCredentialSourceError(model.CredentialSourceReasonIdentityMissing)
 	} else if clientID != *established {
 		return "", "", model.NewCredentialSourceError(model.CredentialSourceReasonIdentityMismatch)
+	}
+	if candidate.ClientIdentityRevision != entity.ClientIdentityRevision {
+		return "", "", model.NewCredentialSourceError(model.CredentialSourceReasonIdentitySuperseded)
 	}
 	return clientID, clientSecret, nil
 }

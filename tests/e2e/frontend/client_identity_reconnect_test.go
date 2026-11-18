@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/id"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/storage"
@@ -156,6 +157,52 @@ var _ = Describe("Client identity browser recovery", Label("client-identity-chan
 		Expect(secret).To(Equal(fixtures.ReportsSecretV2))
 	}
 
+	expectReportsSignIn := func() {
+		GinkgoHelper()
+		Expect(sessionsPage.WaitForServiceStatus(ctx, "Reports Production", "Sign-in required")).To(Succeed())
+		Expect(sessionsPage.IsServiceActionVisible(ctx, "Reports Production", "Login")).To(BeTrue())
+		Expect(sessionsPage.IsServiceActionVisible(ctx, "Reports Production", "Refresh")).To(BeFalse())
+		Expect(sessionsPage.IsServiceActionVisible(ctx, "Reports Production", "Terminate")).To(BeTrue())
+		Expect(sessionsPage.WaitForServiceStatus(ctx, "Calendar Production", "Active")).To(Succeed())
+		Expect(sessionsPage.IsServiceActionVisible(ctx, "Calendar Production", "Login")).To(BeFalse())
+		Expect(sessionsPage.IsServiceActionVisible(ctx, "Calendar Production", "Refresh")).To(BeTrue())
+		Expect(sessionsPage.IsServiceActionVisible(ctx, "Calendar Production", "Terminate")).To(BeTrue())
+	}
+
+	expectReconnectFailure := func(message string) {
+		GinkgoHelper()
+		Expect(sessionsPage.WaitForErrorMessage(ctx, message)).To(Succeed())
+		Expect(sessionsPage.WaitForURL(ctx, `/sessions$`)).To(Succeed())
+		expectReportsSignIn()
+		requests := len(journey.Upstream.GetTokenRequests())
+		authorization := journey.Upstream.GetLastAuthorizeURL()
+		Consistently(func(g Gomega) {
+			g.Expect(GetTestPage().URL()).To(Equal(journey.EndUser.BaseURL() + "/sessions"))
+			g.Expect(journey.Upstream.GetTokenRequests()).To(HaveLen(requests))
+			g.Expect(journey.Upstream.GetLastAuthorizeURL()).To(Equal(authorization))
+		}, 2*time.Second, 50*time.Millisecond).Should(Succeed())
+		expectSessionUnchanged()
+		expectGrantUnchanged()
+		expectConnectedServices(calendarID.String())
+		denied := exchange(http.StatusBadRequest)
+		Expect(denied).To(HaveKeyWithValue("error", "invalid_grant"))
+		Expect(denied).NotTo(HaveKey("access_token"))
+		Expect(denied).NotTo(HaveKey("refresh_token"))
+	}
+
+	retryReports := func() {
+		GinkgoHelper()
+		Expect(sessionsPage.LoginServiceWithKeyboard(ctx, "Reports Production", "Space")).To(Succeed())
+		Expect(sessionsPage.WaitForURL(ctx, `/sessions\?.*success=true`)).To(Succeed())
+		Expect(sessionsPage.WaitForServiceStatus(ctx, "Reports Production", "Active")).To(Succeed())
+		Expect(sessionsPage.IsServiceActionVisible(ctx, "Reports Production", "Login")).To(BeFalse())
+		Expect(sessionsPage.IsServiceActionVisible(ctx, "Reports Production", "Refresh")).To(BeTrue())
+		expectCurrentProviderIdentity()
+		expectConnectedServices(serviceID.String(), calendarID.String())
+		expectGrantUnchanged()
+		Expect(exchange(http.StatusOK)).To(HaveKey("access_token"))
+	}
+
 	Context("after Reports client identity changes", func() {
 		BeforeEach(publishChange)
 
@@ -165,6 +212,10 @@ var _ = Describe("Client identity browser recovery", Label("client-identity-chan
 			Expect(consentPage.IsServiceLoginVisible(ctx, "Reports Production")).To(BeTrue())
 			Expect(consentPage.IsPermissionSetServiceIncluded(ctx, "Reports Access", "Calendar Production")).To(BeTrue())
 			Expect(consentPage.IsServiceLoginVisible(ctx, "Calendar Production")).To(BeFalse())
+			normalContrast, hoverContrast, err := consentPage.GetServiceLoginContrast(ctx, "Reports Production")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(normalContrast).To(BeNumerically(">=", 4.5), "Reports Login normal text contrast meets WCAG AA")
+			Expect(hoverContrast).To(BeNumerically(">=", 4.5), "Reports Login hover text contrast meets WCAG AA")
 			expectConnectedServices(calendarID.String())
 			Expect(consentPage.TakeScreenshot(ctx, "client_identity_consent_sign_in_required")).To(Succeed())
 			expectGrantUnchanged()
@@ -211,9 +262,12 @@ var _ = Describe("Client identity browser recovery", Label("client-identity-chan
 			Expect(target.Query().Get("redirect_uri")).To(Equal(journey.EndUser.BaseURL() + "/sessions"))
 			Expect(sessionsPage.Navigate(ctx, target.RequestURI())).To(Succeed())
 			Expect(sessionsPage.WaitForURL(ctx, `/sessions\?.*success=true`)).To(Succeed())
-			Expect(sessionsPage.WaitForTerminateButton(ctx)).To(Succeed())
-			Expect(sessionsPage.GetLoginButtonCount(ctx)).To(Equal(0))
-			Expect(sessionsPage.GetRefreshButtonCount(ctx)).To(Equal(2))
+			Expect(sessionsPage.WaitForServiceStatus(ctx, "Reports Production", "Active")).To(Succeed())
+			Expect(sessionsPage.IsServiceActionVisible(ctx, "Reports Production", "Login")).To(BeFalse())
+			Expect(sessionsPage.IsServiceActionVisible(ctx, "Reports Production", "Refresh")).To(BeTrue())
+			Expect(sessionsPage.WaitForServiceStatus(ctx, "Calendar Production", "Active")).To(Succeed())
+			Expect(sessionsPage.IsServiceActionVisible(ctx, "Calendar Production", "Login")).To(BeFalse())
+			Expect(sessionsPage.IsServiceActionVisible(ctx, "Calendar Production", "Refresh")).To(BeTrue())
 			Expect(sessionsPage.TakeScreenshot(ctx, "client_identity_sessions_reconnected")).To(Succeed())
 			expectCurrentProviderIdentity()
 			expectGrantUnchanged()
@@ -223,66 +277,89 @@ var _ = Describe("Client identity browser recovery", Label("client-identity-chan
 		// AS-2.4 from specs/056-invalidate-client-sessions/spec.md
 		It("keeps failed reconnection unusable without grant expansion and permits a keyboard retry", func() {
 			Expect(sessionsPage.NavigateToSessions(ctx)).To(Succeed())
-			Expect(sessionsPage.WaitForLoginButton(ctx)).To(Succeed())
+			expectReportsSignIn()
 			journey.Upstream.WithErrorResponse("access_denied")
-			Expect(sessionsPage.LoginWithKeyboard(ctx, "Enter")).To(Succeed())
-			Expect(sessionsPage.WaitForErrorMessage(ctx, "Authorization failed - please try again")).To(Succeed())
-			Expect(sessionsPage.WaitForLoginButton(ctx)).To(Succeed())
-			Expect(sessionsPage.WaitForURL(ctx, `/sessions$`)).To(Succeed())
+			Expect(sessionsPage.LoginServiceWithKeyboard(ctx, "Reports Production", "Enter")).To(Succeed())
+			expectReconnectFailure("Authorization failed - please try again")
 			Expect(sessionsPage.TakeScreenshot(ctx, "client_identity_reconnect_failed")).To(Succeed())
-			expectSessionUnchanged()
-			expectGrantUnchanged()
-			Expect(exchange(http.StatusBadRequest)).To(HaveKeyWithValue("error", "invalid_grant"))
 			journey.Upstream.WithSuccessfulTokenResponse()
-			Expect(sessionsPage.LoginWithKeyboard(ctx, "Space")).To(Succeed())
-			Expect(sessionsPage.WaitForURL(ctx, `/sessions\?.*success=true`)).To(Succeed())
-			Expect(sessionsPage.WaitForTerminateButton(ctx)).To(Succeed())
-			expectCurrentProviderIdentity()
-			expectGrantUnchanged()
-			Expect(exchange(http.StatusOK)).To(HaveKey("access_token"))
+			retryReports()
 		})
 
 		// AS-2.4 from specs/056-invalidate-client-sessions/spec.md
 		It("retains the invalidated session after a provider decline and offers a service-specific retry", func() {
 			journey.Upstream.WithAuthorizationError("access_denied")
 			Expect(sessionsPage.NavigateToSessions(ctx)).To(Succeed())
-			Expect(sessionsPage.WaitForLoginButton(ctx)).To(Succeed())
+			expectReportsSignIn()
 			calls := len(journey.Upstream.GetTokenRequests())
-			Expect(sessionsPage.LoginWithKeyboard(ctx, "Enter")).To(Succeed())
-			Expect(sessionsPage.WaitForErrorMessage(ctx, "You denied access to the service. No tokens were stored.")).To(Succeed())
-			Expect(sessionsPage.WaitForLoginButton(ctx)).To(Succeed())
-			Expect(sessionsPage.WaitForURL(ctx, `/sessions$`)).To(Succeed())
+			Expect(sessionsPage.LoginServiceWithKeyboard(ctx, "Reports Production", "Enter")).To(Succeed())
+			expectReconnectFailure("You denied access to the service. No tokens were stored.")
 			Expect(sessionsPage.TakeScreenshot(ctx, "client_identity_reconnect_declined")).To(Succeed())
 			Expect(journey.Upstream.GetTokenRequests()).To(HaveLen(calls))
 			lastAuthorization, err := url.Parse(journey.Upstream.GetLastAuthorizeURL())
 			Expect(err).NotTo(HaveOccurred())
 			Expect(lastAuthorization.Query().Get("client_id")).To(Equal(fixtures.ReportsClientV2))
-			expectSessionUnchanged()
-			expectGrantUnchanged()
-			Expect(exchange(http.StatusBadRequest)).To(HaveKeyWithValue("error", "invalid_grant"))
 			journey.Upstream.WithAuthorizationError("")
-			Expect(sessionsPage.LoginWithKeyboard(ctx, "Space")).To(Succeed())
-			Expect(sessionsPage.WaitForURL(ctx, `/sessions\?.*success=true`)).To(Succeed())
-			expectCurrentProviderIdentity()
-			expectGrantUnchanged()
-			Expect(exchange(http.StatusOK)).To(HaveKey("access_token"))
+			retryReports()
+		})
+
+		Context("when reconnecting from agent consent", func() {
+			BeforeEach(func() {
+				enterAuthorization()
+				Expect(consentPage.TogglePermissionSet(ctx, "Additional Reports Access")).To(Succeed())
+				Expect(consentPage.IsPermissionSetSelected(ctx, "Additional Reports Access")).To(BeTrue())
+			})
+
+			// AS-2.4 from specs/056-invalidate-client-sessions/spec.md (User Story 2), consent provider-failure variant
+			It("returns a failed consent reconnect to sessions without releasing old tokens and succeeds on keyboard retry", func() {
+				journey.Upstream.WithErrorResponse("access_denied")
+				calls := len(journey.Upstream.GetTokenRequests())
+				Expect(consentPage.LoginServiceWithKeyboard(ctx, "Reports Production", "Enter")).To(Succeed())
+				expectReconnectFailure("Authorization failed - please try again")
+				requests := journey.Upstream.GetTokenRequests()[calls:]
+				Expect(requests).NotTo(BeEmpty())
+				for _, request := range requests {
+					form, err := url.ParseQuery(request.Body)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(form.Get("grant_type")).To(Equal("authorization_code"))
+					clientID, secret, err := helpers.CredentialTokenRequest(request)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(clientID).To(Equal(fixtures.ReportsClientV2))
+					Expect(secret).To(Equal(fixtures.ReportsSecretV2))
+				}
+				journey.Upstream.WithSuccessfulTokenResponse()
+				retryReports()
+			})
+
+			// AS-2.4 from specs/056-invalidate-client-sessions/spec.md (User Story 2), consent provider-decline variant
+			It("returns a declined consent reconnect to sessions without expanding grants and succeeds on keyboard retry", func() {
+				journey.Upstream.WithAuthorizationError("access_denied")
+				calls := len(journey.Upstream.GetTokenRequests())
+				Expect(consentPage.LoginServiceWithKeyboard(ctx, "Reports Production", "Enter")).To(Succeed())
+				expectReconnectFailure("You denied access to the service. No tokens were stored.")
+				Expect(journey.Upstream.GetTokenRequests()).To(HaveLen(calls))
+				lastAuthorization, err := url.Parse(journey.Upstream.GetLastAuthorizeURL())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(lastAuthorization.Query().Get("client_id")).To(Equal(fixtures.ReportsClientV2))
+				journey.Upstream.WithAuthorizationError("")
+				retryReports()
+			})
 		})
 
 		// AS-2.5 from specs/056-invalidate-client-sessions/spec.md
 		It("shows Reports sign-in after the next sessions load without unsolicited consent navigation", func() {
 			Expect(helpers.PublishCredentialPair(binding, fixtures.ReportsClientV1, fixtures.ReportsSecretV1)).To(Succeed())
 			Expect(sessionsPage.NavigateToSessions(ctx)).To(Succeed())
-			Expect(sessionsPage.WaitForTerminateButton(ctx)).To(Succeed())
-			Expect(sessionsPage.GetLoginButtonCount(ctx)).To(Equal(0))
+			Expect(sessionsPage.WaitForServiceStatus(ctx, "Reports Production", "Active")).To(Succeed())
+			Expect(sessionsPage.IsServiceActionVisible(ctx, "Reports Production", "Login")).To(BeFalse())
+			Expect(sessionsPage.IsServiceActionVisible(ctx, "Reports Production", "Refresh")).To(BeTrue())
+			Expect(sessionsPage.WaitForServiceStatus(ctx, "Calendar Production", "Active")).To(Succeed())
+			Expect(sessionsPage.IsServiceActionVisible(ctx, "Calendar Production", "Refresh")).To(BeTrue())
 			beforeURL := GetTestPage().URL()
 			publishChange()
-			Expect(GetTestPage().URL()).To(Equal(beforeURL))
+			Consistently(GetTestPage().URL, 2*time.Second, 50*time.Millisecond).Should(Equal(beforeURL))
 			Expect(sessionsPage.NavigateToSessions(ctx)).To(Succeed())
-			Expect(sessionsPage.WaitForLoginButton(ctx)).To(Succeed())
-			Expect(sessionsPage.IsTextVisible(ctx, "Sign-in required")).To(BeTrue())
-			Expect(sessionsPage.GetLoginButtonCount(ctx)).To(Equal(1))
-			Expect(sessionsPage.GetRefreshButtonCount(ctx)).To(Equal(1), "Calendar remains refreshable")
-			Expect(sessionsPage.GetTerminateButtonCount(ctx)).To(Equal(2))
+			expectReportsSignIn()
 			current, err := url.Parse(GetTestPage().URL())
 			Expect(err).NotTo(HaveOccurred())
 			Expect(current.Path).To(Equal("/sessions"))

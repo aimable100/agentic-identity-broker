@@ -1,10 +1,14 @@
 package oauth2session_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -329,14 +333,14 @@ func TestCredentialRotation_PublicationAfterValidationUsesOnlyAcquiredPairAndChe
 					acquiredID, nextID = "client-B", "client-A"
 				}
 				binding := projectedCredentialPair(t, "client-A", "acquired-secret")
-				h := newCredentialSessionHarness(t, map[string]ports.CredentialFileBinding{"publication-service": binding})
+				var logs bytes.Buffer
+				h := newCredentialSessionHarness(t, map[string]ports.CredentialFileBinding{"publication-service": binding}, slog.New(slog.NewJSONHandler(&logs, nil)))
 				provider := h.register(t, model.CredentialSourceFilesystem, "publication-service", "", "")
 				principal := id.Principal("publication@example.com")
 				established := id.ClientID("client-A")
 				state := credentialState(t, h.service, principal, provider.ID, &established)
-				if operation != "callback" {
-					h.seedSession(t, principal, provider.ID, &established)
-				}
+				original := h.seedSession(t, principal, provider.ID, &established)
+				logs.Reset()
 				var publication sync.Once
 				var publicationError error
 				h.reader.beforePair = func(attempt int) error {
@@ -376,7 +380,46 @@ func TestCredentialRotation_PublicationAfterValidationUsesOnlyAcquiredPairAndChe
 				} else {
 					assertCredentialSourceReason(t, err, model.CredentialSourceReasonIdentityMismatch)
 					assert.Empty(t, h.endpoint.captured(t), "a newly matching publication cannot rescue a mismatched acquired pair")
-					require.NoError(t, attemptOperation())
+					observed, err := h.records.Get(context.Background(), provider.ID)
+					require.NoError(t, err)
+					require.NotNil(t, observed.ClientIdentity)
+					require.Equal(t, id.ClientID("client-B"), *observed.ClientIdentity, "the acquired mismatch must be recorded even though the files already reverted")
+					assert.Equal(t, int64(1), observed.ClientIdentityRevision)
+					idsBeforeRollback, _ := h.reader.counts()
+					wantIDs := 1
+					if operation == "automatic refresh" {
+						wantIDs++
+					}
+					assert.Equal(t, wantIDs, idsBeforeRollback, "the denied pair must not depend on a later identity reread")
+					var changes []map[string]any
+					for _, line := range strings.Split(strings.TrimSpace(logs.String()), "\n") {
+						var event map[string]any
+						require.NoError(t, json.Unmarshal([]byte(line), &event))
+						if event["event"] == "session.oauth2.client_identity_changed" {
+							changes = append(changes, event)
+						}
+					}
+					require.Len(t, changes, 1)
+					assert.Equal(t, "INFO", changes[0]["level"])
+					assert.Equal(t, provider.ID.String(), changes[0]["service_id"])
+					assert.Equal(t, float64(1), changes[0]["client_identity_revision"])
+					assert.Equal(t, "filesystem_observation", changes[0]["channel"])
+					assert.NotContains(t, changes[0], "operator_principal")
+					assertCredentialSourceReason(t, attemptOperation(), model.CredentialSourceReasonIdentitySuperseded)
+					_, token, err := h.service.GetValidAccessToken(context.Background(), principal, provider.ID)
+					assertCredentialSourceReason(t, err, model.CredentialSourceReasonIdentitySuperseded)
+					assert.Empty(t, token)
+					assert.Empty(t, h.endpoint.captured(t), "restoring the original identity must not authenticate the old callback or refresh")
+					unchanged, err := h.sessions.Get(context.Background(), original.ID)
+					require.NoError(t, err)
+					assert.Equal(t, original, unchanged)
+					fresh := h.initiate(t, principal, provider.ID)
+					reconnected := h.callback(t, principal, provider.ID, fresh.StateToken)
+					assert.Equal(t, &established, reconnected.UpstreamClientID)
+					assert.Equal(t, int64(2), reconnected.UpstreamClientRevision)
+					_, token, err = h.service.GetValidAccessToken(context.Background(), principal, provider.ID)
+					require.NoError(t, err)
+					assert.NotEmpty(t, token)
 					requests := h.endpoint.captured(t)
 					require.Len(t, requests, 1)
 					assert.Equal(t, "client-A", requests[0].clientID)
@@ -387,6 +430,9 @@ func TestCredentialRotation_PublicationAfterValidationUsesOnlyAcquiredPairAndChe
 					assert.Equal(t, 1, pairs, "the changed identity blocks the subsequent attempt before pair acquisition")
 				} else {
 					assert.Equal(t, 2, pairs)
+				}
+				for _, forbidden := range []string{"client-A", "client-B", "acquired-secret", "published-secret", binding.ClientIDFile, binding.ClientSecretFile, filepath.Base(binding.ClientIDFile), filepath.Base(binding.ClientSecretFile), "credential-code", "publication-code", "credential-access", "credential-refresh", "legacy-access", "legacy-refresh", state} {
+					assert.NotContains(t, logs.String(), forbidden)
 				}
 			})
 		}

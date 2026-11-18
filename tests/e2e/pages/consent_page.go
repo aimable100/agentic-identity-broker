@@ -733,17 +733,67 @@ func (cp *ConsentPage) IsServiceLoginVisible(_ context.Context, serviceName stri
 	return cp.serviceLoginButton(serviceName).IsVisible()
 }
 
+func (cp *ConsentPage) GetServiceLoginContrast(_ context.Context, serviceName string) (float64, float64, error) {
+	button := cp.serviceLoginButton(serviceName)
+	readContrast := func() (float64, error) {
+		value, err := button.Evaluate(`async element => {
+			await Promise.all(element.getAnimations().map(animation => animation.finished));
+			const luminance = color => {
+				const channels = color.match(/[\d.]+/g).slice(0, 3).map(Number).map(value => {
+					const channel = value / 255;
+					return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+				});
+				return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+			};
+			const style = getComputedStyle(element);
+			const text = luminance(style.color);
+			const background = luminance(style.backgroundColor);
+			return (Math.max(text, background) + 0.05) / (Math.min(text, background) + 0.05);
+		}`, nil)
+		if err != nil {
+			return 0, err
+		}
+		contrast, ok := value.(float64)
+		if !ok {
+			return 0, fmt.Errorf("service %q login returned invalid contrast %v", serviceName, value)
+		}
+		return contrast, nil
+	}
+	if err := cp.page().Mouse().Move(0, 0); err != nil {
+		return 0, 0, err
+	}
+	normal, err := readContrast()
+	if err != nil {
+		return 0, 0, err
+	}
+	if err := button.Hover(); err != nil {
+		return 0, 0, err
+	}
+	hover, err := readContrast()
+	if err != nil {
+		return 0, 0, err
+	}
+	return normal, hover, cp.page().Mouse().Move(0, 0)
+}
+
 func (cp *ConsentPage) LoginServiceWithKeyboard(_ context.Context, serviceName, key string) error {
 	button := cp.serviceLoginButton(serviceName)
 	if err := button.Focus(); err != nil {
 		return err
 	}
-	focused, err := button.Evaluate(`element => element === document.activeElement`, nil)
+	focused, err := button.Evaluate(`async element => {
+		await Promise.all(element.getAnimations().map(animation => animation.finished));
+		const style = getComputedStyle(element);
+		return element === document.activeElement && style.boxShadow !== 'none' &&
+			style.getPropertyValue('--tw-ring-shadow').trim() !== '' &&
+			style.getPropertyValue('--tw-ring-shadow').trim() !== '0 0 #0000' &&
+			style.getPropertyValue('--tw-ring-color').trim() !== '';
+	}`, nil)
 	if err != nil {
 		return err
 	}
 	if focused != true {
-		return fmt.Errorf("service %q login did not receive keyboard focus", serviceName)
+		return fmt.Errorf("service %q login did not receive visible keyboard focus", serviceName)
 	}
 	return button.Press(key)
 }

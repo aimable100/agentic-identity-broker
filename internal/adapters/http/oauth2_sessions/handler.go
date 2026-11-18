@@ -621,10 +621,12 @@ func (h *Handler) RefreshSession(w http.ResponseWriter, r *http.Request) {
 				"message": "failed to refresh token with the third-party provider",
 			})
 		default:
-			h.logger.ErrorContext(ctx, "failed to refresh session",
-				"principal", principalValue,
-				"service_id", serviceIDStr,
-				"error", err)
+			if !errors.Is(err, model.ErrCredentialSourceUnavailable) {
+				h.logger.ErrorContext(ctx, "failed to refresh session",
+					"principal", principalValue,
+					"service_id", serviceIDStr,
+					"error", err)
+			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(map[string]string{

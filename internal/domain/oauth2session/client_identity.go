@@ -63,20 +63,11 @@ func (s *OAuth2SessionService) resolveIdentity(ctx context.Context, service *mod
 			}
 			return ports.ClientIdentityState{Identity: &identity, Revision: revision}, nil
 		}
-		state, applied, changed, err := s.clientIdentityRepo.RecordObservedClientIdentity(ctx, service.ID, id.ClientID(value), ports.ClientIdentityObservation{ServiceVersion: service.Version, CanonicalID: *service.CanonicalID, Revision: service.ClientIdentityRevision})
+		state, applied, err := s.recordClientIdentityObservation(ctx, service, id.ClientID(value))
 		if err != nil {
-			return ports.ClientIdentityState{}, identityReadError(err)
+			return ports.ClientIdentityState{}, err
 		}
 		if applied {
-			service.ClientIdentity = state.Identity
-			service.ClientIdentityRevision = state.Revision
-			if changed {
-				s.logger.InfoContext(ctx, "oauth2 client identity changed",
-					"event", "session.oauth2.client_identity_changed",
-					"service_id", service.ID,
-					"client_identity_revision", state.Revision,
-					"channel", identityChangeFilesystem)
-			}
 			return state, nil
 		}
 		fresh, err := s.providerService.GetForIdentityEvaluation(ctx, service.ID)
@@ -87,6 +78,31 @@ func (s *OAuth2SessionService) resolveIdentity(ctx context.Context, service *mod
 		*service = *fresh
 	}
 	return ports.ClientIdentityState{}, model.NewCredentialSourceError(model.CredentialSourceReasonGenerationChanged)
+}
+
+func (s *OAuth2SessionService) recordClientIdentityObservation(ctx context.Context, service *model.ThirdpartyOAuth2ProviderEntity, observed id.ClientID) (ports.ClientIdentityState, bool, error) {
+	if observed.IsZero() {
+		return ports.ClientIdentityState{}, false, model.NewCredentialSourceError(model.CredentialSourceReasonEmpty)
+	}
+	if s.clientIdentityRepo == nil {
+		return ports.ClientIdentityState{}, false, identityReadError(nil)
+	}
+	state, applied, changed, err := s.clientIdentityRepo.RecordObservedClientIdentity(ctx, service.ID, observed, ports.ClientIdentityObservation{ServiceVersion: service.Version, CanonicalID: *service.CanonicalID, Revision: service.ClientIdentityRevision})
+	if err != nil {
+		return ports.ClientIdentityState{}, false, identityReadError(err)
+	}
+	if applied {
+		service.ClientIdentity = state.Identity
+		service.ClientIdentityRevision = state.Revision
+		if changed {
+			s.logger.InfoContext(ctx, "oauth2 client identity changed",
+				"event", "session.oauth2.client_identity_changed",
+				"service_id", service.ID,
+				"client_identity_revision", state.Revision,
+				"channel", identityChangeFilesystem)
+		}
+	}
+	return state, applied, nil
 }
 
 func identityReadError(err error) error {
