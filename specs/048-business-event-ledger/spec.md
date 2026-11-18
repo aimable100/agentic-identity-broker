@@ -132,7 +132,8 @@ retention run, and read the ledger.
 **Cast**: Alice (`alice@example.com`, asserted by the SSO proxy as `X-Remote-User`); agent *Data
 Analysis Assistant* (`550e8400-e29b-41d4-a716-446655440000`); Alice's grant for that agent
 (`990e8400-e29b-41d4-a716-446655440020`) with permission set *GitHub Read Access*
-(`770e8400-e29b-41d4-a716-446655440001`). All times are 2026-11-12 UTC. All IDs are synthetic.
+(`770e8400-e29b-41d4-a716-446655440001`), including the GitHub service
+(`880e8400-e29b-41d4-a716-446655440002`). All times are 2026-11-12 UTC. All IDs are synthetic.
 
 **Step 1 — Broker configuration (excerpt)**
 
@@ -167,7 +168,12 @@ The record on stdout, as LOGGING.md prescribes. It is the same with the ledger o
   "principal": "alice@example.com",
   "agent_id": "550e8400-e29b-41d4-a716-446655440000",
   "grant_id": "990e8400-e29b-41d4-a716-446655440020",
-  "granted_permission_sets": ["770e8400-e29b-41d4-a716-446655440001"],
+  "granted_permission_sets": [
+    {
+      "permission_set_id": "770e8400-e29b-41d4-a716-446655440001",
+      "included_service_ids": ["880e8400-e29b-41d4-a716-446655440002"]
+    }
+  ],
   "revoked_at": "2026-11-12T10:15:00.123Z",
   "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
   "actor": "alice@example.com"
@@ -186,7 +192,7 @@ The record on stdout, as LOGGING.md prescribes. It is the same with the ledger o
 | `principal` | `alice@example.com` |
 | `actor` | `alice@example.com` |
 | `trace_id` | `4bf92f3577b34da6a3ce929d0e0e4736` |
-| `attributes` | `{"agent_id": "550e8400-…", "grant_id": "990e8400-…", "granted_permission_sets": ["770e8400-…"], "revoked_at": "2026-11-12T10:15:00.123Z"}` |
+| `attributes` | `{"agent_id": "550e8400-…", "grant_id": "990e8400-…", "granted_permission_sets": [{"permission_set_id": "770e8400-…", "included_service_ids": ["880e8400-…"]}], "revoked_at": "2026-11-12T10:15:00.123Z"}` |
 
 `occurred_at` preserves the record's instant at PostgreSQL's microsecond precision: `.123456789Z`
 becomes `.123456Z` by truncation, not rounding. See [timestamp precision](./data-model.md#timestamp-precision).

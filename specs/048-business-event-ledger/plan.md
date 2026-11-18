@@ -362,7 +362,7 @@ enabled, disabled, write failing; retention) → one `It` per scenario.
 | US1.2 | Same planned file, `Label("docker")` | `It("keeps exactly one event when a second revocation returns 404")` | The row of the first revocation is absent |
 | US1.3 | Same planned file, `Label("docker")` | `It("stores no event and still logs the revocation when the ledger is disabled")` | The audit record has `action`, not `event` |
 | US1.4 | Same planned file, `Label("docker")` | `It("returns 204 and reports exactly one failed write without losing the audit record")` | No failure is counted or logged, and the audit record has `action`, not `event` |
-| US2.1 | Same planned file, `Label("docker")` | `It("deletes only the expired event without a deletion log or counter")` | The old row is still present |
+| US2.1 | Same planned file, `Label("docker")` | `It("deletes only the expired event without a deletion log or counter")` | No events are stored; after onboarding but before retention, the expired row remains |
 
 T021 adds line numbers after the tests are written during `/speckit-implement`. No mapped test file exists yet.
 
@@ -383,8 +383,10 @@ status, the log buffer, and the metric reader.
   "exactly one row" also proves that a record without a definition is not stored (FR-001).
 - US2.1 needs a row that is older than the retention period. The smallest valid period is 24
   hours and no production API sets the storage time, so the test runs against PostgreSQL: it
-  revokes two grants, sets `recorded_at` of the first row to two days ago with SQL, and uses
-  `retention.period: 24h` and `retention.interval: 1s`.
+  revokes two grants and asserts that both committed events exist before ageing either row.
+  It sets the first row's `recorded_at` to two days ago with SQL and asserts that exactly one row changes.
+  It uses `retention.period: 24h` and `retention.interval: 1s`, then asserts that only the second row remains.
+  Before event onboarding, the test fails because events are absent. T029 and T033 isolate deletion behavior with controlled fixtures.
 - T020 cannot turn green in Phase 2.5: its two revocations need the typed event from T049–T050.
   Retention unit and repository tests turn green in Phase 2.5. T056 owns the retention E2E green gate.
 

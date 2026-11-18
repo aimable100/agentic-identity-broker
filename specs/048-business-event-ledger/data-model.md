@@ -66,7 +66,7 @@ type BusinessEvent struct {
 Invariants:
 
 - `ID` is not zero. `Event` is not empty. `OccurredAt` is not zero.
-- `Attributes` does not contain the keys `event`, `principal`, `actor`, or `trace_id`.
+- `Attributes` has no top-level key named `event`, `principal`, `actor`, or `trace_id`. These names can occur inside groups.
 - `Attributes` contains nothing that LOGGING.md section 6.1 prohibits. The invariant holds because
   the event is built only from a log record; the repository does not check content.
 - A stored event is immutable (ADR 048, Decision 9). No port has an update operation. An event is

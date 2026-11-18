@@ -99,17 +99,19 @@ order, random index inserts.
 
 ## R7. Attribute encoding
 
-**Decision**: The handler resolves each attribute (`slog.Value.Resolve`), then encodes: string,
-bool, integer, and float as JSON scalars; `time.Time` as RFC 3339 with nanoseconds in UTC;
-`time.Duration` as integer nanoseconds; a group as a JSON object. For other values, match
+**Decision**: The handler resolves each attribute with `slog.Value.Resolve`.
+Strings, booleans, integers, and floats encode as JSON scalars.
+A `time.Time` encodes as RFC 3339 with nanoseconds and its original UTC offset.
+A `time.Duration` encodes as integer nanoseconds. A group encodes as a JSON object.
+For other values, match
 `slog.JSONHandler`: an `error` without `json.Marshaler` encodes as its `Error()` string;
 `json.Marshaler` takes precedence over `error`; remaining values use `encoding/json`.
 If value encoding returns an error, store the JSON string `fmt.Sprintf("!ERROR:%v", err)`,
 not the original value's printed representation. This also applies to non-finite floats.
 These rules apply after resolution and within slog groups, not recursively inside arbitrary Go values.
 Attributes from `WithAttrs` and `WithGroup`
-are included. The keys `event`, `principal`, `actor`, and `trace_id` move to their columns and are
-not repeated in the document. `calling_peer` stays in the document.
+are included. Only top-level keys `event`, `principal`, `actor`, and `trace_id` move to their columns.
+They are not repeated in the document. Keys inside a group remain in the document. `calling_peer` also remains in the document.
 
 **Rationale**: This equals the output of `slog.JSONHandler`, so a ledger row and the stdout line
 of the same record have the same attribute values (spec Journey 1, observable result). A typed ID

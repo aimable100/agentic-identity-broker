@@ -26,7 +26,20 @@ image that the deployment uses (`009-separate-migration-docker-image`). The memo
 
 ## 2. Produce an event
 
-Create a grant for an agent in the consent UI, then revoke it:
+As Alice, create a grant for an agent in the consent UI. List her active delegations:
+
+```sh
+curl -sS -H 'X-Remote-User: alice@example.com' \
+  'http://localhost:8000/api/consent/agents'
+```
+
+Find the selected agent in the response. In the same shell, replace the example UUID with that agent's `agentId`:
+
+```sh
+export AGENT_ID='550e8400-e29b-41d4-a716-446655440000'
+```
+
+Revoke the grant:
 
 ```sh
 curl -i -X DELETE \

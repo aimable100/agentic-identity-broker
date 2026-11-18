@@ -27,6 +27,7 @@ to `consent.grant.revoked` ([spec](../spec.md) FR-012, SC-001). Later features r
 ## Log call
 
 - [ ] The record satisfies the LOGGING.md section 10 review checklist.
+- [ ] The call logs at `Info` or above, independently of the operational sinks' configured threshold (FR-008).
 - [ ] The logger of the call has no attribute group (`WithGroup`). The ledger reads `event` and
       `principal` only at the top level, so a grouped record is not stored (FR-001).
 - [ ] The call runs after the mutation commits and only when the operation changed state
