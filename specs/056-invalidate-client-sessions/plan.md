@@ -8,12 +8,12 @@
 
 When a third-party service's effective client ID changes, every session established under the previous identity must stop supplying tokens on its next use. Users reach consent automatically on the next agent authorization and reconnect under the new identity. Routine secret rotation must not invalidate anything.
 
-Technical approach ([research.md](research.md), draft [ADR 048](adr-048-client-identity-revisions.md)):
+Technical approach ([research.md](research.md), accepted [ADR 048-client-identity-revisions](../../adrs/048-client-identity-revisions.md)):
 
 - Each service persists its last **Effective Client Identity** and a monotonic **Client Identity Revision**. An accepted Admin API `PUT` that changes a stored `client_id` increments the revision atomically in the existing conditional `UPDATE`. A filesystem change is recorded by compare-and-set the first time any broker operation reads a different client-ID file value. Admin `Update` returns a lock/transaction-derived `identityChanged` outcome alongside its committed entity identity/revision; only this outcome attributes an admin change event, never a comparison with an earlier read. A resulting-filesystem metadata update preserves intervening observation evidence and reports no increment of its own ([ports contract](contracts/ports.md#atomic-admin-update-outcome)).
 - New authorizations seal `{client ID, revision}` for every service variant. Sessions store both. A session is usable only when both match the service's current state. Legacy identity-less sessions keep ADR 041's exception only while the revision is still 0 (DEC-001). A rollback is a new revision, so it never revives a session.
 - One domain rule is enforced at token acquisition, including still-valid tokens (narrowing ADR 038), and at refresh, sweep, callback, agent authorization, consent, and session listing.
-- Recovery reuses existing flows: `invalid_grant` with ADR 044's `error_uri`, the consent redirect, and service sign-in. The End-User API extends its existing ADR 046 `requires_reauthentication` predicate with identity invalidation and retains the equal deprecated `is_expired` alias (proposed major 1.2.0 → 2.0.0 cutover). Observed-rejection handling remains binding. The Admin API takes a proposed 2.1.1 → 3.0.0 major cutover: sweep results classify identity-invalid candidates as failed rather than refreshed, including dry runs. A continuous rolling upgrade allows mixed-version traffic under fixed identities, then resumes identity mutations only after all old readers/writers and admitted work are drained; post-activation rollback is revision-aware only (DEC-005).
+- Recovery reuses existing flows: `invalid_grant` with ADR 044-service-specific-session-recovery-url's `error_uri`, the consent redirect, and service sign-in. The End-User API extends its existing ADR 046-observed-refresh-token-rejection `requires_reauthentication` predicate with identity invalidation and retains the equal deprecated `is_expired` alias (approved major 1.2.0 → 2.0.0 cutover). Observed-rejection handling remains binding. The Admin API takes an approved 2.1.1 → 3.0.0 major cutover: sweep results classify identity-invalid candidates as failed rather than refreshed, including dry runs. A continuous rolling upgrade allows mixed-version traffic under fixed identities, then resumes identity mutations only after all old readers/writers and admitted work are drained; post-activation rollback is revision-aware only (DEC-005).
 
 ## Technical Context
 
@@ -23,19 +23,19 @@ Technical approach ([research.md](research.md), draft [ADR 048](adr-048-client-i
 **Testing**: Go `testing` (domain and adapters), Ginkgo/Gomega E2E (`tests/e2e/`), Playwright via Ginkgo (`tests/e2e/frontend/`), Vitest (`web/`), and testcontainers PostgreSQL (`tests/integration/`).
 **Target Platform**: Linux containers (Kubernetes/Helm). Mounted credential files per ADR 041.
 **Project Type**: Web service with an embedded SPA (monorepo).
-**Performance Goals**: Token exchange adds one indexed service read without secret decryption. For filesystem services it also adds one bounded `ReadClientID` call (≤ 64 KiB, same adapter as initiation). Invalidation itself is O(1) per change.
-**Constraints**: Fail closed (Principle I, SR-001). No credential values, paths, or client IDs in logs, metrics, or public errors (SR-004). Administrative service-metadata operations never read files (ADR 041). Consent/session usability displays read the live client-ID file, never the secret file, with persisted fallback; Proposed ADR 048 partially supersedes ADR 041's no-file-read rule for those displays only. Observations atomically fence filesystem source, administrative version, canonical ID, and revision; lost preconditions require fresh service/binding/file reads. Continuous mixed-version serving during rollout with effective identity/source/canonical-ID/binding mutations frozen until every serving/writing process and admitted operation is revision-aware; no stop-the-world outage or enforcement opt-out (DEC-005). There is no internal scheduler or distributed lock (ADR 038).
+**Performance Goals**: An uncontended identity evaluation adds one indexed service read without secret decryption. A filesystem evaluation also reads the client-ID file once (at most 64 KiB). Lost observation preconditions require fresh service/binding/file reads. Each evaluation permits at most eight observation attempts, then fails closed with `generation_changed` in Gate mode. Display mode retains its persisted-evidence fallback. Batch entries for one service share the evaluation. Invalidation records O(1) evidence per change, without scanning sessions. T031 validates read counts, bounded contention, and batch reuse.
+**Constraints**: Fail closed (Principle I, SR-001). No credential values, paths, or client IDs in logs, metrics, or public errors (SR-004). Administrative service-metadata operations never read files (ADR 041-oauth2-client-secret-file-overrides). Consent/session usability displays read the live client-ID file, never the secret file, with persisted fallback; Accepted ADR 048-client-identity-revisions partially supersedes ADR 041-oauth2-client-secret-file-overrides's no-file-read rule for those displays only. Observations atomically fence filesystem source, administrative version, canonical ID, and revision; lost preconditions require fresh service/binding/file reads. Continuous mixed-version serving during rollout with effective identity/source/canonical-ID/binding mutations frozen until every serving/writing process and admitted operation is revision-aware; no stop-the-world outage or enforcement opt-out (DEC-005). There is no internal scheduler or distributed lock (ADR 038-proactive-token-refresh).
 **Scale/Scope**: All service variants: static, public, CIMD, DCR, Google, and filesystem. All principals of a changed service. Four browser states (spec wireframes A–D).
 
 All Technical Context unknowns are resolved in [research.md](research.md).
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-checked after Phase 1 design. Result: PASS, subject to approval of the items below.*
+*GATE: Approval is recorded, but the acceptance-test checkpoint is incomplete. Further behavior changes are blocked by the recovery checkpoint in tasks.md.*
 
 **Design Preconditions (BLOCKING)**:
 
-Checked entries below record design coverage, not implementation or executed test evidence. The unchecked tasks in [tasks.md](tasks.md) are the implementation checklist, including approval recording, acceptance-test red evidence, and validation.
+Checked entries below record design coverage, not completed implementation or executed tests. The unchecked tasks in [tasks.md](tasks.md) track remaining work. T011–T013, T015, and T018 must finish before further behavior changes. Test-first development remains mandatory. Recorded red/green output, logs, and CI links are not required evidence.
 
 - [x] **Domain Model**: Aggregates `ThirdpartyOAuth2Service` and `UserSession` are extended, with value objects Effective Client Identity and Client Identity Revision and the derived condition Reauthentication Required ([data-model.md](data-model.md)).
 - [x] **Domain Concepts**: The two identity terms are planned for the `ARCHITECTURE.md` §12 Glossary and the AGENTS.md glossary. Extend existing **Requires Reauthentication** (ADR 046) and **Client-identity association** (ADR 041) entries rather than duplicating them.
@@ -44,20 +44,21 @@ Checked entries below record design coverage, not implementation or executed tes
 - [x] **Config Examples**: No new keys. `examples/config/third-party-oauth2.yaml` gains only a comment that points to the client-ID change procedure.
 - [x] **Helm Deployment Contract**: No values change. The chart README's migration and rollback notes gain migrations 049/050, the guarded DOWN, and the continuous rolling upgrade, fixed-identity overlap, and verified old-work drain before identity mutations resume (DEC-005). No workflow or chart setting is added.
 - [x] **API Design First**: The deltas are in [contracts/enduser-api.md](contracts/enduser-api.md) and [contracts/admin-api.md](contracts/admin-api.md). They are applied to `api/` only after approval (API-001, API-002).
-- [x] **API Documentation**: `api/enduser/openapi.yaml` (proposed 2.0.0 from baseline 1.2.0) and `api/admin/openapi.yaml` (changed sweep classifications, proposed major 3.0.0 from baseline 2.1.1), plus `docs/api/` and `docs/reference/token-exchange.md`.
-- [ ] **API Changes**: Pending maintainer sign-off on API-001 and API-002.
+- [x] **API Documentation**: `api/enduser/openapi.yaml` (approved 2.0.0 from baseline 1.2.0) and `api/admin/openapi.yaml` (changed sweep classifications, approved major 3.0.0 from baseline 2.1.1), plus `docs/api/` and `docs/reference/token-exchange.md`.
+- [x] **API Changes**: jbspeakr approved API-001 and API-002 on 2026-11-05 in [the approval comment](https://github.com/zalando-incubator/agentic-identity-broker/pull/412#issuecomment-6658788612).
 - [x] **Database Design**: Migrations `049`/`050` use go-migrate naming and the guarded online pattern of migrations 040/041 and 044/045.
-- [x] **E2E Acceptance Tests**: All 16 named scenarios are mapped below and written before implementation.
+- [ ] **E2E Acceptance Tests**: All 16 primary scenarios exist. Required race, isolation, mixed-version, and restart matrices remain incomplete under T011–T013/T015/T018. Some foundation implementation preceded this completed gate. That sequencing violation cannot be repaired retroactively.
 - [x] **E2E Test Mapping**: Each AS maps to exactly one `It`.
 - [x] **E2E Red Phase**: Realistic assertions on status, `error`, `error_uri`, `Location`, and `requires_reauthentication`, with no placeholders.
 - [x] **Frontend Playwright E2E**: Consent and sessions-page journeys in `tests/e2e/frontend/`.
 - [x] **Frontend Screenshots**: Four journey states plus the failure/retry state, named below.
+- [ ] **Observability Design**: Phase 2g (T070) verifies the event contract and required safety tests before further logging changes. No new span or metric instrument is planned.
 
 **Implementation Considerations**:
 
 - [x] **Security-First**: Enforcement is always on, with no opt-out. Unknown identity fails closed. A rollback cannot revive a session. No secrets are logged.
 - [x] **Architecture Docs**: `ARCHITECTURE.md` updates the credential-source section (§ near "Transition evidence"), the session lifecycle, and the glossary.
-- [x] **ADRs**: Draft [ADR 048](adr-048-client-identity-revisions.md) partially supersedes ADR 041 and ADR 038. It is Proposed (ADR-001).
+- [x] **ADRs**: Accepted [ADR 048-client-identity-revisions](../../adrs/048-client-identity-revisions.md) partially supersedes ADR 041-oauth2-client-secret-file-overrides and ADR 038-proactive-token-refresh (ADR-001). Its existing numbered filename is retained.
 - [x] **Library-First Security**: The existing JWE service and the ADR 041 credential-file reader are used. No crypto change.
 - [x] **Zalando Guidelines**: No new property. The existing snake_case `requires_reauthentication` and its deprecated alias are reused. No closed enum is extended. Error codes are unchanged. Changed End-User behavior takes a major version (API-001); changed Admin sweep classifications take a major version too (API-002), even without a schema/status change.
 - [x] **End-User Docs**: `docs/api/` and `docs/reference/token-exchange.md` are updated with the examples from the spec.
@@ -84,18 +85,18 @@ Checked entries below record design coverage, not implementation or executed tes
 
 ## Approval Items
 
-These items need the maintainer's sign-off before implementation. Each is Proposed with its rationale and main alternative at the cited location.
+jbspeakr approved API-001, API-002, ADR-001, and DEC-001–DEC-005 on 2026-11-05 in [the approval comment](https://github.com/zalando-incubator/agentic-identity-broker/pull/412#issuecomment-6658788612). These entries record the approved decisions, not new approval requests. Approval does not establish implementation completion.
 
 | ID | Type | Decision | Details |
 |---|---|---|---|
 | API-001 | API | End-User API 1.2.0 → 2.0.0 major cutover on existing routes: add identity unusability to the existing `requires_reauthentication` predicate, preserving ADR 046's rejection and refreshability rule and the equal deprecated `is_expired` alias; `SessionStatus` inherits the summary fields. `connectionStatus` reports `not_connected` for such sessions. Documented behavior for `/oauth2/authorize` (consent redirect), `/oauth2/token` (`invalid_grant` despite an unexpired token, `server_error` when identity is unreadable), the third-party callback (stale or pre-upgrade state missing explicit identity/revision rejected before exchange), manual refresh (identity denial → `409 refresh_unavailable` instead of `500`, preserving `409 refresh_rejected`), and grant submission | specs/056-invalidate-client-sessions/contracts/enduser-api.md:1-80 |
 | API-002 | API | Admin API 2.1.1 → 3.0.0 major cutover on existing routes (observable sweep result change, not description-only): an accepted `client_id` change invalidates all sessions of the service, secret rotation and same-identity changes do not, internal identity values are never bound as input or returned (request validation unchanged), and sweep `failed` includes superseded sessions, including in dry runs | specs/056-invalidate-client-sessions/contracts/admin-api.md:1-38 |
-| ADR-001 | ADR | Draft ADR 048 "Client Identity Revisions Invalidate Third-Party Sessions", which partially supersedes ADR 041 (enforcement scope/timing, legacy exception, consent/session usability no-file-read boundary, and rollout/rollback procedure) and ADR 038 (immediate valid-token return now follows the identity check) | specs/056-invalidate-client-sessions/adr-048-client-identity-revisions.md:1-120 |
+| ADR-001 | ADR | Accepted ADR 048-client-identity-revisions partially supersedes ADR 041-oauth2-client-secret-file-overrides (enforcement scope/timing, legacy exception, display reads, and rollout/rollback) and ADR 038-proactive-token-refresh (identity check before valid-token return) | [Accepted decision and approval](../../adrs/048-client-identity-revisions.md) |
 | DEC-001 | Decision | Identity-less legacy sessions stay usable only while the service's Client Identity Revision is 0. The first recorded change after rollout invalidates them for all principals. No identity is inferred | specs/056-invalidate-client-sessions/spec.md:439 |
 | DEC-002 | Decision | Persisted schema change: `client_identity` and `client_identity_revision` on services, `upstream_client_revision` on sessions. Migrations 049 (add, `NOT VALID` checks, `NOWAIT`) and 050 (validate). DOWN 049 refuses while any revision > 0. Invalidated sessions are retained, not deleted | specs/056-invalidate-client-sessions/data-model.md:109-120 |
 | DEC-003 | Decision | Security over availability: an unreadable client-ID file or unloadable identity state blocks the release of still-valid stored tokens (`500 server_error`). Display surfaces fall back to persisted evidence | specs/056-invalidate-client-sessions/research.md:75-81 |
 | DEC-004 | Decision | Every differing filesystem observation whose source/configuration-generation/revision preconditions still hold, including a stale replica or reverted file, records a new revision. Lost preconditions require fresh reads. Reconnections during incomplete multi-replica publication can need repeating; operators publish coherently | specs/056-invalidate-client-sessions/research.md:83-89 |
-| DEC-005 | Decision | Continuous rolling upgrade: allow old/new traffic with effective identities/sources/canonical IDs/bindings fixed; same-ID rotation continues, identity-mutating automation and new registrations wait. Apply additive migrations online; resume identity changes only after old processes/admitted work drain and old-image restart is prevented. New replicas enforce immediately and reject legacy callback state. A pre-activation prior-binary abort requires verified unchanged identities, zero increments, drained new work, and retained evidence; post-activation rollback is revision-aware only | specs/056-invalidate-client-sessions/adr-048-client-identity-revisions.md:81-93 |
+| DEC-005 | Decision | Continuous rolling upgrade: allow old/new traffic with effective identities/sources/canonical IDs/bindings fixed; same-ID rotation continues, identity-mutating automation and new registrations wait. Apply additive migrations online; resume identity changes only after old processes/admitted work drain and old-image restart is prevented. New replicas enforce immediately and reject legacy callback state. A pre-activation prior-binary abort requires verified unchanged identities, zero increments, drained new work, and retained evidence; post-activation rollback is revision-aware only | [Accepted rollout procedure](../../adrs/048-client-identity-revisions.md#guarded-rollout-and-rollback-proposed-dec-005) |
 
 ## Project Structure
 
@@ -108,7 +109,7 @@ specs/056-invalidate-client-sessions/
 ├── research.md                              # Phase 0
 ├── data-model.md                            # Phase 1
 ├── quickstart.md                            # Phase 1
-├── adr-048-client-identity-revisions.md     # Proposed ADR draft (moves to adrs/ after approval)
+├── adr-048-client-identity-revisions.md     # Historical link to the accepted decision in adrs/
 ├── contracts/
 │   ├── enduser-api.md                       # API-001 delta
 │   ├── admin-api.md                         # API-002 delta
@@ -175,8 +176,8 @@ tests/
 | Phase | Purpose | Required? |
 |-------|---------|-----------|
 | **Phase 0** | Pre-implementation refactoring | Skipped |
-| **Phase 1** | Setup | Minimal: move the approved ADR draft to `adrs/` and record the approval |
-| **Phase 2** | Design preconditions: OpenAPI deltas, ADR, glossary, migrations, red E2E | **MANDATORY** |
+| **Phase 1** | Setup | Approval recorded in the existing `adrs/048-client-identity-revisions.md` |
+| **Phase 2** | Design preconditions: OpenAPI, ADR, glossary, migrations, acceptance tests, observability contract | **MANDATORY** |
 | **Phase 2.7** | Entity boilerplate | Skipped |
 | **Phase 2.5** | Foundational: ports, both adapters, revision recording, usability rule | Yes |
 | **Phase 3+** | US1 (enforcement), US2 (consent and recovery UI), US3 (isolation and rotation) | Yes |
@@ -218,7 +219,7 @@ tests/
 
 *Line numbers are recorded during Phase 2 when the tests are written.*
 
-**Red Phase Requirements**: As in the template. Tests compile, assert real status codes, bodies, headers, and redirects, fail semantically before implementation, and use no `XIt`, `PIt`, or `Skip()`.
+**Red Phase Requirements**: Tests compile and assert real status codes, bodies, headers, and redirects. Write tests before the corresponding behavior changes. Observe semantic failure before implementation when the environment supports the suite. Container-backed suites can first run in CI with implementation included. Do not use `XIt`, `PIt`, or `Skip()`. Recorded red/green output, logs, and CI links are not completion requirements.
 
 **Test Data Strategy**:
 
@@ -249,13 +250,13 @@ tests/
 
 ### Deployment Safety
 
-Proposed DEC-005's authoritative procedure is [ADR 048](adr-048-client-identity-revisions.md#guarded-rollout-and-rollback-proposed-dec-005). Keep existing traffic flowing across both ingress planes while old/new replicas overlap under fixed effective identities, sources, canonical IDs, and bindings. Same-ID secret rotation and metadata-only writes continue; pause identity-mutating automation/direct writers and defer identity-assigning registrations. Apply additive migrations online before new replicas start. Verify prior-release explicit-column reads, preservation of unknown columns on updates, and revision-0 inserts against the expanded schema using the actual supported prior release in the AS-1.6 PostgreSQL variant; do not simulate compatibility by disabling enforcement. New replicas enforce from startup. Drain only old processes/admitted work while healthy new replicas serve, then verify the complete serving/writing image inventory and prevent old-image restart before resuming identity changes. Failed upgrades retain healthy traffic and the freeze. Prior-binary abort before activation requires unchanged identities, zero increments, drained new work, and retained evidence; after activation rollback is revision-aware only. Document this in the chart/operator runbook without changing workflows, hooks, Helm settings, or adding a runtime bypass. AS-1.6 covers continuity, compatibility, incremental drain, abort, and legacy sessions; AS-1.4 covers callback claim-presence rejection and cross-version sign-in retry; AS-1.5 covers safe revision-aware rollback. Automated tests cannot substitute for operator freeze/inventory verification. Unrestricted mixed-version identity mutation is not supported.
+Approved DEC-005's authoritative procedure is [ADR 048-client-identity-revisions](../../adrs/048-client-identity-revisions.md#guarded-rollout-and-rollback-proposed-dec-005). Keep existing traffic flowing across both ingress planes while old/new replicas overlap under fixed effective identities, sources, canonical IDs, and bindings. Same-ID secret rotation and metadata-only writes continue; pause identity-mutating automation/direct writers and defer identity-assigning registrations. Apply additive migrations online before new replicas start. Verify prior-release explicit-column reads, preservation of unknown columns on updates, and revision-0 inserts against the expanded schema using the actual supported prior release in the AS-1.6 PostgreSQL variant; do not simulate compatibility by disabling enforcement. New replicas enforce from startup. Drain only old processes/admitted work while healthy new replicas serve, then verify the complete serving/writing image inventory and prevent old-image restart before resuming identity changes. Failed upgrades retain healthy traffic and the freeze. Prior-binary abort before activation requires unchanged identities, zero increments, drained new work, and retained evidence; after activation rollback is revision-aware only. Document this in the chart/operator runbook without changing workflows, hooks, Helm settings, or adding a runtime bypass. AS-1.6 covers continuity, compatibility, incremental drain, abort, and legacy sessions; AS-1.4 covers callback claim-presence rejection and cross-version sign-in retry; AS-1.5 covers safe revision-aware rollback. Automated tests cannot substitute for operator freeze/inventory verification. Unrestricted mixed-version identity mutation is not supported.
 
 ### Unit & Integration Tests
 
 **Unit Tests** (TDD, red first):
 
-- `internal/domain/oauth2session/client_identity_test.go`: a usability rule table covering match, mismatch, superseded, legacy, rollback, each variant, and the cross-product with ADR 046's recorded rejection and refreshability states; source/version/canonical-ID/revision observation fencing and fresh service/binding/file reads on lost preconditions; fail-closed on source errors.
+- `internal/domain/oauth2session/client_identity_test.go`: a usability rule table covering match, mismatch, superseded, legacy, rollback, each variant, and the cross-product with ADR 046-observed-refresh-token-rejection's recorded rejection and refreshability states; source/version/canonical-ID/revision observation fencing and fresh service/binding/file reads on lost preconditions; fail-closed on source errors. Verify uncontended service/file read counts, the eight-attempt observation bound, safe exhaustion, and one evaluation per service in a batch (T031).
 - `internal/domain/oauth2session/*_test.go`: the token-acquisition fast path, refresh under lock, callback revision check, sweep classification, and sealing for public, CIMD, DCR, and Google services.
 - `internal/domain/oauth2/service_test.go` and `internal/domain/consent/service_test.go`: evaluator gate and display modes.
 - `internal/domain/tokenexchange/session_diagnostic_test.go`: `identity_superseded` mapping.
@@ -273,4 +274,4 @@ Proposed DEC-005's authoritative procedure is [ADR 048](adr-048-client-identity-
 
 ## Complexity Tracking
 
-No constitution violations. ADR 041 and ADR 038 are partially superseded through draft ADR 048 under Principle II. This is not an exception.
+Accepted ADR 048-client-identity-revisions partially supersedes ADR 041-oauth2-client-secret-file-overrides and ADR 038-proactive-token-refresh under Principle II. No architectural exception is requested. The incomplete acceptance-test gate is a sequencing violation, not an exception. The recovery checkpoint in tasks.md blocks further behavior changes until the missing tests exist.
