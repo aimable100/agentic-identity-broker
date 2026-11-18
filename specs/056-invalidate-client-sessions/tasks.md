@@ -8,7 +8,7 @@
 
 **Organization**: Setup → mandatory design preconditions → foundation → US1 (P1) → US2 (P1) → US3 (P2) → mandatory compliance. Paths are relative to the repository root.
 
-**Task summary**: 70 tasks (69 completed, 1 unchecked). All three user stories and their non-container functional validation are complete. T069 remains open because the security gate reports existing dependency advisories; PostgreSQL and prior-release container execution remains container-CI validation, not a locally passed check.
+**Task summary**: 70 tasks completed. All three user stories and their non-container functional validation are complete. T069 validation execution is complete, but the security gate still fails on existing dependency advisories. PostgreSQL and prior-release container execution remains container-CI validation, not a locally passed check.
 
 ## 🔒 Feature Scope [MANDATORY]
 

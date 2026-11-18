@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-04
 
-**Status**: Implemented; non-container functional validation passes. The security gate remains open and container validation is unverified; see `tasks.md`. jbspeakr approved API-001, API-002, ADR-001, and DEC-001–DEC-005 on 2026-11-05 ([approval](https://github.com/zalando-incubator/agentic-identity-broker/pull/412#issuecomment-6658788612)).
+**Status**: Implemented; non-container functional validation passes and T069 validation execution is complete. The security gate still fails on baseline findings, and container validation is unverified; see `tasks.md`. jbspeakr approved API-001, API-002, ADR-001, and DEC-001–DEC-005 on 2026-11-05 ([approval](https://github.com/zalando-incubator/agentic-identity-broker/pull/412#issuecomment-6658788612)).
 
 The accepted decision is [ADR 048-client-identity-revisions](../../adrs/048-client-identity-revisions.md). Its existing numbered filename remains unchanged. Dated clarification entries retain the proposal history. The approval record supersedes their pending-status wording, not their requirements. The recovery checkpoint in `tasks.md` is complete; its historical sequencing violation remains recorded.
 

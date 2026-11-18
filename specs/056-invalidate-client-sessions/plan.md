@@ -31,7 +31,7 @@ All Technical Context unknowns are resolved in [research.md](research.md).
 
 ## Constitution Check
 
-*GATE: Approval, acceptance recovery, and observability design are complete. Runtime enforcement and non-container functional validation pass. T069 remains open for the security gate; container execution is unverified.*
+*GATE: Approval, acceptance recovery, observability design, and T069 validation execution are complete. Runtime enforcement and non-container functional validation pass. The security gate still fails on baseline findings; container execution is unverified.*
 
 **Design Preconditions (BLOCKING)**:
 
