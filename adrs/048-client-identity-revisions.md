@@ -2,7 +2,7 @@
 
 **Status**: Accepted (approved by jbspeakr on 2026-11-05: https://github.com/zalando-incubator/agentic-identity-broker/pull/412#issuecomment-6658788612)
 **Date**: 2026-11-05
-**Feature**: 055-invalidate-client-sessions
+**Feature**: 056-invalidate-client-sessions
 **Supersedes**: In part, [ADR 041](041-oauth2-client-secret-file-overrides.md) (scope and timing of client-identity enforcement, the legacy identity exception, the no-file-read rule for consent/session usability displays, and rollout/rollback procedure) and [ADR 038](038-proactive-token-refresh.md) (unconditional immediate return of a valid access token). All other decisions of both ADRs remain binding. [ADR 046](046-observed-refresh-token-rejection.md) remains binding in full: identity invalidation extends its reauthentication predicate without weakening observed-rejection handling.
 
 > Approval covers ADR-001 and DEC-001–DEC-005, including the guarded rollout below. The approval record is in Status; the approved specification and plan remain unchanged.
@@ -102,7 +102,7 @@ Replicas can briefly read different client-ID file values while a publication pr
 - Routine secret rotation through files or the Admin API causes no reconnection.
 - Every token exchange for a filesystem service reads the client-ID file, and every token exchange reads the service's identity state. The added cost is one small file read and one indexed read. A file outage now blocks the release of stored tokens for that service. Before this ADR, a valid token was still released.
 - Public, CIMD, DCR, and Google-flavor services now enforce identity for new connections. Their identity-less legacy sessions keep the never-transitioned exception until the first recorded change.
-- Users see identity invalidation through the existing `requires_reauthentication` field and its equal deprecated `is_expired` alias, with `not_connected` in agent consent. `access_token_expired` retains its distinct meaning. They reconnect through the existing service sign-in flow. The proposed API-001 major 1.2.0 → 2.0.0 cutover and manual-refresh behavior are detailed in [the End-User contract](../specs/055-invalidate-client-sessions/contracts/enduser-api.md); ADR 046's `409 refresh_rejected` remains unchanged.
+- Users see identity invalidation through the existing `requires_reauthentication` field and its equal deprecated `is_expired` alias, with `not_connected` in agent consent. `access_token_expired` retains its distinct meaning. They reconnect through the existing service sign-in flow. The proposed API-001 major 1.2.0 → 2.0.0 cutover and manual-refresh behavior are detailed in [the End-User contract](../specs/056-invalidate-client-sessions/contracts/enduser-api.md); ADR 046's `409 refresh_rejected` remains unchanged.
 - First deployment keeps existing traffic flowing during mixed-version serving, but freezes identity/source/canonical-ID/binding mutations and defers identity-assigning registrations until all old processes and admitted work are drained. Same-ID rotation remains available. Legacy callback state reaching a new replica must restart sign-in. A verified unchanged, zero-revision pre-activation abort can use the prior binary; post-activation rollback is revision-aware only. The guarded DOWN protects evidence but does not replace the operator's freeze and inventory controls.
 - Consent and session usability displays now read live client-ID files and can observe changes; administrative service metadata retains its no-file-read boundary. No secret file is read to render usability.
 
@@ -116,5 +116,5 @@ Replicas can briefly read different client-ID file values while a publication pr
 
 ## References
 
-- [Feature specification](../specs/055-invalidate-client-sessions/spec.md), [plan](../specs/055-invalidate-client-sessions/plan.md), [research](../specs/055-invalidate-client-sessions/research.md), [data model](../specs/055-invalidate-client-sessions/data-model.md)
+- [Feature specification](../specs/056-invalidate-client-sessions/spec.md), [plan](../specs/056-invalidate-client-sessions/plan.md), [research](../specs/056-invalidate-client-sessions/research.md), [data model](../specs/056-invalidate-client-sessions/data-model.md)
 - [ADR 041](041-oauth2-client-secret-file-overrides.md), [ADR 038](038-proactive-token-refresh.md), [ADR 044](044-service-specific-session-recovery-url.md)

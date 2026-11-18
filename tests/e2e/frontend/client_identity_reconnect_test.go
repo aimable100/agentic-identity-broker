@@ -148,7 +148,7 @@ var _ = Describe("Client identity browser recovery", Label("client-identity-chan
 	Context("after Reports client identity changes", func() {
 		BeforeEach(publishChange)
 
-		// AS-2.1 from specs/055-invalidate-client-sessions/spec.md
+		// AS-2.1 from specs/056-invalidate-client-sessions/spec.md
 		It("automatically enters consent on the next agent authorization and offers Reports sign-in", func() {
 			enterAuthorization()
 			Expect(consentPage.IsServiceLoginVisible(ctx, "Reports Production")).To(BeTrue())
@@ -159,7 +159,7 @@ var _ = Describe("Client identity browser recovery", Label("client-identity-chan
 			expectSessionUnchanged()
 		})
 
-		// AS-2.2 from specs/055-invalidate-client-sessions/spec.md
+		// AS-2.2 from specs/056-invalidate-client-sessions/spec.md
 		It("reconnects from consent with tab-local selections intact and completes the original authorization", func() {
 			enterAuthorization()
 			Expect(consentPage.TogglePermissionSet(ctx, "Additional Reports Access")).To(Succeed())
@@ -183,7 +183,7 @@ var _ = Describe("Client identity browser recovery", Label("client-identity-chan
 			Expect(exchange(http.StatusOK)).To(HaveKey("access_token"))
 		})
 
-		// AS-2.3 from specs/055-invalidate-client-sessions/spec.md
+		// AS-2.3 from specs/056-invalidate-client-sessions/spec.md
 		It("follows the token recovery URI through the provider back to sessions and restores exchange", func() {
 			body := exchange(http.StatusBadRequest)
 			Expect(body).To(HaveKeyWithValue("error", "invalid_grant"))
@@ -206,7 +206,7 @@ var _ = Describe("Client identity browser recovery", Label("client-identity-chan
 			Expect(exchange(http.StatusOK)).To(HaveKey("access_token"))
 		})
 
-		// AS-2.4 from specs/055-invalidate-client-sessions/spec.md
+		// AS-2.4 from specs/056-invalidate-client-sessions/spec.md
 		It("keeps failed reconnection unusable without grant expansion and permits a keyboard retry", func() {
 			Expect(sessionsPage.NavigateToSessions(ctx)).To(Succeed())
 			Expect(sessionsPage.WaitForLoginButton(ctx)).To(Succeed())
@@ -228,7 +228,7 @@ var _ = Describe("Client identity browser recovery", Label("client-identity-chan
 			Expect(exchange(http.StatusOK)).To(HaveKey("access_token"))
 		})
 
-		// AS-2.4 from specs/055-invalidate-client-sessions/spec.md
+		// AS-2.4 from specs/056-invalidate-client-sessions/spec.md
 		It("retains the invalidated session after a provider decline and offers a service-specific retry", func() {
 			Expect(GetTestPage().Route(journey.Upstream.URL()+"/oauth/authorize**", func(route playwright.Route) {
 				authorization, err := url.Parse(route.Request().URL())
@@ -259,7 +259,7 @@ var _ = Describe("Client identity browser recovery", Label("client-identity-chan
 			Expect(exchange(http.StatusOK)).To(HaveKey("access_token"))
 		})
 
-		// AS-2.5 from specs/055-invalidate-client-sessions/spec.md
+		// AS-2.5 from specs/056-invalidate-client-sessions/spec.md
 		It("shows Reports sign-in after the next sessions load without unsolicited consent navigation", func() {
 			Expect(helpers.PublishCredentialPair(binding, fixtures.ReportsClientV1, fixtures.ReportsSecretV1)).To(Succeed())
 			Expect(sessionsPage.NavigateToSessions(ctx)).To(Succeed())

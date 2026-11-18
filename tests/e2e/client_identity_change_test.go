@@ -189,7 +189,7 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 			connect(alice)
 		})
 
-		// AS-1.1 from specs/055-invalidate-client-sessions/spec.md
+		// AS-1.1 from specs/056-invalidate-client-sessions/spec.md
 		It("denies an unexpired token after the client-ID file changes and returns the service recovery URI", func() {
 			Expect(exchange(alice, http.StatusOK)).To(HaveKeyWithValue("access_token", "mock-access-token"))
 			before := session(alice)
@@ -200,7 +200,7 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 			Expect(session(alice)).To(Equal(before))
 		})
 
-		// AS-1.2 from specs/055-invalidate-client-sessions/spec.md
+		// AS-1.2 from specs/056-invalidate-client-sessions/spec.md
 		It("requires each affected user to reconnect independently, including sessions without expiry", func() {
 			connect(bob)
 			unknownExpiry := session(bob)
@@ -215,7 +215,7 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 			Expect(session(bob)).To(Equal(unknownExpiry))
 		})
 
-		// AS-1.3 from specs/055-invalidate-client-sessions/spec.md
+		// AS-1.3 from specs/056-invalidate-client-sessions/spec.md
 		It("never refreshes a superseded session on demand, manually, or in the admin sweep", func() {
 			before := session(alice)
 			past := time.Now().Add(-time.Hour)
@@ -252,7 +252,7 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			// AS-1.4 from specs/055-invalidate-client-sessions/spec.md
+			// AS-1.4 from specs/056-invalidate-client-sessions/spec.md
 			It("rejects a callback that began under the previous identity and allows a fresh connection", func() {
 				before := session(alice)
 				providerCalls := len(journey.Upstream.GetTokenRequests())
@@ -272,7 +272,7 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 			})
 		})
 
-		// AS-1.5 from specs/055-invalidate-client-sessions/spec.md
+		// AS-1.5 from specs/056-invalidate-client-sessions/spec.md
 		It("keeps an invalidated session unusable after the previous client ID is restored", func() {
 			publish(fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
 			expectDenied(alice)
@@ -282,7 +282,7 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 			Expect(exchange(alice, http.StatusOK)).To(HaveKey("access_token"))
 		})
 
-		// AS-2.1 from specs/055-invalidate-client-sessions/spec.md
+		// AS-2.1 from specs/056-invalidate-client-sessions/spec.md
 		It("shows agent consent on the next authorization despite an existing grant", func() {
 			before := grant()
 			Expect(authorizeAgent().Query().Get("code")).NotTo(BeEmpty())
@@ -294,7 +294,7 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 			Expect(grant()).To(Equal(before))
 		})
 
-		// AS-2.2 from specs/055-invalidate-client-sessions/spec.md
+		// AS-2.2 from specs/056-invalidate-client-sessions/spec.md
 		It("reconnects from consent under the current identity and completes the original authorization", func() {
 			publish(fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
 			location := authorizeAgent()
@@ -343,7 +343,7 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 			Expect(exchange(alice, http.StatusOK)).To(HaveKey("access_token"))
 		})
 
-		// AS-2.3 from specs/055-invalidate-client-sessions/spec.md
+		// AS-2.3 from specs/056-invalidate-client-sessions/spec.md
 		It("recovers through the token error_uri and returns to sessions", func() {
 			publish(fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
 			recovery, err := url.Parse(expectDenied(alice))
@@ -366,7 +366,7 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 			Expect(exchange(alice, http.StatusOK)).To(HaveKey("access_token"))
 		})
 
-		// AS-2.4 from specs/055-invalidate-client-sessions/spec.md
+		// AS-2.4 from specs/056-invalidate-client-sessions/spec.md
 		It("keeps the session unusable after a declined reconnect and allows retry without grant expansion", func() {
 			before, delegation := session(alice), grant()
 			publish(fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
@@ -408,7 +408,7 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 			Expect(grant()).To(Equal(delegation))
 		})
 
-		// AS-2.5 from specs/055-invalidate-client-sessions/spec.md
+		// AS-2.5 from specs/056-invalidate-client-sessions/spec.md
 		It("reports reauthentication on list and detail despite an unexpired token", func() {
 			publish(fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
 			for _, path := range []string{"/api/third-party/sessions", "/api/third-party/" + serviceID.String() + "/session"} {
@@ -470,7 +470,7 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 				return body
 			}
 
-			// AS-3.1 from specs/055-invalidate-client-sessions/spec.md
+			// AS-3.1 from specs/056-invalidate-client-sessions/spec.md
 			It("leaves Calendar, broker login, grants, rejection, and refreshability unchanged", func() {
 				before, err := journey.Storage.UserSessions().FindByPrincipalAndService(ctx, id.Principal(alice), calendarID)
 				Expect(err).NotTo(HaveOccurred())
@@ -499,7 +499,7 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 				Expect(grant()).To(Equal(delegation))
 			})
 
-			// AS-3.3 from specs/055-invalidate-client-sessions/spec.md
+			// AS-3.3 from specs/056-invalidate-client-sessions/spec.md
 			It("does not force consent for a changed optional service excluded from the grant", func() {
 				delegation := grant()
 				delegation.GrantedPermissionSets[0].IncludedServiceIDs = []id.ServiceID{calendarID}
@@ -515,7 +515,7 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 			})
 		})
 
-		// AS-3.2 from specs/055-invalidate-client-sessions/spec.md
+		// AS-3.2 from specs/056-invalidate-client-sessions/spec.md
 		It("keeps sessions usable through filesystem secret rotation with the same client ID", func() {
 			publish(fixtures.ReportsClientV1, fixtures.ReportsSecretV2)
 			Expect(exchange(alice, http.StatusOK)).To(HaveKey("access_token"))
@@ -552,7 +552,7 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 				}
 			})
 
-			// AS-1.6 from specs/055-invalidate-client-sessions/spec.md
+			// AS-1.6 from specs/056-invalidate-client-sessions/spec.md
 			It("keeps legacy sessions usable until the first later identity change without historical backfill", func() {
 				for _, principal := range []string{alice, bob} {
 					Expect(exchange(principal, http.StatusOK)).To(HaveKey("access_token"))
@@ -569,7 +569,7 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 			})
 		})
 
-		// AS-1.7 from specs/055-invalidate-client-sessions/spec.md
+		// AS-1.7 from specs/056-invalidate-client-sessions/spec.md
 		It("denies tokens for every user after an accepted Admin client_id change", func() {
 			Expect(exchange(alice, http.StatusOK)).To(HaveKey("access_token"))
 			Expect(exchange(bob, http.StatusOK)).To(HaveKey("access_token"))
@@ -583,7 +583,7 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 			expectDenied(bob)
 		})
 
-		// AS-3.4 from specs/055-invalidate-client-sessions/spec.md
+		// AS-3.4 from specs/056-invalidate-client-sessions/spec.md
 		It("keeps sessions usable through Admin secret rotation and metadata updates", func() {
 			updateStored(fixtures.ReportsClientV1, fixtures.ReportsSecretV2)
 			metadata := fixtures.ClientIdentityServiceRequest(journey.Upstream.URL(), "stored")
