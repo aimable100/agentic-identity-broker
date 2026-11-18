@@ -8,19 +8,19 @@
 
 **Organization**: Setup → mandatory design preconditions → foundation → US1 (P1) → US2 (P1) → US3 (P2) → mandatory compliance. Paths are relative to the repository root.
 
-**Task summary**: 70 tasks (21 completed, 49 unchecked): 40 shared/design/compliance, 13 US1, 11 US2, and 6 US3. Sixteen tasks have parallel opportunities after their listed prerequisites. Existing task IDs remain stable. T070 adds the missing observability design gate. US1 token safety, US2 recovery, and US3 isolation are all required for completion.
+**Task summary**: 70 tasks (26 completed, 44 unchecked): 40 shared/design/compliance, 13 US1, 11 US2, and 6 US3. Sixteen tasks have parallel opportunities after their listed prerequisites. Existing task IDs remain stable. T070 tracks the remaining observability design gate. US1 token safety, US2 recovery, and US3 isolation are all required for completion.
 
 ## 🔒 Feature Scope [MANDATORY]
 
 Every task cites a requirement, scenario, or binding principle. Scope is service client-identity invalidation, recovery, isolation, and the documentation and validation necessary to deliver them. No provider revocation, unsolicited browser navigation, new dependency, runtime switch, independent cleanup, or workflow change is included. `plan.md` records that no preparatory refactoring or new-entity CRUD scaffolding is needed. If required refactoring emerges, isolate it in a behavior-preserving commit before feature commits in this PR, with existing tests passing unchanged (Principles II, VIII).
 
-### Recovery checkpoint (current)
+### Recovery checkpoint (acceptance coverage complete)
 
 Foundation behavior was implemented while required acceptance matrices remained incomplete. This violated the original Phase 2 gate and Principle XIII. The historical record remains intact.
 
-Before further behavior changes, complete the missing fixtures, matrices, and traceability in T011–T013, T015, and T018. Write and compile container-backed variants locally. Their first execution can occur in CI. Complete T070 before further logging changes.
+T011–T013, T015, and T018 are complete as acceptance-test writing and traceability tasks. The non-container cases run with semantic failures for missing production enforcement; container-backed variants compile and can first execute in CI. See the current recovery record below for locations and validation limits.
 
-These prerequisites are still unchecked. This documentation correction does not complete the tests or prove retroactive TDD. Subsequent work must follow test-first development.
+This resolves the missing-test recovery work, not the historical sequencing violation or runtime implementation. Continue test-first development through the remaining foundation and consumer tasks; complete T070 before further logging changes.
 
 
 ## Phase 1: Setup (Approval Record)
@@ -57,18 +57,18 @@ These prerequisites are still unchecked. This documentation correction does not 
 
 ### Phase 2f: E2E Acceptance Test Design [MANDATORY]
 
-All story-labelled acceptance-test tasks belong before foundation implementation. The implementation record shows that this gate was crossed early. Finish T011–T013, T015, and T018 before further behavior changes. This recovery does not establish retroactive test-first compliance.
+All story-labelled acceptance-test tasks were required before foundation implementation. The implementation record shows that this gate was crossed early. T011–T013, T015, and T018 now supply the missing coverage and traceability. This recovery does not establish retroactive test-first compliance.
 
-- [ ] T011 Create isolated Reports filesystem/stored and Calendar fixtures in `tests/e2e/fixtures/client_identity.go` and a coherent immutable-target/symlink-publication helper in `tests/e2e/helpers/client_identity.go`; reuse existing mock-provider helpers with both client IDs accepted and observable refresh/code-exchange counts; add the pinned prior-release image constant with its `CLIENT_IDENTITY_PRIOR_RELEASE_IMAGE` override and a testcontainers starter for the AS-1.6 mixed-version variant (research R12); configure files through production bootstrap, with temporary files confined to the permitted temporary directory (AS-1.1–AS-3.4; Principles VIII, XIII). Do not add test-only production APIs or import helpers from production.
-- [ ] T012 [US1] Write the seven AS-1.1–AS-1.7 cases in `tests/e2e/client_identity_change_test.go`, one scenario per `It`, with variant matrices inside that scenario: both change channels, two principals/unknown expiry, all refresh paths/no provider authentication, delayed callback and refresh races (including missing identity/revision pre-upgrade state rejected before exchange), revision-aware rollback, continuous rolling legacy rollout/restart with simultaneous old/new token, refresh, browser/session, same-ID rotation, and metadata operations under fixed identities, incremental old-work drain before identity mutation, and failed-upgrade/pre-activation abort retaining traffic/freeze/evidence (the PostgreSQL variant uses the actual supported prior release against the expanded schema, never an enforcement-disabled new binary; no claim of safe mixed-version identity mutation), rejected/conflicting PUT, and successful fresh reconnect; assert real HTTP status, token absence, configured service recovery URI, session state, and provider call counts (FR-001–FR-006, FR-013; SC-001, SC-005).
-- [ ] T013 [US1] Write the AS-1.6 `docker` mixed-version and restart variants in `tests/e2e/client_identity_change_test.go`, using T011 fixtures and a testcontainers starter in `tests/e2e/helpers/client_identity.go`: pin the published `ghcr.io/zalando-incubator/agentic-identity-broker:<tag>` prior release (planning baseline `v0.1.135`; implementation pins the latest preceding release) with the `CLIENT_IDENTITY_PRIOR_RELEASE_IMAGE` mirror override from research R12. Run the actual prior-release container beside the production-bootstrapped new broker against the same expanded PostgreSQL schema, mock provider, and credential directory using the existing container-suite connectivity pattern. Assert old/new token, refresh, browser/session, same-ID rotation and metadata traffic continues with fixed identities; old explicit-column reads/writes preserve evidence and omitted revision inserts default to 0; new handlers reject old callback state before exchange and old handlers consume additive new state only before activation; incremental old-work drain precedes identity changes, failed-upgrade/pre-activation abort retains healthy traffic/freeze/schema/evidence, and subsequent change/restart/rollback never revives legacy sessions. Keep each supplemental It mapped only to AS-1.6. An unavailable prior image or failed startup fails the suite, never skips, substitutes a new binary, or disables enforcement. Write these variants before behavior implementation; run them in container CI via `just test-e2e-docker` when local infrastructure is unavailable. Do not run containers in the agent sandbox. Their first CI run can include implementation. Recorded red/green output, logs, and CI links are not required (FR-003–FR-005, FR-013; DEC-005; Principles VIII, XIII; research R12).
+- [X] T011 Create isolated Reports filesystem/stored and Calendar fixtures in `tests/e2e/fixtures/client_identity.go` and a coherent immutable-target/symlink-publication helper in `tests/e2e/helpers/client_identity.go`; reuse existing mock-provider helpers with both client IDs accepted and observable refresh/code-exchange counts; add the pinned prior-release image constant with its `CLIENT_IDENTITY_PRIOR_RELEASE_IMAGE` override and a testcontainers starter for the AS-1.6 mixed-version variant (research R12); configure files through production bootstrap, with temporary files confined to the permitted temporary directory (AS-1.1–AS-3.4; Principles VIII, XIII). Do not add test-only production APIs or import helpers from production.
+- [X] T012 [US1] Write the seven AS-1.1–AS-1.7 primary cases in `tests/e2e/client_identity_change_test.go`, one scenario per `It`, with both change channels, two principals/unknown expiry, all refresh paths/no provider authentication, delayed callback and refresh races (including missing identity/revision pre-upgrade state rejected before exchange), revision-aware rollback, rejected/conflicting PUT, and successful fresh reconnect. T013 supplies supplemental continuous rolling/restart matrices in `tests/e2e/client_identity_rollout_test.go`: simultaneous old/new token, refresh, browser/session, same-ID rotation and metadata operations under fixed identities, incremental old-work drain before identity mutation, and failed-upgrade/pre-activation abort retaining traffic/freeze/evidence. Use the actual prior release, never an enforcement-disabled new binary; assert real HTTP status, token absence, configured service recovery URI, session state, and provider call counts (FR-001–FR-006, FR-013; SC-001, SC-005).
+- [X] T013 [US1] Write the AS-1.6 `docker` mixed-version and restart variants in `tests/e2e/client_identity_rollout_test.go`, using T011 fixtures and the testcontainers starter in `tests/e2e/helpers/client_identity.go`. Pin published `ghcr.io/zalando-incubator/agentic-identity-broker:v0.1.147` with the `CLIENT_IDENTITY_PRIOR_RELEASE_IMAGE` mirror override from research R12. Run the actual prior-release container beside the production-bootstrapped new broker against the same expanded PostgreSQL schema, mock provider, and credential directory. Assert old/new token, refresh, browser/session, same-ID rotation and metadata traffic continues with fixed identities; old explicit-column reads/writes preserve evidence and omitted revision inserts default to 0; new handlers reject old callback state before exchange and old handlers consume additive new state only before activation; incremental old-work drain precedes identity changes, failed-upgrade/pre-activation abort retains healthy traffic/freeze/schema/evidence, and subsequent change/restart/rollback never revives legacy sessions. Each supplemental `It` maps only to AS-1.6. Unavailable images and failed startup fail rather than skip or substitute a new binary. Test writing and compilation are complete; execute in container CI via `just test-e2e-docker` when local infrastructure is unavailable. Do not run containers in the agent sandbox. Their first CI run can include implementation; recorded red/green output, logs, and CI links are not required (FR-003–FR-005, FR-013; DEC-005; Principles VIII, XIII; research R12).
 - [X] T014 [US2] Write the five AS-2.1–AS-2.5 complete HTTP journeys in `tests/e2e/client_identity_change_test.go`, continuing the shared feature Describe: automatic consent despite a grant, reconnect preserving valid selections and completing original authorization, direct `error_uri` recovery returning to `/sessions` then successful exchange, cancellation/failure/retry with no grant expansion, and list/detail/consent sign-in state (FR-007–FR-010, FR-014; SC-002, SC-003).
-- [ ] T015 [US3] Write the four AS-3.1–AS-3.4 journeys in `tests/e2e/client_identity_change_test.go`: Calendar/login/grant isolation plus ADR 046 rejected/refreshable controls and alias equality; file secret rotation using the new secret on refresh; optional excluded versus included service; Admin secret/metadata/same-identity source-transition matrix including paused obsolete observers across source/canonical-ID/binding changes followed by a same-ID update with no spurious invalidation (FR-011, FR-012, FR-015; SC-004).
+- [X] T015 [US3] Write the four AS-3.1–AS-3.4 journeys in `tests/e2e/client_identity_change_test.go`: Calendar/login/grant isolation plus ADR 046-observed-refresh-token-rejection rejected/refreshable controls and alias equality; file secret rotation using the new secret on refresh; optional excluded versus included service; Admin secret/metadata/same-identity source-transition matrix including paused obsolete observers across source/canonical-ID/binding changes followed by a same-ID update with no spurious invalidation (FR-011, FR-012, FR-015; SC-004).
 - [X] T016 [US2] Add browser cases for AS-2.1–AS-2.5 in `tests/e2e/frontend/client_identity_reconnect_test.go` using production bootstrap and page objects in `tests/e2e/pages/consent_page.go` and `tests/e2e/pages/sessions_page.go`; cover next-authorization entry, tab-local restored selections, direct recovery, failure/retry, next-state-load updates without unsolicited navigation, and service-specific keyboard-accessible sign-in (FR-007–FR-010, FR-014; Principles XI, XIII).
-- [X] T017 [US2] Configure browser captures in `tests/e2e/frontend/client_identity_reconnect_test.go` for the five filenames in `plan.md`: `client_identity_consent_sign_in_required.png`, `client_identity_consent_reconnected.png`, `client_identity_sessions_sign_in_required.png`, `client_identity_sessions_reconnected.png`, `client_identity_reconnect_failed.png`; use the existing opt-in capture and maintained-image flow to `tests/e2e/screenshots/`, not workflow changes (FR-008–FR-010; Principle XIII).
-- [ ] T018 Verify the 16 primary scenario mappings and supplemental browser/restart variants in `specs/056-invalidate-client-sessions/tasks.md` against `tests/e2e/client_identity_change_test.go` and `tests/e2e/frontend/client_identity_reconnect_test.go`; record actual test locations here. Enforce Describe → Context → It, nearby scenario references, fixtures, isolated BeforeEach/AfterEach, separate admin/end-user servers, no direct DI, fixed sleeps, placeholders, pending/Skip markers, or test-order dependencies (Principle XIII).
+- [X] T017 [US2] Configure browser captures in `tests/e2e/frontend/client_identity_reconnect_test.go` for the six filenames in `plan.md`: `client_identity_consent_sign_in_required.png`, `client_identity_consent_reconnected.png`, `client_identity_sessions_sign_in_required.png`, `client_identity_sessions_reconnected.png`, `client_identity_reconnect_failed.png`, and `client_identity_reconnect_declined.png`; use the existing opt-in capture and maintained-image flow to `tests/e2e/screenshots/`, not workflow changes (FR-008–FR-010; Principle XIII).
+- [X] T018 Verify the 16 primary scenario mappings and supplemental browser/restart variants against `tests/e2e/client_identity_change_test.go`, `tests/e2e/client_identity_rollout_test.go`, and `tests/e2e/frontend/client_identity_reconnect_test.go`; record actual test locations in the current recovery record below. Enforce Describe → Context → It, nearby scenario references, fixtures, isolated lifecycle hooks, separate Admin/end-user servers, no direct DI, fixed sleeps, placeholders, pending/Skip markers, or test-order dependencies (Principle XIII).
 - [X] T019 Review the three journeys and four Wireloom SVGs in `specs/056-invalidate-client-sessions/spec.md` and `wireframes/` against approved OpenAPI, synthetic config/HTTP examples, callback state, PKCE, and return-URI safeguards; no output JWT is introduced, so do not invent one. Record discrepancies and approved resolutions. Keep artifact status accurate without silently changing approved behavior (SR-002, SR-003; Principle XIV).
-- [X] T020 Run the compiling HTTP and browser acceptance tests in `tests/e2e/client_identity_change_test.go` and `tests/e2e/frontend/client_identity_reconnect_test.go`. Use focused non-container Ginkgo runs and matching `just test-e2e-backend`/`just test-e2e-frontend` recipes. T011–T013/T015/T018 still govern the unfinished matrices. Run container-backed cases in CI when local infrastructure is unavailable. No saved red/green output, logs, or CI links are required (Principles VIII, XIII).
+- [X] T020 Run the compiling HTTP and browser acceptance tests in `tests/e2e/client_identity_change_test.go` and `tests/e2e/frontend/client_identity_reconnect_test.go`. Use focused non-container Ginkgo runs and matching `just test-e2e-backend`/`just test-e2e-frontend` recipes. The current recovery record distinguishes written matrices from missing runtime behavior and container execution. Run container-backed cases in CI when local infrastructure is unavailable. No saved red/green output, logs, or CI links are required (Principles VIII, XIII).
 
 ### Phase 2g: Observability Design [MANDATORY]
 
@@ -138,7 +138,7 @@ Primary E2E/browser red tasks: T014, T016, T017, T020.
 - [ ] T046 [US2] Integrate Display mode into consent detail in `internal/domain/consent/service.go` and session list/detail/refresh summaries in `internal/domain/oauth2session/service.go`; read only the live client-ID file for usability (Accepted ADR 048-client-identity-revisions supersedes ADR 041-oauth2-client-secret-file-overrides's no-file-read rule on these displays only), retain no-secret/no-token-blob storage metadata reads and administrative service-metadata no-file-read tests, truthful identity state, equal requires_reauthentication/is_expired, distinct access expiry, and fallback logging (FR-008, FR-015; DEC-003).
 - [ ] T047 [US2] Align `web/src/services/api/sessions.ts` and `web/src/components/sessions/SessionCard.tsx` with the existing required reauthentication field and sign-in action rather than expiry-only decisions; reuse the current consent not_connected presentation in `web/src/components/consent/ServiceRequirementCard.tsx` and tab-local return state without adding an enum, navigation loop, or live redirect (FR-008–FR-010, FR-014; Principle XI).
 - [ ] T048 [US2] Verify and minimally repair the existing provider initiation/callback and refresh-after-return integration in `internal/domain/oauth2session/service.go` and `web/src/pages/ThirdPartySessionsPage.tsx` only where T014/T016 show a gap: consent reconnect preserves valid selections, direct recovery returns to `/sessions`, cancellation/failure never revives old tokens or broadens grants and leaves a retry; retain state/principal/PKCE/same-origin checks (AS-2.2–AS-2.4; FR-009, FR-010; SR-002, SR-003).
-- [ ] T049 [US2] Run `just check`, `just test`, `just web-test`, `just test-e2e-backend`, and `just test-e2e-frontend` until AS-2.1–AS-2.5 and their unit/browser tests pass; capture the five maintained screenshots through opt-in serial capture described in `specs/056-invalidate-client-sessions/quickstart.md`, and keep assertions unchanged apart from fixture corrections (SC-002, SC-003; Principles VIII, XIII).
+- [ ] T049 [US2] Run `just check`, `just test`, `just web-test`, `just test-e2e-backend`, and `just test-e2e-frontend` until AS-2.1–AS-2.5 and their unit/browser tests pass; capture the six maintained screenshots listed in `plan.md`, including the separate failure/retry and cancellation/retry states, through opt-in serial capture described in `specs/056-invalidate-client-sessions/quickstart.md`, and keep assertions unchanged apart from fixture corrections (SC-002, SC-003; Principles VIII, XIII).
 
 **Checkpoint**: Both P1 stories work end to end, including recovery; P2 isolation still gates full feature completion.
 
@@ -207,7 +207,7 @@ Primary acceptance red task: T015 before foundation. Later unit tests expose any
 
 **E2E Acceptance Testing** (Principle XIII):
 
-- [ ] T067 Run the complete non-container acceptance gate with `just test-e2e-backend` and `just test-e2e-frontend`; verify AS-1.1–AS-3.4 green, full user journeys, production bootstrap, scenario comments, isolated fixtures, minimal assertion changes, and five captured UI artifacts in `tests/e2e/screenshots/` using opt-in serial screenshot capture; run container restart variants separately with `just test-e2e-docker` in container CI (Principle XIII; SC-001–SC-005).
+- [ ] T067 Run the complete non-container acceptance gate with `just test-e2e-backend` and `just test-e2e-frontend`; verify AS-1.1–AS-3.4 green, full user journeys, production bootstrap, scenario comments, isolated fixtures, minimal assertion changes, and all six UI artifacts listed in `plan.md` captured in `tests/e2e/screenshots/` using opt-in serial screenshot capture, including `client_identity_reconnect_declined.png` for cancellation/retry; run container restart variants separately with `just test-e2e-docker` in container CI (Principle XIII; SC-001–SC-005).
 
 **Frontend** (Principle XI - if applicable):
 
@@ -224,7 +224,7 @@ Primary acceptance red task: T015 before foundation. Later unit tests expose any
 ```text
 T001 approval record
   → Phase 2a–2g design (including T070) + T011 fixtures
-  → T012 → T013 → T014 → T015 (same backend file; T013 can first run in container CI)
+  → T012 → T013 → T014 → T015 (primary backend scenarios stay in one file; supplemental T013 has its own docker file and can first run in container CI)
   → T016 → T017 (same frontend file)
   → T018–T020 scenario mapping, journeys, and acceptance tests
   → T021–T030 foundation (tests → models/ports → both adapters → rule → DI)
@@ -234,7 +234,7 @@ T001 approval record
   → Phase N T055–T069
 ```
 
-Current recovery order: finish T011–T013/T015/T018 and T070 before further behavior changes. Then finish the remaining foundation work, including T022/T024/T030. T022 completion never depends on T033/T037. Historical completed tasks do not imply that the original order was followed.
+The acceptance recovery tasks T011–T013/T015/T018 are complete. Continue the remaining foundation work, including T022/T024/T030; complete T070 before further logging changes. T022 completion never depends on T033/T037. Historical completed tasks do not imply that the original order was followed.
 
 
 The existing approval covers the listed API and decision items. Missing test coverage is not a new approval requirement. Unapproved changes still require explicit approval before implementation.
@@ -326,7 +326,7 @@ Every primary row maps to a separate `It` in `tests/e2e/client_identity_change_t
 
 `tests/e2e/client_identity_change_test.go` contains one primary `It` for each of the 16 scenarios. Helpers reuse the production credential journey, separate Admin/end-user servers, real provider authorization/callbacks, signed token-exchange credentials, and immutable-target/symlink pair publication. Reports and Calendar fixtures have distinct resources. Fixture corrections removed the unrelated placeholder service from grants and avoid warming the permission-set cache before Calendar setup.
 
-| Scenario | Primary test location |
+| Scenario | Historical primary test location (2026-11-05; current locations are in the acceptance recovery record below) |
 |---|---|
 | AS-1.1 | `tests/e2e/client_identity_change_test.go:193` |
 | AS-1.2 | `tests/e2e/client_identity_change_test.go:204` |
@@ -564,3 +564,67 @@ This increment changes feature documentation only. It does not complete runtime 
 
 The existing numbered ADR remains unchanged. New ADRs require UTC timestamp filenames. New or changed ADR references require full file stems.
 
+
+### 2026-11-18 — acceptance recovery checkpoint
+
+The historical sequencing violation remains recorded. This recovery increment adds acceptance coverage without adding production enforcement. Test-writing completion is distinct from green feature behavior and from real PostgreSQL/prior-release execution.
+
+The screenshot inventory in `plan.md`, T017, T049, T067, and `quickstart.md` now includes six states: consent sign-in required, consent reconnected, sessions sign-in required, sessions reconnected, provider failure/retry, and provider cancellation/retry. The cancellation artifact is `client_identity_reconnect_declined.png`. Capture configuration already exists; no new screenshot is claimed captured.
+
+Browser traceability verified against `tests/e2e/frontend/client_identity_reconnect_test.go`:
+
+| Scenario | Browser test location | Observable acceptance behavior |
+|---|---|---|
+| AS-2.1 | `tests/e2e/frontend/client_identity_reconnect_test.go:152` | Next authorization enters consent and offers service-specific sign-in. |
+| AS-2.2 | `tests/e2e/frontend/client_identity_reconnect_test.go:163` | Reconnect restores tab-local selections and completes the original authorization. |
+| AS-2.3 | `tests/e2e/frontend/client_identity_reconnect_test.go:187` | Resolved-service recovery returns to sessions and restores token exchange. |
+| AS-2.4 | `tests/e2e/frontend/client_identity_reconnect_test.go:210` | Failed reconnect preserves session/grant, denies issuance, and permits keyboard retry. |
+| AS-2.4 | `tests/e2e/frontend/client_identity_reconnect_test.go:232` | Provider decline performs no code exchange, preserves session/grant, and permits retry. |
+| AS-2.5 | `tests/e2e/frontend/client_identity_reconnect_test.go:263` | Next state load shows sign-in without unsolicited navigation; Calendar remains usable. |
+
+Each browser case has a nearby scenario reference and runs under the shared Context with a fresh production-bootstrapped journey and cleanup. Failure and cancellation are separate supplemental variants of AS-2.4. Screenshot calls cover all six states through the existing opt-in mechanism.
+
+Primary HTTP scenario locations after the recovery matrix additions:
+
+| Scenario | Primary `It` in `tests/e2e/client_identity_change_test.go` |
+|---|---|
+| AS-1.1 | `:294` |
+| AS-1.2 | `:305` |
+| AS-1.3 | `:332` |
+| AS-1.4 | `:376` |
+| AS-1.5 | `:505` |
+| AS-1.6 | `:923` |
+| AS-1.7 | `:962` |
+| AS-2.1 | `:531` |
+| AS-2.2 | `:543` |
+| AS-2.3 | `:592` |
+| AS-2.4 | `:615` |
+| AS-2.5 | `:657` |
+| AS-3.1 | `:719` |
+| AS-3.2 | `:854` |
+| AS-3.3 | `:823` |
+| AS-3.4 | `:1014` |
+
+Supplemental HTTP variants in that file map to AS-1.4 at `:445` (missing pre-upgrade callback claims), AS-1.6 at `:470` (legacy sessions already rejected by source rules), and AS-3.4 at `:1109` (four obsolete-observer source/canonical-ID/binding interleavings). Primary scenarios retain one `It` each; variants exercise both change channels, independent principals, delayed work, rollback, routine rotation, and unchanged-service controls.
+
+Supplemental AS-1.6 PostgreSQL/prior-release cases are in `tests/e2e/client_identity_rollout_test.go` under the `docker` label:
+
+| Test location | Acceptance matrix |
+|---|---|
+| `:379` | Actual prior-release and new-replica token, refresh, browser, and session traffic under fixed identities; same-ID rotation; expanded-schema/default-0 compatibility; cross-version callbacks; incremental old-work drain; activation; restart/rollback and independent reconnection. |
+| `:523` | Failed online validation retains healthy prior-release traffic, the identity freeze, dirty-state visibility, and schema evidence. |
+| `:548` | Guarded preactivation abort drains new work while prior-release traffic continues, retaining fixed identities, zero increments, schema, and ciphertext. |
+
+The fixture pins published `v0.1.147` through `fixtures.ClientIdentityPriorReleaseImage`; `CLIENT_IDENTITY_PRIOR_RELEASE_IMAGE` supports an operator-provided mirror. The released binary is not simulated or replaced with enforcement-disabled new code. All cases use production bootstrap and separate Admin/end-user listeners. The obsolete-observer variants use a bootstrap-only reader wrapper that delegates regular-file reads and pauses the captured value before observation; scenarios do not construct domain services or change production APIs.
+
+Validation performed for this recovery increment:
+
+- `just check`: passed with zero lint issues after replacing a deprecated testcontainers bind-mount API with its supported host-config modifier.
+- `go test -race ./tests/e2e/helpers ./tests/e2e/bootstrap`: passed.
+- `ginkgo -v --procs=1 --label-filter='client-identity-change && !docker' ./tests/e2e/`: all backend cases, including docker cases, compiled; 22 selected cases ran, with 2 passed, 20 failed, and 0 pending. Routine filesystem rotation and Admin/source-transition controls pass. Remaining selected failures expose missing invalidation, callback-revision/legacy enforcement, consent/display integration, and the unused identity-read barrier on the token fast path. These are semantic-red acceptance outcomes, not delivered feature behavior. Label-excluded cases were not executed.
+- The Docker CLI cannot connect because the configured Colima socket is absent. No PostgreSQL/prior-release container journey was executed or claimed passed; run the docker-labelled slice in container CI.
+- `ripwire --quality-delta` was run and is not clean: it reports Ginkgo closure growth, generic locking/constructor duplication matches, HTTP helper duplication, and new container-starter size/complexity warnings. No finding was suppressed or acknowledged, and no unrelated refactoring was added to this test-first recovery.
+
+T011–T013/T015/T018 are complete as writing/compilation/traceability work. The task inventory is 26 checked and 44 unchecked. T070 remains open before further logging changes; runtime enforcement, green acceptance, actual screenshots, and final compliance remain unfinished.
+
+The GitHub release API confirms that `v0.1.147` was published on 2026-11-17 at 13:31:23 UTC from `main` ([release](https://github.com/zalando-incubator/agentic-identity-broker/releases/tag/v0.1.147)). This verifies the published tag and date, not the registry image digest or mixed-version runtime compatibility; those remain unverified until the container journey executes.

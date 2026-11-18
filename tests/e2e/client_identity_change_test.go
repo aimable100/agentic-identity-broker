@@ -13,6 +13,7 @@ import (
 
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/id"
 	domainstorage "github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/storage"
+	"github.com/agentic-identity-broker/agentic-identity-broker/tests/e2e/bootstrap"
 	"github.com/agentic-identity-broker/agentic-identity-broker/tests/e2e/fixtures"
 	"github.com/agentic-identity-broker/agentic-identity-broker/tests/e2e/helpers"
 )
@@ -127,6 +128,94 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 		Expect(body).NotTo(HaveKey("client_identity_revision"))
 	}
 
+	putService := func(request map[string]any, headers map[string]string, status int) map[string]any {
+		GinkgoHelper()
+		if headers == nil || headers["If-Match"] == "" {
+			delete(request, "protected_resources")
+		}
+		encoded, err := json.Marshal(request)
+		Expect(err).NotTo(HaveOccurred())
+		if headers == nil {
+			headers = map[string]string{}
+		}
+		headers["Content-Type"] = "application/json"
+		response, err := journey.Admin.DirectRequest(http.MethodPut, "/api/services/"+serviceID.String(), fixtures.AdminPrincipal().String(), headers, bytes.NewReader(encoded))
+		Expect(err).NotTo(HaveOccurred())
+		body, err := helpers.CredentialResponseObject(response)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(response.StatusCode).To(Equal(status), "%v", body)
+		Expect(body).NotTo(HaveKey("client_identity"))
+		Expect(body).NotTo(HaveKey("client_identity_revision"))
+		return body
+	}
+
+	changeIdentity := func(source, clientID, secret string) {
+		GinkgoHelper()
+		if source == "filesystem" {
+			publish(clientID, secret)
+		} else {
+			updateStored(clientID, secret)
+		}
+	}
+
+	expectSessionFlags := func(target id.ServiceID, principal string, reauthentication, expired bool) {
+		GinkgoHelper()
+		for _, path := range []string{"/api/third-party/sessions", "/api/third-party/" + target.String() + "/session"} {
+			response, err := journey.EndUser.AuthenticatedGET(path, principal)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(response.StatusCode).To(Equal(http.StatusOK))
+			body, err := helpers.CredentialResponseObject(response)
+			Expect(err).NotTo(HaveOccurred())
+			data, ok := body["data"].(map[string]any)
+			Expect(ok).To(BeTrue())
+			var summary map[string]any
+			if path == "/api/third-party/sessions" {
+				list, ok := data["sessions"].([]any)
+				Expect(ok).To(BeTrue())
+				for _, entry := range list {
+					candidate, ok := entry.(map[string]any)
+					Expect(ok).To(BeTrue())
+					if candidate["service_id"] == target.String() {
+						summary = candidate
+					}
+				}
+			} else {
+				summary, ok = data["session"].(map[string]any)
+				Expect(ok).To(BeTrue())
+			}
+			Expect(summary).NotTo(BeNil())
+			Expect(summary).To(HaveKeyWithValue("requires_reauthentication", reauthentication))
+			Expect(summary).To(HaveKeyWithValue("is_expired", reauthentication))
+			Expect(summary).To(HaveKeyWithValue("access_token_expired", expired))
+			Expect(summary).NotTo(HaveKey("upstream_client_id"))
+			Expect(summary).NotTo(HaveKey("upstream_client_revision"))
+		}
+	}
+
+	beginCallback := func() *url.URL {
+		GinkgoHelper()
+		journey.Principal = alice
+		response, err := journey.Authorize(serviceID)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(response.StatusCode).To(Equal(http.StatusFound))
+		callback, err := helpers.ProviderAuthorizationCallback(response.Header.Get("Location"))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(response.Body.Close()).To(Succeed())
+		return callback
+	}
+
+	expectFailedCallback := func(result proactiveExchangeResult) {
+		GinkgoHelper()
+		Expect(result.err).NotTo(HaveOccurred())
+		defer func() { _ = result.response.Body.Close() }()
+		Expect(result.response.StatusCode).To(Equal(http.StatusFound))
+		location, err := url.Parse(result.response.Header.Get("Location"))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(location.Path).To(Equal("/sessions"))
+		Expect(location.Query().Get("error")).To(Equal("callback_failed"))
+		Expect(location.Query().Get("success")).To(BeEmpty())
+	}
+
 	authorizeAgent := func() *url.URL {
 		GinkgoHelper()
 		query := url.Values{
@@ -149,6 +238,18 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 		Expect(err).NotTo(HaveOccurred())
 		Expect(value).NotTo(BeNil())
 		return value
+	}
+
+	grantResponse := func() map[string]any {
+		GinkgoHelper()
+		response, err := journey.EndUser.AuthenticatedGET("/api/consent/agents/"+agent.ID.String()+"/grants", alice)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(response.StatusCode).To(Equal(http.StatusOK))
+		body, err := helpers.CredentialResponseObject(response)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(body["data"]).To(HaveKeyWithValue("agent_id", agent.ID.String()))
+		Expect(body["data"]).To(HaveKeyWithValue("principal", alice))
+		return body
 	}
 
 	consentConnection := func() string {
@@ -189,7 +290,7 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 			connect(alice)
 		})
 
-		// AS-1.1 from specs/056-invalidate-client-sessions/spec.md
+		// AS-1.1 from specs/056-invalidate-client-sessions/spec.md (User Story 1)
 		It("denies an unexpired token after the client-ID file changes and returns the service recovery URI", func() {
 			Expect(exchange(alice, http.StatusOK)).To(HaveKeyWithValue("access_token", "mock-access-token"))
 			before := session(alice)
@@ -200,89 +301,233 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 			Expect(session(alice)).To(Equal(before))
 		})
 
-		// AS-1.2 from specs/056-invalidate-client-sessions/spec.md
+		// AS-1.2 from specs/056-invalidate-client-sessions/spec.md (User Story 1)
 		It("requires each affected user to reconnect independently, including sessions without expiry", func() {
+			for _, source := range []string{"filesystem", "stored"} {
+				By("invalidating both principals through " + source)
+				changeIdentity(source, fixtures.ReportsClientV1, fixtures.ReportsSecretV1)
+				connect(alice)
+				connect(bob)
+				unknownExpiry := session(bob)
+				unknownExpiry.AccessTokenExpiresAt = nil
+				Expect(journey.Storage.UserSessions().Create(ctx, unknownExpiry)).To(Succeed())
+				Expect(exchange(alice, http.StatusOK)).To(HaveKey("access_token"))
+				Expect(exchange(bob, http.StatusOK)).To(HaveKey("access_token"))
+				providerCalls := journey.Upstream.TokenGrantCount("refresh_token")
+				changeIdentity(source, fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
+				expectDenied(alice)
+				expectDenied(bob)
+				expectSessionFlags(serviceID, alice, true, false)
+				expectSessionFlags(serviceID, bob, true, false)
+				connect(alice)
+				Expect(exchange(alice, http.StatusOK)).To(HaveKey("access_token"))
+				expectSessionFlags(serviceID, alice, false, false)
+				expectDenied(bob)
+				Expect(session(bob)).To(Equal(unknownExpiry))
+				Expect(journey.Upstream.TokenGrantCount("refresh_token")).To(Equal(providerCalls))
+			}
+		})
+
+		// AS-1.3 from specs/056-invalidate-client-sessions/spec.md (User Story 1)
+		It("never refreshes a superseded session on demand, in the background, manually, or in the admin sweep", func() {
+			for _, source := range []string{"filesystem", "stored"} {
+				for _, untilExpiry := range []time.Duration{time.Minute, -time.Hour} {
+					By("denying every refresh path for " + source + " with expiry " + untilExpiry.String())
+					changeIdentity(source, fixtures.ReportsClientV1, fixtures.ReportsSecretV1)
+					connect(alice)
+					before := session(alice)
+					expiry := time.Now().Add(untilExpiry)
+					before.AccessTokenExpiresAt = &expiry
+					Expect(journey.Storage.UserSessions().Create(ctx, before)).To(Succeed())
+					providerCalls := journey.Upstream.TokenGrantCount("refresh_token")
+					changeIdentity(source, fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
+					for index, request := range []string{`{"dry_run":true}`, `{"dry_run":false}`} {
+						serviceBefore, err := journey.Storage.Services().Get(ctx, serviceID)
+						Expect(err).NotTo(HaveOccurred())
+						result := proactiveSweepBody(proactiveSweep(journey.Admin, request))
+						Expect(result.DryRun).To(Equal(index == 0))
+						Expect(result.TotalEvaluated).To(Equal(1))
+						Expect(result.Failed).To(Equal(1))
+						Expect(result.Refreshed).To(BeZero())
+						Expect(result.Skipped).To(BeZero())
+						Expect(session(alice)).To(Equal(before))
+						if index == 0 {
+							serviceAfter, err := journey.Storage.Services().Get(ctx, serviceID)
+							Expect(err).NotTo(HaveOccurred())
+							Expect(serviceAfter).To(Equal(serviceBefore))
+						}
+					}
+					expectDenied(alice)
+					journey.Principal = alice
+					response, err := journey.Refresh(serviceID)
+					Expect(err).NotTo(HaveOccurred())
+					body, err := helpers.CredentialResponseObject(response)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(response.StatusCode).To(Equal(http.StatusConflict))
+					Expect(body["error"]).To(Equal("refresh_unavailable"))
+					Expect(body).NotTo(HaveKey("access_token"))
+					Expect(session(alice)).To(Equal(before))
+					Consistently(func() int { return journey.Upstream.TokenGrantCount("refresh_token") }, 200*time.Millisecond).Should(Equal(providerCalls))
+				}
+			}
+		})
+
+		// AS-1.4 from specs/056-invalidate-client-sessions/spec.md (User Story 1)
+		It("rejects delayed callbacks and refresh results from the previous identity and allows a fresh connection", func() {
+			for _, source := range []string{"filesystem", "stored"} {
+				By("rejecting a callback before provider exchange through " + source)
+				changeIdentity(source, fixtures.ReportsClientV1, fixtures.ReportsSecretV1)
+				connect(alice)
+				callback := beginCallback()
+				before := session(alice)
+				providerCalls := journey.Upstream.TokenGrantCount("authorization_code")
+				changeIdentity(source, fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
+				response, err := journey.EndUser.AuthenticatedGET(callback.RequestURI(), alice)
+				expectFailedCallback(proactiveExchangeResult{response: response, err: err})
+				Expect(journey.Upstream.TokenGrantCount("authorization_code")).To(Equal(providerCalls))
+				Expect(session(alice)).To(Equal(before))
+				expectDenied(alice)
+				connect(alice)
+				Expect(exchange(alice, http.StatusOK)).To(HaveKey("access_token"))
+
+				By("discarding an old code-exchange result after a newer reconnect through " + source)
+				changeIdentity(source, fixtures.ReportsClientV1, fixtures.ReportsSecretV1)
+				connect(alice)
+				callback = beginCallback()
+				journey.Upstream.WithAccessToken("obsolete-callback-token")
+				codeBarrier := journey.Upstream.GateTokenGrant("authorization_code")
+				DeferCleanup(codeBarrier.Release)
+				callbackResult := make(chan proactiveExchangeResult, 1)
+				go func() {
+					response, err := journey.EndUser.AuthenticatedGET(callback.RequestURI(), alice)
+					callbackResult <- proactiveExchangeResult{response: response, err: err}
+				}()
+				Eventually(codeBarrier.Entered).Should(BeClosed())
+				changeIdentity(source, fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
+				journey.Upstream.WithAccessToken("current-callback-token")
+				connect(alice)
+				current := session(alice)
+				codeBarrier.Release()
+				var delayed proactiveExchangeResult
+				Eventually(callbackResult).Should(Receive(&delayed))
+				expectFailedCallback(delayed)
+				Expect(session(alice)).To(Equal(current))
+				Expect(exchange(alice, http.StatusOK)).To(HaveKeyWithValue("access_token", "current-callback-token"))
+
+				By("discarding a refresh that returns after the identity changes through " + source)
+				changeIdentity(source, fixtures.ReportsClientV1, fixtures.ReportsSecretV1)
+				connect(alice)
+				before = session(alice)
+				journey.Upstream.WithAccessToken("obsolete-refresh-token")
+				refreshBarrier := journey.Upstream.GateTokenGrant("refresh_token")
+				DeferCleanup(refreshBarrier.Release)
+				refreshResult := make(chan proactiveExchangeResult, 1)
+				go func() {
+					response, err := journey.Refresh(serviceID)
+					refreshResult <- proactiveExchangeResult{response: response, err: err}
+				}()
+				Eventually(refreshBarrier.Entered).Should(BeClosed())
+				changeIdentity(source, fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
+				refreshBarrier.Release()
+				Eventually(refreshResult).Should(Receive(&delayed))
+				body := proactiveExchangeBody(delayed, http.StatusConflict)
+				Expect(body).To(HaveKeyWithValue("error", "refresh_unavailable"))
+				Expect(body).NotTo(HaveKey("access_token"))
+				Expect(session(alice)).To(Equal(before))
+				expectDenied(alice)
+				journey.Upstream.WithAccessToken("current-refresh-reconnect-token")
+				connect(alice)
+				Expect(exchange(alice, http.StatusOK)).To(HaveKeyWithValue("access_token", "current-refresh-reconnect-token"))
+			}
+		})
+
+		// Supplemental AS-1.4 from specs/056-invalidate-client-sessions/spec.md (User Story 1).
+		It("rejects pre-upgrade callback state missing identity or revision before any exchange at revision zero", func() {
+			for _, source := range []string{"filesystem", "stored"} {
+				if source == "stored" {
+					updateStored(fixtures.ReportsClientV1, fixtures.ReportsSecretV1)
+				}
+				for _, missing := range [][]string{{"upstream_client_id"}, {"upstream_client_revision"}, {"upstream_client_id", "upstream_client_revision"}} {
+					By("requiring explicit identity claims for " + source + " callback state")
+					callback := beginCallback()
+					before := session(alice)
+					Expect(before.UpstreamClientRevision).To(BeZero())
+					legacyCallback, err := helpers.RemoveClientIdentityStateClaims(journey, callback, missing...)
+					Expect(err).NotTo(HaveOccurred())
+					providerCalls := journey.Upstream.TokenGrantCount("authorization_code")
+					response, err := journey.EndUser.AuthenticatedGET(legacyCallback.RequestURI(), alice)
+					expectFailedCallback(proactiveExchangeResult{response: response, err: err})
+					Expect(journey.Upstream.TokenGrantCount("authorization_code")).To(Equal(providerCalls))
+					Expect(session(alice)).To(Equal(before))
+					Expect(exchange(alice, http.StatusOK)).To(HaveKey("access_token"))
+					connect(alice)
+					Expect(exchange(alice, http.StatusOK)).To(HaveKey("access_token"))
+				}
+			}
+		})
+
+		// Supplemental AS-1.6 from specs/056-invalidate-client-sessions/spec.md (User Story 1).
+		It("keeps identity-less filesystem and previously transitioned stored sessions rejected", func() {
 			connect(bob)
-			unknownExpiry := session(bob)
-			unknownExpiry.AccessTokenExpiresAt = nil
-			Expect(journey.Storage.UserSessions().Create(ctx, unknownExpiry)).To(Succeed())
-			publish(fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
-			expectDenied(alice)
-			expectDenied(bob)
+			for _, principal := range []string{alice, bob} {
+				legacy := session(principal)
+				legacy.UpstreamClientID = nil
+				legacy.UpstreamClientRevision = 0
+				Expect(journey.Storage.UserSessions().Create(ctx, legacy)).To(Succeed())
+			}
+			providerCalls := len(journey.Upstream.GetTokenRequests())
+			for _, source := range []string{"filesystem", "stored after a source transition"} {
+				By("preserving the legacy rejection for " + source)
+				if source != "filesystem" {
+					updateStored(fixtures.ReportsClientV1, fixtures.ReportsSecretV1)
+				}
+				for _, principal := range []string{alice, bob} {
+					before := session(principal)
+					expectDenied(principal)
+					journey.Principal = principal
+					response, err := journey.Refresh(serviceID)
+					Expect(err).NotTo(HaveOccurred())
+					body, err := helpers.CredentialResponseObject(response)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(response.StatusCode).To(Equal(http.StatusConflict))
+					Expect(body).To(HaveKeyWithValue("error", "refresh_unavailable"))
+					Expect(session(principal)).To(Equal(before))
+				}
+				Expect(journey.Upstream.GetTokenRequests()).To(HaveLen(providerCalls))
+			}
 			connect(alice)
 			Expect(exchange(alice, http.StatusOK)).To(HaveKey("access_token"))
 			expectDenied(bob)
-			Expect(session(bob)).To(Equal(unknownExpiry))
+			Expect(session(bob).UpstreamClientID).To(BeNil())
 		})
 
-		// AS-1.3 from specs/056-invalidate-client-sessions/spec.md
-		It("never refreshes a superseded session on demand, manually, or in the admin sweep", func() {
-			before := session(alice)
-			past := time.Now().Add(-time.Hour)
-			before.AccessTokenExpiresAt = &past
-			Expect(journey.Storage.UserSessions().Create(ctx, before)).To(Succeed())
-			providerCalls := len(journey.Upstream.GetTokenRequests())
-			publish(fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
-			for _, request := range []string{`{"dry_run":true}`, `{"dry_run":false}`} {
-				result := proactiveSweepBody(proactiveSweep(journey.Admin, request))
-				Expect(result.TotalEvaluated).To(Equal(1))
-				Expect(result.Failed).To(Equal(1))
-				Expect(result.Refreshed).To(BeZero())
-			}
-			expectDenied(alice)
-			journey.Principal = alice
-			response, err := journey.Refresh(serviceID)
-			Expect(err).NotTo(HaveOccurred())
-			body, err := helpers.CredentialResponseObject(response)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(response.StatusCode).To(Equal(http.StatusConflict))
-			Expect(body["error"]).To(Equal("refresh_unavailable"))
-			Expect(session(alice)).To(Equal(before))
-			Expect(journey.Upstream.GetTokenRequests()).To(HaveLen(providerCalls))
-		})
-
-		Context("with an authorization code issued but not yet exchanged", func() {
-			var callback *url.URL
-			BeforeEach(func() {
-				response, err := journey.Authorize(serviceID)
-				Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = response.Body.Close() }()
-				Expect(response.StatusCode).To(Equal(http.StatusFound))
-				callback, err = helpers.ProviderAuthorizationCallback(response.Header.Get("Location"))
-				Expect(err).NotTo(HaveOccurred())
-			})
-
-			// AS-1.4 from specs/056-invalidate-client-sessions/spec.md
-			It("rejects a callback that began under the previous identity and allows a fresh connection", func() {
+		// AS-1.5 from specs/056-invalidate-client-sessions/spec.md (User Story 1)
+		It("keeps an invalidated session unusable after the previous client ID is restored", func() {
+			for _, source := range []string{"filesystem", "stored"} {
+				By("retaining invalidation across a revision-aware " + source + " rollback")
+				changeIdentity(source, fixtures.ReportsClientV1, fixtures.ReportsSecretV1)
+				connect(alice)
 				before := session(alice)
-				providerCalls := len(journey.Upstream.GetTokenRequests())
-				publish(fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
-				response, err := journey.EndUser.AuthenticatedGET(callback.RequestURI(), alice)
+				providerCalls := journey.Upstream.TokenGrantCount("refresh_token")
+				changeIdentity(source, fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
+				expectDenied(alice)
+				changeIdentity(source, fixtures.ReportsClientV1, fixtures.ReportsSecretV1)
+				expectDenied(alice)
+				journey.Principal = alice
+				response, err := journey.Refresh(serviceID)
 				Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = response.Body.Close() }()
-				Expect(response.StatusCode).To(Equal(http.StatusFound))
-				location, err := url.Parse(response.Header.Get("Location"))
+				body, err := helpers.CredentialResponseObject(response)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(location.Path).To(Equal("/sessions"))
-				Expect(location.Query().Get("error")).To(Equal("callback_failed"))
-				Expect(journey.Upstream.GetTokenRequests()).To(HaveLen(providerCalls))
+				Expect(response.StatusCode).To(Equal(http.StatusConflict))
+				Expect(body).To(HaveKeyWithValue("error", "refresh_unavailable"))
+				Expect(journey.Upstream.TokenGrantCount("refresh_token")).To(Equal(providerCalls))
 				Expect(session(alice)).To(Equal(before))
 				connect(alice)
 				Expect(exchange(alice, http.StatusOK)).To(HaveKey("access_token"))
-			})
+			}
 		})
 
-		// AS-1.5 from specs/056-invalidate-client-sessions/spec.md
-		It("keeps an invalidated session unusable after the previous client ID is restored", func() {
-			publish(fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
-			expectDenied(alice)
-			publish(fixtures.ReportsClientV1, fixtures.ReportsSecretV1)
-			expectDenied(alice)
-			connect(alice)
-			Expect(exchange(alice, http.StatusOK)).To(HaveKey("access_token"))
-		})
-
-		// AS-2.1 from specs/056-invalidate-client-sessions/spec.md
+		// AS-2.1 from specs/056-invalidate-client-sessions/spec.md (User Story 2)
 		It("shows agent consent on the next authorization despite an existing grant", func() {
 			before := grant()
 			Expect(authorizeAgent().Query().Get("code")).NotTo(BeEmpty())
@@ -294,7 +539,7 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 			Expect(grant()).To(Equal(before))
 		})
 
-		// AS-2.2 from specs/056-invalidate-client-sessions/spec.md
+		// AS-2.2 from specs/056-invalidate-client-sessions/spec.md (User Story 2)
 		It("reconnects from consent under the current identity and completes the original authorization", func() {
 			publish(fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
 			location := authorizeAgent()
@@ -343,7 +588,7 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 			Expect(exchange(alice, http.StatusOK)).To(HaveKey("access_token"))
 		})
 
-		// AS-2.3 from specs/056-invalidate-client-sessions/spec.md
+		// AS-2.3 from specs/056-invalidate-client-sessions/spec.md (User Story 2)
 		It("recovers through the token error_uri and returns to sessions", func() {
 			publish(fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
 			recovery, err := url.Parse(expectDenied(alice))
@@ -366,7 +611,7 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 			Expect(exchange(alice, http.StatusOK)).To(HaveKey("access_token"))
 		})
 
-		// AS-2.4 from specs/056-invalidate-client-sessions/spec.md
+		// AS-2.4 from specs/056-invalidate-client-sessions/spec.md (User Story 2)
 		It("keeps the session unusable after a declined reconnect and allows retry without grant expansion", func() {
 			before, delegation := session(alice), grant()
 			publish(fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
@@ -408,7 +653,7 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 			Expect(grant()).To(Equal(delegation))
 		})
 
-		// AS-2.5 from specs/056-invalidate-client-sessions/spec.md
+		// AS-2.5 from specs/056-invalidate-client-sessions/spec.md (User Story 2)
 		It("reports reauthentication on list and detail despite an unexpired token", func() {
 			publish(fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
 			for _, path := range []string{"/api/third-party/sessions", "/api/third-party/" + serviceID.String() + "/session"} {
@@ -470,71 +715,189 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 				return body
 			}
 
-			// AS-3.1 from specs/056-invalidate-client-sessions/spec.md
+			// AS-3.1 from specs/056-invalidate-client-sessions/spec.md (User Story 3)
 			It("leaves Calendar, broker login, grants, rejection, and refreshability unchanged", func() {
-				before, err := journey.Storage.UserSessions().FindByPrincipalAndService(ctx, id.Principal(alice), calendarID)
-				Expect(err).NotTo(HaveOccurred())
 				delegation := grant()
-				Expect(calendarExchange(http.StatusOK)).To(HaveKey("access_token"))
-				publish(fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
-				expectDenied(alice)
-				Expect(calendarExchange(http.StatusOK)).To(HaveKey("access_token"))
-				after, err := journey.Storage.UserSessions().FindByPrincipalAndService(ctx, id.Principal(alice), calendarID)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(after).To(Equal(before))
-				Expect(grant()).To(Equal(delegation))
-				response, err := journey.EndUser.AuthenticatedGET("/api/me", alice)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(response.StatusCode).To(Equal(http.StatusOK))
-				Expect(response.Body.Close()).To(Succeed())
-				now := time.Now()
-				after.RefreshRejectedAt = &now
-				Expect(journey.Storage.UserSessions().Create(ctx, after)).To(Succeed())
-				Expect(calendarExchange(http.StatusBadRequest)).To(HaveKeyWithValue("error", "invalid_grant"))
-				after.RefreshRejectedAt = nil
-				past := time.Now().Add(-time.Hour)
-				after.AccessTokenExpiresAt = &past
-				Expect(journey.Storage.UserSessions().Create(ctx, after)).To(Succeed())
-				Expect(calendarExchange(http.StatusOK)).To(HaveKey("access_token"))
-				Expect(grant()).To(Equal(delegation))
+				publicDelegation := grantResponse()
+				for _, control := range []string{"usable", "recorded rejection", "expired and refreshable", "same provider client ID"} {
+					By("retaining the Calendar outcome: " + control)
+					publish(fixtures.ReportsClientV1, fixtures.ReportsSecretV1)
+					connect(alice)
+					if control == "same provider client ID" {
+						request := fixtures.ClientIdentityCalendarRequest(journey.Upstream.URL())
+						delete(request, "protected_resources")
+						request["client_id"] = fixtures.ReportsClientV1
+						response, err := journey.AdminJSON(http.MethodPut, "/api/services/"+calendarID.String(), request)
+						Expect(err).NotTo(HaveOccurred())
+						body, err := helpers.CredentialResponseObject(response)
+						Expect(err).NotTo(HaveOccurred())
+						Expect(response.StatusCode).To(Equal(http.StatusOK), "%v", body)
+					}
+					connectService(alice, calendarID)
+					before, err := journey.Storage.UserSessions().FindByPrincipalAndService(ctx, id.Principal(alice), calendarID)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(before).NotTo(BeNil())
+					switch control {
+					case "recorded rejection":
+						expiry := time.Now().Add(time.Minute)
+						before.AccessTokenExpiresAt = &expiry
+						Expect(journey.Storage.UserSessions().Create(ctx, before)).To(Succeed())
+						journey.Upstream.WithErrorResponse("invalid_grant")
+						response, err := journey.Refresh(calendarID)
+						Expect(err).NotTo(HaveOccurred())
+						body, err := helpers.CredentialResponseObject(response)
+						Expect(err).NotTo(HaveOccurred())
+						Expect(response.StatusCode).To(Equal(http.StatusConflict))
+						Expect(body).To(HaveKeyWithValue("error", "refresh_rejected"))
+						journey.Upstream.WithSuccessfulTokenResponse()
+						before, err = journey.Storage.UserSessions().FindByPrincipalAndService(ctx, id.Principal(alice), calendarID)
+						Expect(err).NotTo(HaveOccurred())
+						Expect(before.RefreshRejectedAt).NotTo(BeNil())
+						expectSessionFlags(calendarID, alice, true, false)
+						Expect(calendarExchange(http.StatusBadRequest)).To(HaveKeyWithValue("error", "invalid_grant"))
+					case "expired and refreshable":
+						expiry := time.Now().Add(-time.Hour)
+						before.AccessTokenExpiresAt = &expiry
+						Expect(journey.Storage.UserSessions().Create(ctx, before)).To(Succeed())
+						expectSessionFlags(calendarID, alice, false, true)
+					default:
+						Expect(calendarExchange(http.StatusOK)).To(HaveKey("access_token"))
+						expectSessionFlags(calendarID, alice, false, false)
+					}
+					providerCalls := journey.Upstream.TokenGrantCount("refresh_token")
+					publish(fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
+					expectDenied(alice)
+					switch control {
+					case "recorded rejection":
+						expectSessionFlags(calendarID, alice, true, false)
+						body := calendarExchange(http.StatusBadRequest)
+						Expect(body).To(HaveKeyWithValue("error", "invalid_grant"))
+						Expect(body).NotTo(HaveKey("access_token"))
+						Expect(body).NotTo(HaveKey("refresh_token"))
+						Expect(body).To(HaveKeyWithValue("error_uri", journey.Config.Server.EndUser.PublicURL+"/api/third-party/"+calendarID.String()+"/oauth2/authorize?redirect_uri="+url.QueryEscape(journey.Config.Server.EndUser.PublicURL+"/sessions")))
+						response, err := journey.Refresh(calendarID)
+						Expect(err).NotTo(HaveOccurred())
+						body, err = helpers.CredentialResponseObject(response)
+						Expect(err).NotTo(HaveOccurred())
+						Expect(response.StatusCode).To(Equal(http.StatusConflict))
+						Expect(body).To(HaveKeyWithValue("error", "refresh_rejected"))
+						for _, request := range []string{`{"dry_run":true}`, `{"dry_run":false}`} {
+							result := proactiveSweepBody(proactiveSweep(journey.Admin, request))
+							Expect(result.TotalEvaluated).To(BeZero())
+							Expect(result.Failed).To(BeZero())
+							Expect(result.Refreshed).To(BeZero())
+						}
+						Consistently(func() int { return journey.Upstream.TokenGrantCount("refresh_token") }, 200*time.Millisecond).Should(Equal(providerCalls))
+					case "expired and refreshable":
+						expectSessionFlags(calendarID, alice, false, true)
+						Expect(calendarExchange(http.StatusOK)).To(HaveKeyWithValue("access_token", "mock-access-token"))
+						Expect(journey.Upstream.TokenGrantCount("refresh_token")).To(Equal(providerCalls + 1))
+						requests := journey.Upstream.GetTokenRequests()
+						clientID, _, err := helpers.CredentialTokenRequest(requests[len(requests)-1])
+						Expect(err).NotTo(HaveOccurred())
+						Expect(clientID).To(Equal("calendar-client-v1"))
+						expectSessionFlags(calendarID, alice, false, false)
+					default:
+						Expect(calendarExchange(http.StatusOK)).To(HaveKey("access_token"))
+						expectSessionFlags(calendarID, alice, false, false)
+						Expect(journey.Upstream.TokenGrantCount("refresh_token")).To(Equal(providerCalls))
+					}
+					after, err := journey.Storage.UserSessions().FindByPrincipalAndService(ctx, id.Principal(alice), calendarID)
+					Expect(err).NotTo(HaveOccurred())
+					if control != "expired and refreshable" {
+						Expect(after).To(Equal(before))
+					}
+					Expect(after.ID).To(Equal(before.ID))
+					Expect(after.UpstreamClientID).To(Equal(before.UpstreamClientID))
+					Expect(after.UpstreamClientRevision).To(Equal(before.UpstreamClientRevision))
+					Expect(grant()).To(Equal(delegation))
+					Expect(grantResponse()).To(Equal(publicDelegation))
+					response, err := journey.EndUser.AuthenticatedGET("/api/me", alice)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(response.StatusCode).To(Equal(http.StatusOK))
+					Expect(response.Body.Close()).To(Succeed())
+				}
 			})
 
-			// AS-3.3 from specs/056-invalidate-client-sessions/spec.md
+			// AS-3.3 from specs/056-invalidate-client-sessions/spec.md (User Story 3)
 			It("does not force consent for a changed optional service excluded from the grant", func() {
 				delegation := grant()
 				delegation.GrantedPermissionSets[0].IncludedServiceIDs = []id.ServiceID{calendarID}
 				Expect(journey.Storage.UserGrants().Update(ctx, delegation)).To(Succeed())
+				excludedGrant := grant()
+				excludedPublicGrant := grantResponse()
 				publish(fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
 				Expect(authorizeAgent().Query().Get("code")).NotTo(BeEmpty())
 				Expect(calendarExchange(http.StatusOK)).To(HaveKey("access_token"))
+				Expect(grant()).To(Equal(excludedGrant))
+				Expect(grantResponse()).To(Equal(excludedPublicGrant))
+				expectSessionFlags(calendarID, alice, false, false)
 				delegation.GrantedPermissionSets[0].IncludedServiceIDs = append(delegation.GrantedPermissionSets[0].IncludedServiceIDs, serviceID)
 				Expect(journey.Storage.UserGrants().Update(ctx, delegation)).To(Succeed())
+				includedGrant := grant()
+				includedPublicGrant := grantResponse()
 				location := authorizeAgent()
 				Expect(location.Path).To(Equal("/agents/" + agent.ID.String()))
 				Expect(location.Query().Get("session_token")).NotTo(BeEmpty())
+				Expect(consentConnection()).To(Equal("not_connected"))
+				Expect(grant()).To(Equal(includedGrant))
+				Expect(grantResponse()).To(Equal(includedPublicGrant))
+				connect(alice)
+				Expect(authorizeAgent().Query().Get("code")).NotTo(BeEmpty())
+				Expect(exchange(alice, http.StatusOK)).To(HaveKey("access_token"))
+				Expect(grant()).To(Equal(includedGrant))
+				Expect(grantResponse()).To(Equal(includedPublicGrant))
 			})
 		})
 
-		// AS-3.2 from specs/056-invalidate-client-sessions/spec.md
+		// AS-3.2 from specs/056-invalidate-client-sessions/spec.md (User Story 3)
 		It("keeps sessions usable through filesystem secret rotation with the same client ID", func() {
+			before := session(alice)
+			providerCalls := journey.Upstream.TokenGrantCount("refresh_token")
 			publish(fixtures.ReportsClientV1, fixtures.ReportsSecretV2)
-			Expect(exchange(alice, http.StatusOK)).To(HaveKey("access_token"))
+			Expect(exchange(alice, http.StatusOK)).To(HaveKeyWithValue("access_token", "mock-access-token"))
+			Expect(session(alice)).To(Equal(before))
+			expectSessionFlags(serviceID, alice, false, false)
+			journey.Upstream.WithAccessToken("rotated-secret-access-token")
 			response, err := journey.Refresh(serviceID)
 			Expect(err).NotTo(HaveOccurred())
-			defer func() { _ = response.Body.Close() }()
+			body, err := helpers.CredentialResponseObject(response)
+			Expect(err).NotTo(HaveOccurred())
 			Expect(response.StatusCode).To(Equal(http.StatusOK))
+			Expect(body["data"]).To(HaveKeyWithValue("requires_reauthentication", false))
+			Expect(body["data"]).To(HaveKeyWithValue("is_expired", false))
+			Expect(journey.Upstream.TokenGrantCount("refresh_token")).To(Equal(providerCalls + 1))
 			requests := journey.Upstream.GetTokenRequests()
 			clientID, secret, err := helpers.CredentialTokenRequest(requests[len(requests)-1])
 			Expect(err).NotTo(HaveOccurred())
 			Expect(clientID).To(Equal(fixtures.ReportsClientV1))
 			Expect(secret).To(Equal(fixtures.ReportsSecretV2))
+			Expect(session(alice).UpstreamClientRevision).To(Equal(before.UpstreamClientRevision))
+			Expect(exchange(alice, http.StatusOK)).To(HaveKeyWithValue("access_token", "rotated-secret-access-token"))
+
+			By("preserving provider-credential failure instead of inventing identity recovery")
+			journey.Upstream.WithErrorResponse("invalid_client")
+			response, err = journey.Refresh(serviceID)
+			Expect(err).NotTo(HaveOccurred())
+			body, err = helpers.CredentialResponseObject(response)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(response.StatusCode).To(Equal(http.StatusBadGateway))
+			Expect(body).To(HaveKeyWithValue("error", "refresh_failed"))
+			Expect(body).NotTo(HaveKey("error_uri"))
+			Expect(body).NotTo(HaveKey("access_token"))
+			expectSessionFlags(serviceID, alice, false, false)
+			Expect(exchange(alice, http.StatusOK)).To(HaveKeyWithValue("access_token", "rotated-secret-access-token"))
 		})
 	})
 
 	Context("with stored Reports connections established under v1", func() {
 		BeforeEach(func() {
-			Expect(journey.Start(nil)).To(Succeed())
 			var err error
+			binding, err = journey.WritePair(fixtures.ReportsClientV1, fixtures.ReportsSecretV2)
+			Expect(err).NotTo(HaveOccurred())
+			alternate, err := journey.WritePair(fixtures.ReportsClientV1, fixtures.ReportsSecretV1)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(journey.Start(map[string]map[string]string{"reports-prod": binding, "reports-alternate": alternate})).To(Succeed())
 			serviceID, _, err = journey.Register(fixtures.ClientIdentityServiceRequest(journey.Upstream.URL(), "stored"))
 			Expect(err).NotTo(HaveOccurred())
 			seedDelegations()
@@ -548,63 +911,274 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 				for _, principal := range []string{alice, bob} {
 					legacy := session(principal)
 					legacy.UpstreamClientID = nil
+					legacy.UpstreamClientRevision = 0
+					if principal == bob {
+						legacy.AccessTokenExpiresAt = nil
+					}
 					Expect(journey.Storage.UserSessions().Create(ctx, legacy)).To(Succeed())
 				}
 			})
 
-			// AS-1.6 from specs/056-invalidate-client-sessions/spec.md
+			// AS-1.6 from specs/056-invalidate-client-sessions/spec.md (User Story 1)
 			It("keeps legacy sessions usable until the first later identity change without historical backfill", func() {
 				for _, principal := range []string{alice, bob} {
 					Expect(exchange(principal, http.StatusOK)).To(HaveKey("access_token"))
+					expectSessionFlags(serviceID, principal, false, false)
+					journey.Principal = principal
+					response, err := journey.Refresh(serviceID)
+					Expect(err).NotTo(HaveOccurred())
+					body, err := helpers.CredentialResponseObject(response)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(response.StatusCode).To(Equal(http.StatusOK), "%v", body)
 					Expect(session(principal).UpstreamClientID).To(BeNil())
+					Expect(session(principal).UpstreamClientRevision).To(BeZero())
 				}
-				updateStored(fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
-				expectDenied(alice)
-				expectDenied(bob)
-				updateStored(fixtures.ReportsClientV1, fixtures.ReportsSecretV1)
-				expectDenied(alice)
+				providerCalls := journey.Upstream.TokenGrantCount("refresh_token")
+				for _, clientID := range []string{fixtures.ReportsClientV2, fixtures.ReportsClientV1} {
+					By("retaining invalidation for legacy sessions at " + clientID)
+					updateStored(clientID, fixtures.ReportsSecretV2)
+					for _, principal := range []string{alice, bob} {
+						before := session(principal)
+						expectDenied(principal)
+						journey.Principal = principal
+						response, err := journey.Refresh(serviceID)
+						Expect(err).NotTo(HaveOccurred())
+						body, err := helpers.CredentialResponseObject(response)
+						Expect(err).NotTo(HaveOccurred())
+						Expect(response.StatusCode).To(Equal(http.StatusConflict))
+						Expect(body).To(HaveKeyWithValue("error", "refresh_unavailable"))
+						Expect(session(principal)).To(Equal(before))
+					}
+					Expect(journey.Upstream.TokenGrantCount("refresh_token")).To(Equal(providerCalls))
+				}
 				connect(alice)
 				Expect(exchange(alice, http.StatusOK)).To(HaveKey("access_token"))
 				expectDenied(bob)
+				Expect(session(bob).UpstreamClientID).To(BeNil())
 			})
 		})
 
-		// AS-1.7 from specs/056-invalidate-client-sessions/spec.md
-		It("denies tokens for every user after an accepted Admin client_id change", func() {
-			Expect(exchange(alice, http.StatusOK)).To(HaveKey("access_token"))
-			Expect(exchange(bob, http.StatusOK)).To(HaveKey("access_token"))
+		// AS-1.7 from specs/056-invalidate-client-sessions/spec.md (User Story 1)
+		It("denies tokens for every user only after an accepted Admin client_id change", func() {
+			beforeAlice, beforeBob := session(alice), session(bob)
 			providerCalls := len(journey.Upstream.GetTokenRequests())
+			response, err := journey.AdminJSON(http.MethodGet, "/api/services/"+serviceID.String(), nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(response.StatusCode).To(Equal(http.StatusOK))
+			staleETag := response.Header.Get("ETag")
+			Expect(staleETag).NotTo(BeEmpty())
+			Expect(response.Body.Close()).To(Succeed())
+
+			By("leaving both sessions usable after rejected and version-conflicting proposals")
+			for _, invalid := range []string{"missing secret", "stale version"} {
+				request := fixtures.ClientIdentityServiceRequest(journey.Upstream.URL(), "stored")
+				request["client_id"] = fixtures.ReportsClientV2
+				if invalid == "missing secret" {
+					delete(request, "client_secret")
+					putService(request, nil, http.StatusBadRequest)
+				} else {
+					metadata := fixtures.ClientIdentityServiceRequest(journey.Upstream.URL(), "stored")
+					metadata["display_name"] = "Reports metadata without identity change"
+					putService(metadata, map[string]string{"If-Match": staleETag}, http.StatusOK)
+					putService(request, map[string]string{"If-Match": staleETag}, http.StatusPreconditionFailed)
+				}
+				for _, principal := range []string{alice, bob} {
+					Expect(exchange(principal, http.StatusOK)).To(HaveKeyWithValue("access_token", "mock-access-token"))
+					expectSessionFlags(serviceID, principal, false, false)
+				}
+				Expect(session(alice)).To(Equal(beforeAlice))
+				Expect(session(bob)).To(Equal(beforeBob))
+				response, err = journey.AdminJSON(http.MethodGet, "/api/services/"+serviceID.String(), nil)
+				Expect(err).NotTo(HaveOccurred())
+				body, err := helpers.CredentialResponseObject(response)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(response.StatusCode).To(Equal(http.StatusOK))
+				Expect(body).To(HaveKeyWithValue("client_id", fixtures.ReportsClientV1))
+			}
+
+			By("invalidating both principals from the accepted identity update")
 			updateStored(fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
 			expectDenied(alice)
 			expectDenied(bob)
+			expectSessionFlags(serviceID, alice, true, false)
+			expectSessionFlags(serviceID, bob, true, false)
 			Expect(journey.Upstream.GetTokenRequests()).To(HaveLen(providerCalls))
+			Expect(session(alice)).To(Equal(beforeAlice))
+			Expect(session(bob)).To(Equal(beforeBob))
 			connect(alice)
 			Expect(exchange(alice, http.StatusOK)).To(HaveKey("access_token"))
 			expectDenied(bob)
 		})
 
-		// AS-3.4 from specs/056-invalidate-client-sessions/spec.md
-		It("keeps sessions usable through Admin secret rotation and metadata updates", func() {
-			updateStored(fixtures.ReportsClientV1, fixtures.ReportsSecretV2)
-			metadata := fixtures.ClientIdentityServiceRequest(journey.Upstream.URL(), "stored")
-			delete(metadata, "protected_resources")
-			metadata["display_name"] = "Reports renamed"
-			metadata["client_secret"] = fixtures.ReportsSecretV2
-			updated, err := journey.AdminJSON(http.MethodPut, "/api/services/"+serviceID.String(), metadata)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(updated.StatusCode).To(Equal(http.StatusOK))
-			Expect(updated.Body.Close()).To(Succeed())
+		// AS-3.4 from specs/056-invalidate-client-sessions/spec.md (User Story 3)
+		It("keeps sessions usable through Admin secret rotation, metadata, and same-identity source transitions", func() {
+			beforeAlice, beforeBob, delegation := session(alice), session(bob), grant()
+			publicDelegation := grantResponse()
+			for _, operation := range []struct {
+				name, source, canonicalID, secret string
+			}{
+				{"stored secret rotation", "stored", "reports-prod", fixtures.ReportsSecretV2},
+				{"display name and scope metadata", "stored", "reports-prod", fixtures.ReportsSecretV2},
+				{"stored to filesystem", "filesystem", "reports-prod", fixtures.ReportsSecretV2},
+				{"same-identity canonical ID and binding", "filesystem", "reports-alternate", fixtures.ReportsSecretV1},
+				{"filesystem to stored", "stored", "reports-alternate", fixtures.ReportsSecretV2},
+				{"source round trip to filesystem", "filesystem", "reports-prod", fixtures.ReportsSecretV2},
+				{"source round trip back to stored", "stored", "reports-prod", fixtures.ReportsSecretV2},
+			} {
+				By(operation.name)
+				request := fixtures.ClientIdentityServiceRequest(journey.Upstream.URL(), operation.source)
+				request["canonical_id"] = operation.canonicalID
+				if operation.source == "stored" {
+					request["client_secret"] = operation.secret
+				}
+				if operation.name == "display name and scope metadata" {
+					request["display_name"] = "Reports renamed"
+					request["scopes"] = []map[string]string{{"scope_value": "profile", "description": "Existing Reports access"}, {"scope_value": "reports:write", "description": "Not delegated"}}
+				}
+				putService(request, nil, http.StatusOK)
+				for _, principal := range []string{alice, bob} {
+					Expect(exchange(principal, http.StatusOK)).To(HaveKey("access_token"))
+					expectSessionFlags(serviceID, principal, false, false)
+				}
+				providerCalls := journey.Upstream.TokenGrantCount("refresh_token")
+				journey.Principal = alice
+				response, err := journey.Refresh(serviceID)
+				Expect(err).NotTo(HaveOccurred())
+				body, err := helpers.CredentialResponseObject(response)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(response.StatusCode).To(Equal(http.StatusOK), "%v", body)
+				Expect(body["data"]).To(HaveKeyWithValue("requires_reauthentication", false))
+				Expect(body["data"]).To(HaveKeyWithValue("is_expired", false))
+				Expect(journey.Upstream.TokenGrantCount("refresh_token")).To(Equal(providerCalls + 1))
+				requests := journey.Upstream.GetTokenRequests()
+				clientID, secret, err := helpers.CredentialTokenRequest(requests[len(requests)-1])
+				Expect(err).NotTo(HaveOccurred())
+				Expect(clientID).To(Equal(fixtures.ReportsClientV1))
+				Expect(secret).To(Equal(operation.secret))
+				Expect(session(alice).ID).To(Equal(beforeAlice.ID))
+				Expect(session(alice).UpstreamClientID).To(Equal(beforeAlice.UpstreamClientID))
+				Expect(session(alice).UpstreamClientRevision).To(Equal(beforeAlice.UpstreamClientRevision))
+				Expect(session(bob)).To(Equal(beforeBob))
+				Expect(grant()).To(Equal(delegation))
+				Expect(grantResponse()).To(Equal(publicDelegation))
+			}
+
+			By("retaining source-transition validation without invalidating existing sessions")
+			invalid := fixtures.ClientIdentityServiceRequest(journey.Upstream.URL(), "filesystem")
+			invalid["client_id"] = fixtures.ReportsClientV1
+			putService(invalid, nil, http.StatusBadRequest)
+			putService(fixtures.ClientIdentityServiceRequest(journey.Upstream.URL(), "filesystem"), nil, http.StatusOK)
+			invalid = fixtures.ClientIdentityServiceRequest(journey.Upstream.URL(), "stored")
+			delete(invalid, "client_secret")
+			putService(invalid, nil, http.StatusBadRequest)
 			Expect(exchange(alice, http.StatusOK)).To(HaveKey("access_token"))
 			Expect(exchange(bob, http.StatusOK)).To(HaveKey("access_token"))
-			response, err := journey.Refresh(serviceID)
-			Expect(err).NotTo(HaveOccurred())
-			defer func() { _ = response.Body.Close() }()
-			Expect(response.StatusCode).To(Equal(http.StatusOK))
-			requests := journey.Upstream.GetTokenRequests()
-			clientID, secret, err := helpers.CredentialTokenRequest(requests[len(requests)-1])
-			Expect(err).NotTo(HaveOccurred())
-			Expect(clientID).To(Equal(fixtures.ReportsClientV1))
-			Expect(secret).To(Equal(fixtures.ReportsSecretV2))
+			Expect(session(bob)).To(Equal(beforeBob))
+			Expect(grant()).To(Equal(delegation))
+			Expect(grantResponse()).To(Equal(publicDelegation))
 		})
+	})
+
+	Context("with an obsolete filesystem identity read paused before observation", func() {
+		var (
+			barrier   *bootstrap.ClientIdentityReadBarrier
+			alternate map[string]string
+		)
+
+		BeforeEach(func() {
+			var err error
+			binding, err = journey.WritePair(fixtures.ReportsClientV1, fixtures.ReportsSecretV1)
+			Expect(err).NotTo(HaveOccurred())
+			alternate, err = journey.WritePair(fixtures.ReportsClientV1, fixtures.ReportsSecretV2)
+			Expect(err).NotTo(HaveOccurred())
+			barrier = bootstrap.NewClientIdentityReadBarrier()
+			DeferCleanup(barrier.Release)
+			document := fixtures.CredentialConfigurationDocument(journey.Upstream.URL(), map[string]map[string]string{"reports-prod": binding, "reports-alternate": alternate}, 8000, 14000)
+			Expect(journey.StartBrowserDocument(document, barrier)).To(Succeed())
+			serviceID, _, err = journey.Register(fixtures.ClientIdentityServiceRequest(journey.Upstream.URL(), "filesystem"))
+			Expect(err).NotTo(HaveOccurred())
+			seedDelegations()
+			connect(alice)
+			connect(bob)
+			journey.Principal = alice
+			Expect(exchange(alice, http.StatusOK)).To(HaveKey("access_token"))
+		})
+
+		for _, mutation := range []string{"filesystem to stored", "canonical ID and binding", "source round trip", "source round trip with a new canonical ID and binding"} {
+			// Supplemental AS-3.4 from specs/056-invalidate-client-sessions/spec.md (User Story 3).
+			It("discards the retired file value after "+mutation+" without a later false invalidation", func() {
+				beforeAlice, beforeBob, delegation := session(alice), session(bob), grant()
+				publicDelegation := grantResponse()
+				oldReads := barrier.ReadCount(binding["client_id_file"])
+				alternateReads := barrier.ReadCount(alternate["client_id_file"])
+				providerCalls := len(journey.Upstream.GetTokenRequests())
+				publish(fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
+				barrier.Arm(binding["client_id_file"])
+				form, err := helpers.ClientIdentityExchangeForm(journey, agent.ID, alice)
+				Expect(err).NotTo(HaveOccurred())
+				result := make(chan proactiveExchangeResult, 1)
+				go func() { result <- proactiveExchange(journey.EndUser, form) }()
+				Eventually(barrier.Entered).Should(BeClosed())
+				Expect(barrier.ReadCount(binding["client_id_file"])).To(Equal(oldReads + 1))
+
+				By("committing the administrative mutation without reading either credential binding")
+				canonicalID := "reports-prod"
+				if mutation == "canonical ID and binding" || mutation == "source round trip with a new canonical ID and binding" {
+					canonicalID = "reports-alternate"
+				}
+				if mutation != "canonical ID and binding" {
+					stored := fixtures.ClientIdentityServiceRequest(journey.Upstream.URL(), "stored")
+					stored["canonical_id"] = canonicalID
+					putService(stored, nil, http.StatusOK)
+				}
+				if mutation == "source round trip" {
+					publish(fixtures.ReportsClientV1, fixtures.ReportsSecretV1)
+				}
+				if mutation != "filesystem to stored" {
+					filesystem := fixtures.ClientIdentityServiceRequest(journey.Upstream.URL(), "filesystem")
+					filesystem["canonical_id"] = canonicalID
+					putService(filesystem, nil, http.StatusOK)
+				}
+				Expect(barrier.ReadCount(binding["client_id_file"])).To(Equal(oldReads + 1))
+				Expect(barrier.ReadCount(alternate["client_id_file"])).To(Equal(alternateReads))
+				barrier.Release()
+				var completed proactiveExchangeResult
+				Eventually(result).Should(Receive(&completed))
+				Expect(proactiveExchangeBody(completed, http.StatusOK)).To(HaveKeyWithValue("access_token", "mock-access-token"))
+				switch mutation {
+				case "filesystem to stored":
+					Expect(barrier.ReadCount(binding["client_id_file"])).To(Equal(oldReads + 1))
+					Expect(barrier.ReadCount(alternate["client_id_file"])).To(Equal(alternateReads))
+				case "source round trip":
+					Expect(barrier.ReadCount(binding["client_id_file"])).To(BeNumerically(">=", oldReads+2))
+				default:
+					Expect(barrier.ReadCount(alternate["client_id_file"])).To(BeNumerically(">", alternateReads))
+				}
+				Expect(len(journey.Upstream.GetTokenRequests())).To(Equal(providerCalls))
+				Expect(session(alice)).To(Equal(beforeAlice))
+				Expect(session(bob)).To(Equal(beforeBob))
+				expectSessionFlags(serviceID, alice, false, false)
+				expectSessionFlags(serviceID, bob, false, false)
+
+				By("performing a later same-ID stored secret rotation without a spurious revision change")
+				updateStored(fixtures.ReportsClientV1, fixtures.ReportsSecretV2)
+				Expect(exchange(alice, http.StatusOK)).To(HaveKey("access_token"))
+				Expect(exchange(bob, http.StatusOK)).To(HaveKey("access_token"))
+				response, err := journey.Refresh(serviceID)
+				Expect(err).NotTo(HaveOccurred())
+				body, err := helpers.CredentialResponseObject(response)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(response.StatusCode).To(Equal(http.StatusOK), "%v", body)
+				requests := journey.Upstream.GetTokenRequests()
+				clientID, secret, err := helpers.CredentialTokenRequest(requests[len(requests)-1])
+				Expect(err).NotTo(HaveOccurred())
+				Expect(clientID).To(Equal(fixtures.ReportsClientV1))
+				Expect(secret).To(Equal(fixtures.ReportsSecretV2))
+				Expect(session(alice).UpstreamClientRevision).To(Equal(beforeAlice.UpstreamClientRevision))
+				Expect(session(bob)).To(Equal(beforeBob))
+				Expect(grant()).To(Equal(delegation))
+				Expect(grantResponse()).To(Equal(publicDelegation))
+			})
+		}
 	})
 })

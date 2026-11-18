@@ -31,11 +31,11 @@ All Technical Context unknowns are resolved in [research.md](research.md).
 
 ## Constitution Check
 
-*GATE: Approval is recorded, but the acceptance-test checkpoint is incomplete. Further behavior changes are blocked by the recovery checkpoint in tasks.md.*
+*GATE: Approval is recorded and the acceptance-test recovery checkpoint is complete. Runtime enforcement remains incomplete; T070's observability design gate remains open before further logging changes.*
 
 **Design Preconditions (BLOCKING)**:
 
-Checked entries below record design coverage, not completed implementation or executed tests. The unchecked tasks in [tasks.md](tasks.md) track remaining work. T011–T013, T015, and T018 must finish before further behavior changes. Test-first development remains mandatory. Recorded red/green output, logs, and CI links are not required evidence.
+Checked entries below record design coverage, not completed runtime implementation or passing acceptance tests. The unchecked tasks in [tasks.md](tasks.md) track remaining work. T011–T013, T015, and T018 are complete as test-writing and traceability tasks; container-backed variants compile but require execution in container CI. Test-first development remains mandatory. Recorded red/green output, logs, and CI links are not required evidence.
 
 - [x] **Domain Model**: Aggregates `ThirdpartyOAuth2Service` and `UserSession` are extended, with value objects Effective Client Identity and Client Identity Revision and the derived condition Reauthentication Required ([data-model.md](data-model.md)).
 - [x] **Domain Concepts**: The two identity terms are planned for the `ARCHITECTURE.md` §12 Glossary and the AGENTS.md glossary. Extend existing **Requires Reauthentication** (ADR 046) and **Client-identity association** (ADR 041) entries rather than duplicating them.
@@ -47,11 +47,11 @@ Checked entries below record design coverage, not completed implementation or ex
 - [x] **API Documentation**: `api/enduser/openapi.yaml` (approved 2.0.0 from baseline 1.2.0) and `api/admin/openapi.yaml` (changed sweep classifications, approved major 3.0.0 from baseline 2.1.1), plus `docs/api/` and `docs/reference/token-exchange.md`.
 - [x] **API Changes**: jbspeakr approved API-001 and API-002 on 2026-11-05 in [the approval comment](https://github.com/zalando-incubator/agentic-identity-broker/pull/412#issuecomment-6658788612).
 - [x] **Database Design**: Migrations `049`/`050` use go-migrate naming and the guarded online pattern of migrations 040/041 and 044/045.
-- [ ] **E2E Acceptance Tests**: All 16 primary scenarios exist. Required race, isolation, mixed-version, and restart matrices remain incomplete under T011–T013/T015/T018. Some foundation implementation preceded this completed gate. That sequencing violation cannot be repaired retroactively.
+- [x] **E2E Acceptance Tests**: All 16 primary scenarios and required race, isolation, mixed-version, and restart matrices are written and compile under T011–T013/T015/T018. Non-container tests demonstrate missing enforcement; container-backed execution remains unverified. Foundation implementation preceded completion of this gate; that historical sequencing violation cannot be repaired retroactively.
 - [x] **E2E Test Mapping**: Each AS maps to exactly one `It`.
 - [x] **E2E Red Phase**: Realistic assertions on status, `error`, `error_uri`, `Location`, and `requires_reauthentication`, with no placeholders.
 - [x] **Frontend Playwright E2E**: Consent and sessions-page journeys in `tests/e2e/frontend/`.
-- [x] **Frontend Screenshots**: Four journey states plus the failure/retry state, named below.
+- [x] **Frontend Screenshots**: Capture configuration covers four journey states plus separate failure/retry and cancellation/retry states, named below. Actual captures remain part of implementation validation.
 - [ ] **Observability Design**: Phase 2g (T070) verifies the event contract and required safety tests before further logging changes. No new span or metric instrument is planned.
 
 **Implementation Considerations**:
@@ -164,6 +164,7 @@ docs/guides/manage-agents-and-services.md, docs/configuration.md, charts/agentic
 
 tests/
 ├── e2e/client_identity_change_test.go
+├── e2e/client_identity_rollout_test.go        # docker prior-release/restart variants
 ├── e2e/frontend/client_identity_reconnect_test.go
 ├── e2e/pages/{consent_page.go,sessions_page.go}   # page-object additions
 └── integration/migrations/client_identity_revision_migration_test.go
@@ -190,7 +191,7 @@ tests/
 
 ### End-to-End (E2E) Acceptance Tests
 
-**Test Location**: `tests/e2e/client_identity_change_test.go` (in-memory store). Restart-survival variants carry the existing `docker` label and use PostgreSQL.
+**Test Locations**: `tests/e2e/client_identity_change_test.go` covers the 16 primary scenarios with the in-memory store. Supplemental actual-prior-release mixed-version/schema, restart, failed-upgrade, and preactivation-abort variants are in `tests/e2e/client_identity_rollout_test.go`, carry the existing `docker` label, and use PostgreSQL.
 
 **Framework**: Ginkgo/Gomega, following [tests/e2e/README.md](../../tests/e2e/README.md) and the dual-server pattern. Admin `PUT` goes to the admin server; token exchange and browser flows go to the end-user server.
 
@@ -205,7 +206,7 @@ tests/
 | AS-1.3 | same | `It("never refreshes a superseded session on demand, in the background, or in the admin sweep")` |
 | AS-1.4 | same | `It("rejects a callback that began under the previous client identity and allows a fresh connection")` |
 | AS-1.5 | same | `It("keeps an invalidated session unusable after the previous client ID is restored")` |
-| AS-1.6 | same (+ `docker` actual-prior-release mixed-version/schema and restart variants) | `It("keeps legacy sessions through continuous rolling upgrade and invalidates them on the first later change")`; includes traffic continuity under fixed identities, old-work drain, and failed-upgrade/pre-activation abort. |
+| AS-1.6 | same; supplemental `docker` cases in `tests/e2e/client_identity_rollout_test.go` | `It("keeps legacy sessions usable until the first later identity change without historical backfill")`; supplemental variants cover actual-prior-release schema compatibility, fixed-identity traffic continuity, old-work drain, restart, and failed-upgrade/pre-activation abort. |
 | AS-1.7 | same | `It("denies tokens for every user after an accepted Admin API client_id change")` |
 | AS-2.1 | same | `It("shows agent consent on the next authorization despite an existing grant")` |
 | AS-2.2 | same | `It("reconnects from consent under the current client ID and completes the original authorization")` |
@@ -247,6 +248,7 @@ tests/
 | AS-2.5 State C: sessions page shows Reports "Sign-in required" | same | `client_identity_sessions_sign_in_required.png` |
 | AS-2.3 State D: sessions page after direct recovery | same | `client_identity_sessions_reconnected.png` |
 | AS-2.4: callback failure with retry action | same | `client_identity_reconnect_failed.png` |
+| AS-2.4: provider authorization declined with retry action | same | `client_identity_reconnect_declined.png` |
 
 ### Deployment Safety
 
@@ -274,4 +276,4 @@ Approved DEC-005's authoritative procedure is [ADR 048-client-identity-revisions
 
 ## Complexity Tracking
 
-Accepted ADR 048-client-identity-revisions partially supersedes ADR 041-oauth2-client-secret-file-overrides and ADR 038-proactive-token-refresh under Principle II. No architectural exception is requested. The incomplete acceptance-test gate is a sequencing violation, not an exception. The recovery checkpoint in tasks.md blocks further behavior changes until the missing tests exist.
+Accepted ADR 048-client-identity-revisions partially supersedes ADR 041-oauth2-client-secret-file-overrides and ADR 038-proactive-token-refresh under Principle II. No architectural exception is requested. The historical acceptance-test sequencing violation remains recorded, not waived. Completing the recovery checkpoint in tasks.md supplies the missing tests and traceability but does not establish retroactive TDD or delivered runtime behavior.

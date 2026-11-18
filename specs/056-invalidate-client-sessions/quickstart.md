@@ -61,7 +61,7 @@ Normal verification does not capture screenshots. For maintained review artifact
 E2E_CAPTURE_SCREENSHOTS=true GINKGO_FRONTEND_PROCS=1 just test-e2e-frontend
 ```
 
-The harness writes captures under its suite-relative `coverage/screenshots/` directory. Use the existing maintained-image flow to place the five named artifacts from `plan.md` into `tests/e2e/screenshots/`; no screenshot-workflow change is needed.
+The harness writes captures under its suite-relative `coverage/screenshots/` directory. Use the existing maintained-image flow to place the six named artifacts from `plan.md`, including the separate cancellation/retry state, into `tests/e2e/screenshots/`; no screenshot-workflow change is needed.
 
 ## 4. PostgreSQL persistence and migration (container suites)
 
