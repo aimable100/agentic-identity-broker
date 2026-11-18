@@ -817,7 +817,7 @@ Startup rejects invalid values with the key name, even when the ledger is disabl
 The append deadline ignores request cancellation and starts after event construction, immediately before `Append`.
 Encoding, instrumentation, and operational sinks are outside this deadline. It does not bound the entire request or logging operation.
 A timed-out write can still commit. A failed write does not change the business operation's result.
-The ledger inherits the accepted post-commit loss window of [048-business-events-as-typed-log-records](../adrs/048-business-events-as-typed-log-records.md).
+The ledger inherits the accepted post-commit loss window of [048-business-events-as-typed-log-records](https://github.com/zalando-incubator/agentic-identity-broker/blob/main/adrs/048-business-events-as-typed-log-records.md).
 
 Retention uses storage time, not occurrence time. Disabling the ledger stops both writes and retention, but leaves existing rows unchanged.
 Startup and re-enable trigger immediate cleanup. Failed runs retry at the next scheduled interval.
