@@ -180,6 +180,30 @@ Set `tool_approvals.enabled: true` only with `authorization.enabled: true`. Set 
 
 `sessions.extraction.http_header` defaults to `Mcp-Session-Id`. ExtProc uses this value to scope session approvals.
 
+## ExtProc grant context configuration
+
+The standalone ExtProc service can supply a fresh broker delegation permit to OPA before every policy decision ([ADR 048](https://github.com/zalando-incubator/agentic-identity-broker/blob/main/adrs/048-authzen-delegation-pip.md)). These keys belong to ExtProc's `EXTPROC_` namespace (ADR 011). The broker has no new keys: its AuthZEN endpoints exist whenever token exchange is configured. The broker Helm chart does not deploy ExtProc and is unchanged.
+
+| Key | Environment variable | Flag | Default |
+|---|---|---|---|
+| `grant_context.enabled` | `EXTPROC_GRANT_CONTEXT_ENABLED` | `--grant_context.enabled` | `false` |
+| `grant_context.policy_decision_point` | `EXTPROC_GRANT_CONTEXT_POLICY_DECISION_POINT` | `--grant_context.policy_decision_point` | `""` (origin of `oauth2.token_endpoint`) |
+| `grant_context.request_timeout` | `EXTPROC_GRANT_CONTEXT_REQUEST_TIMEOUT` | `--grant_context.request_timeout` | `5s` |
+| `grant_context.max_staleness` | `EXTPROC_GRANT_CONTEXT_MAX_STALENESS` | `--grant_context.max_staleness` | `60s` |
+
+Precedence is flags, then environment variables, then YAML, then defaults. ExtProc validates the keys only when `grant_context.enabled` is `true`:
+
+- `grant_context.enabled requires authorization.enabled`.
+- `grant_context.policy_decision_point must be an absolute URL with a host and no userinfo, query, or fragment`.
+- `grant_context.policy_decision_point must use https://` unless `oauth2.tls.allow_http` is true for development.
+- `grant_context.request_timeout must be positive` and `grant_context.max_staleness must be positive`.
+
+An empty `policy_decision_point` defaults to the scheme, host and port of `oauth2.token_endpoint`; for `https://broker.example.com:8443/oauth2/token` the identifier is `https://broker.example.com:8443`. The value must equal the broker's `server.enduser.public_url` without a trailing slash. When the broker's public URL has a path prefix, for example `https://example.com/broker`, set the identifier explicitly. ExtProc then discovers `https://example.com/.well-known/authzen-configuration/broker` (the AuthZEN well-known string goes between the host and the path), so the reverse proxy must route that URL to the broker's `/.well-known/authzen-configuration`.
+
+At startup ExtProc fetches the metadata without credentials, requires the advertised `policy_decision_point` to equal the expected identifier exactly, and validates the advertised `access_evaluation_endpoint`. ExtProc never guesses an endpoint or silently disables the feature. A failed discovery (transport error, non-200, invalid or incomplete metadata) is retried with a backoff that starts at 1 s and doubles to a 10 s cap, logging Warn `event=extproc.grant_context.discovery_failed` each time; the gRPC port stays closed until discovery succeeds. A `policy_decision_point` mismatch or an invalid advertised endpoint stops startup. Give the ExtProc container a `tcpSocket` readiness probe on its gRPC port, so a rollout during a broker outage keeps the existing ready pods instead of replacing them with pods that cannot serve. A permit is reused for at most `min(max-age, max_staleness)` from the moment the evaluation request was sent; the broker caps `max-age` at 60 seconds and at the grant expiry. A delegation denial returns 403 with the consent URL, and a broker failure or an expired permit returns 503; a cached exchanged token is never a fallback.
+
+See [`examples/config/extproc-grant-context.yaml`](https://github.com/zalando-incubator/agentic-identity-broker/blob/main/examples/config/extproc-grant-context.yaml).
+
 
 ## Environment-Specific Configuration
 
@@ -347,7 +371,7 @@ The Identity Broker runs two independent HTTP servers on separate ports:
 |--------|------|---------------|--------------|-----------|----------------------|----------|-------------|
 | `server.enduser.port` | integer | `8000` | 1-65535 | No | `IDENTITY_BROKER_SERVER_ENDUSER_PORT` | `--server.enduser.port` | Port for end-user server. Must differ from admin port. |
 | `server.enduser.bind` | string | `::` | IPv4/IPv6 address or hostname | No | `IDENTITY_BROKER_SERVER_ENDUSER_BIND` | `--server.enduser.bind` | Bind address for end-user server. Use `::` for dual-stack (IPv6+IPv4), `0.0.0.0` for IPv4 only, or `127.0.0.1` for localhost only. |
-| `server.enduser.public_url` | URL | `http://localhost:8000` | HTTP or HTTPS URL | Yes | `IDENTITY_BROKER_SERVER_ENDUSER_PUBLIC_URL` | N/A | Public URL for callbacks and broker metadata. Hosted CIMD and DCR require a stable, public HTTPS URL. |
+| `server.enduser.public_url` | URL | `http://localhost:8000` | HTTP or HTTPS URL; no userinfo, query or fragment when token exchange is configured | Yes | `IDENTITY_BROKER_SERVER_ENDUSER_PUBLIC_URL` | N/A | Public URL for callbacks and broker metadata. Hosted CIMD and DCR require a stable, public HTTPS URL. With token exchange configured, it is also the AuthZEN policy decision point; HTTP is for local development only, and production requires HTTPS because evaluation requests carry credentials (ADR 048 §1). |
 | `server.admin.port` | integer | `14000` | 1-65535 | No | `IDENTITY_BROKER_SERVER_ADMIN_PORT` | `--server.admin.port` | Port for admin server. Must differ from end-user port. |
 | `server.admin.bind` | string | `::` | IPv4/IPv6 address or hostname | No | `IDENTITY_BROKER_SERVER_ADMIN_BIND` | `--server.admin.bind` | Bind address for admin server. In production, restrict to private network (for example `10.0.1.0`) or use firewall rules. |
 | `server.admin.public_url` | URL | `http://localhost:14000` | HTTP or HTTPS URL with a hostname, no userinfo, and no empty explicit port | Yes | `IDENTITY_BROKER_SERVER_ADMIN_PUBLIC_URL` | N/A | Public admin URL. All admin `/api` requests must match its Host authority. Reverse proxies must preserve this Host. |

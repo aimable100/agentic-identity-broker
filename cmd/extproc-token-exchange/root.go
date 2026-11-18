@@ -25,6 +25,7 @@ import (
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/extproc/approval"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/extproc/authorization"
 	extprocconfig "github.com/agentic-identity-broker/agentic-identity-broker/internal/extproc/config"
+	"github.com/agentic-identity-broker/agentic-identity-broker/internal/extproc/grantcontext"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/extproc/httpclient"
 	extprocserver "github.com/agentic-identity-broker/agentic-identity-broker/internal/extproc/server"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/ports"
@@ -213,6 +214,22 @@ func run(cmd *cobra.Command, _ []string) error {
 		svc = extprocserver.NewServerWithAuthorizer(cfg, exchanger, authorizer, logger)
 	default:
 		svc = extprocserver.NewServer(cfg, exchanger, logger)
+	}
+	// 8a. Opt-in grant context: discover and verify the PDP before listening (ADR 048). A failed
+	// discovery retries, so the gRPC port stays closed and the pod unready during a broker outage.
+	if cfg.GrantContext.Enabled {
+		resolver, err := grantcontext.NewPermitResolverFromConfig(sigCtx, cfg, exchanger, logger)
+		if err != nil {
+			if isSignalCancellation(sigCtx, err) {
+				logger.InfoContext(sigCtx, "grant context discovery interrupted by signal, shutting down",
+					"event", "extproc.grant_context.discovery_interrupted")
+				return nil
+			}
+			return err
+		}
+		defer resolver.Shutdown()
+		svc.WithPermitResolver(resolver)
+		logger.InfoContext(sigCtx, "grant context enabled", "event", "extproc.grant_context.enabled", "policy_decision_point", cfg.GrantContext.PolicyDecisionPoint)
 	}
 	var stopApprovalSyncer func()
 	if approvalSync != nil {
