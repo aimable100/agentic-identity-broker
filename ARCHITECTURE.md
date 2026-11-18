@@ -526,7 +526,7 @@ A last-resort net in `LoggingMiddleware` finalizes any still-open holder after t
 - **SR-004 / FR-006**: security-relevant logs carry `trace_id`, `actor`, and optional `calling_peer`.
 - **Session-service identity (NFR-001)**: The context handler adds request `actor` and optional `calling_peer` when present. On a sweep, `actor` is the operator, not the session owner. Per-session refresh logs include the owner `principal`; the aggregate audit records `operator_principal` without an owner.
 - **SR-005 / FR-012**: credentials, cookies, authorization codes, and query strings are not copied into the security context or its logs.
-- **Principal policy**: the Principal Policy Handler in `internal/adapters/telemetry` renders every principal in a log record. The broker chain is context handler → principal policy handler → stdout/OTel fan-out; ExtProc wraps its stdout/OTel fan-out the same way, so every sink receives the same output. `SecurityContext.Actor` is an `id.Principal`.
+- **Principal policy**: the Principal Policy Handler in `internal/adapters/telemetry` renders every principal in a log record. The broker chain is context handler → principal policy handler → sink fan-out; ExtProc wraps its stdout/OTel fan-out the same way, so every sink receives the same output. `SecurityContext.Actor` is an `id.Principal`.
 - **SR-006 / FR-010**: forwarding headers are ignored unless trusted proxy mode is explicitly enabled; when enabled, the broker treats the right-most configured forwarded-header entry as authoritative.
 - **Log-forging protection**: access and recovery middleware escape line-break characters and literal backslashes in logged methods, paths, client addresses, and panic messages. Escapes preserve distinct values for CR, LF, vertical tab, form feed, NEL, and Unicode line and paragraph separators. Ordinary values use an unchanged, allocation-free fast path. Requests and diagnostic stack traces remain unchanged.
 - **SC-008**: the design budget is under 1 ms median per-request overhead with no additional heap allocations beyond one context value and one response header on the hot path.
@@ -1495,7 +1495,7 @@ The next five entries describe the implemented, unreleased model from `051-oauth
 
 **User Grant**: A record of a user (principal) delegating specific OAuth2 scopes to an agent for one or more third-party services. Grants have an optional expiration time (valid_until) and can be revoked at any time. Each user can have at most one active grant per agent (upsert semantics).
 
-**GrantRevoked** — Domain event representing a user's explicit deletion of their grant for an agent. Emitted as a structured audit log entry carrying principal, agent_id, grant_id, and revoked_at.
+**GrantRevoked**: Domain event representing a user's explicit deletion of their grant for an agent. Its audit record carries principal, agent_id, and grant_id. Grant deletion ends refresh authority even if session-row cleanup fails; `refresh_cleanup=failed` reports that cleanup failure, not continuing authorization.
 
 **Delegated Token**: Component of a grant specifying which OAuth2 service and which scopes from that service are delegated to the agent. A single grant can contain multiple delegated tokens for different services. Format: {thirdparty_oauth2_service_id, scopes[]}.
 
@@ -1610,7 +1610,9 @@ Every third-party authorization request uses PKCE with `code_challenge_method=S2
 
 **AuthorizationRef**: Scalar observation context for the registered agent and found user-agent grant evaluated by third-party token exchange. It holds IDs, the stored grant update time, and optional expiry by value, including on expired-grant errors. Responses exclude it from JSON; only broker logs and spans project it, never metric labels. It retains no credentials or grant pointer.
 
-**Grant and Definition Lifecycle Audit**: A domain-owned structured operational log emitted after a successful grant, agent, or permission-set mutation. Committed grant metadata and atomic deletion outcomes identify the actual mutation; unchanged consent and absent deletes do not emit success. Typed purpose-limited snapshots exclude credentials and profile text. The request-security logger supplies actor/trace context, distinct from grant ownership. `previous_observed_*` fields represent state read before a write, not a transactionally guaranteed predecessor. These logs are not a durable audit ledger, outbox, protocol field or metric label.
+**Grant and Definition Lifecycle Audit**: A domain-owned structured operational log emitted after a committed grant, agent, or permission-set mutation. Committed grant metadata and atomic deletion outcomes identify the actual mutation; unchanged consent and absent deletes do not emit success. Typed purpose-limited snapshots exclude credentials and profile text. The request-security logger supplies actor/trace context, distinct from grant ownership. `previous_observed_*` fields represent state read before a write, not a transactionally guaranteed predecessor.
+
+**Domain Event**: A security-relevant fact in a bounded context, such as GrantRevoked or ApprovalApproved. This term describes meaning, not a second event bus, recorder API, or persistence guarantee.
 
 **Diagnostic**: Immutable token-exchange classification: outcome, failure stage/detail, recovery recommendation/target, and exchange kind. It contains no credentials or free-form errors.
 
