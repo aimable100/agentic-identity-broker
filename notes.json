@@ -2,7 +2,7 @@
   "version": 1,
   "cursors": {
     "labelling_after": null,
-    "investigation_after": 131
+    "investigation_after": 143
   },
   "issues": [
     {
@@ -238,6 +238,12 @@
       "state": "commented",
       "updated_at": "2026-11-17",
       "note": "Static keyboard propagation gap: Card handles descendant Enter/Space; Revoke stops clicks only. Posted sibling native link/button journey and shared locale/memoization plan. No browser audit or tests; maintenance-only candidate."
+    },
+    {
+      "number": 143,
+      "state": "commented",
+      "updated_at": "2026-11-18",
+      "note": "Separated Nov17 govulncheck data-fetch reset from Nov16 OSV fast-xml-parser finding. Existing #464 fixes 5.11.1 to 5.12.0; both check types pass tests/docs but approvals pending. Recommend review then complete main Security rerun; keep issue open. No new exception or scan pass."
     }
   ],
   "fixes": [
@@ -320,12 +326,6 @@
       "follow_up": "Task 8 fell back to Task 9; added high-value context logging regressions with #414 instead of speculative optimization."
     },
     {
-      "area": "dependencies",
-      "checked_at": "2026-11-10",
-      "result": "Current web manifest uses TypeScript ^6.0.3. Read #452/#453 compiler/API-consumer migration boundaries; no peer-check bypass, aliases or dependency changes. Full verify security stage failed querying OSV due to TLS certificate validation.",
-      "follow_up": "Retain #382 consumer-migration work and existing exception expiry; do not treat failed OSV lookup as a clean scan."
-    },
-    {
       "area": "build",
       "checked_at": "2026-11-12",
       "result": "Broker/frontend builds pass on #403 integration; ExtProc build passes on #432 integration.",
@@ -344,39 +344,45 @@
       "follow_up": null
     },
     {
-      "area": "repo_assist_prs",
-      "checked_at": "2026-11-17",
-      "result": "Read all nine PR details/comments/reviews/threads and both check types (including page 2 for #490). Heads unchanged; eight drafts and non-draft #424. #403/#432 still dirty and size-blocked. No new human request, push or repeat issue reminder.",
-      "follow_up": "Maintainer integration/classifications; authorized external pipeline starts for #403/#490; exact tagging contract and closing-footer correction for #490."
-    },
-    {
-      "area": "ci",
-      "checked_at": "2026-11-17",
-      "result": "Seven external PR pipelines/test stages pass. #403/#490 still fail at pipeline start with no accountable user. DCO passes; classification failures remain #403/#420/#448. No new code-caused failure or code-only workaround.",
-      "follow_up": null
-    },
-    {
-      "area": "hygiene",
-      "checked_at": "2026-11-17",
-      "result": "All 66 open issues and 27 open PRs have labels. Reread monthly checklist/comments and tracked issue-comment threads: no new human acknowledgements or check-offs. No label edit needed; Task 1 falls back to Task 2.",
-      "follow_up": null
-    },
-    {
-      "area": "code",
-      "checked_at": "2026-11-17",
-      "result": "Resumed after #471; skipped previously investigated machine subissues and read parent #478. Wrapped to oldest untouched #131. Read Card/DelegationCard/tests, SessionCard, approval review, SPA bootstrap and docs locale config. Posted concrete keyboard/locale plan.",
-      "follow_up": "Resume after #131. Maintenance-only; no source changes or new PR. Preserve existing machine/tag contract gates."
-    },
-    {
       "area": "qa",
       "checked_at": "2026-11-17",
       "result": "Static #131 finding: Card captures bubbling Enter/Space from descendant controls; Revoke stops only click events, and tests are mouse-only. SessionCard uses browser Intl locale with timestamp-only memoization; SPA lang remains English. No browser reproduction/audit.",
       "follow_up": "Use native sibling navigation/revoke controls, multi-card keyboard/cancel-focus journey, shared explicit locale and memo dependencies. Frontend dependencies absent; no tests/build/full gate run."
     },
     {
+      "area": "repo_assist_prs",
+      "checked_at": "2026-11-18",
+      "result": "Read all nine live PR details/comments/reviews/threads and both check types; #490 page2 included. Heads unchanged, eight drafts and non-draft #424. No new review activity. #403/#432 still dirty and size-blocked; no repeat push or reminder.",
+      "follow_up": "Maintainer integration/classifications and authorized external pipeline starts; preserve #490 design gate."
+    },
+    {
+      "area": "ci",
+      "checked_at": "2026-11-18",
+      "result": "Seven Repo Assist external test pipelines pass; #403/#490 pipeline-start blockers persist. Classifications fail #403/#420/#448. Latest main Security run aborts on vulnerability-data connection reset; previous run reaches OSV and finds fixable fast-xml-parser. Not a clean scan.",
+      "follow_up": "Review existing #464 then rerun complete Security on main; keep #143 open."
+    },
+    {
+      "area": "hygiene",
+      "checked_at": "2026-11-18",
+      "result": "All 66 open issues and 27 open PRs labelled. No issue updated since prior summary; no new maintainer check-offs or acknowledgements. Task1 falls back to Task2; no label churn.",
+      "follow_up": null
+    },
+    {
+      "area": "code",
+      "checked_at": "2026-11-18",
+      "result": "Resumed oldest-first after #131 to untouched #143. Read scanner/workflow/exception configuration and three failed job logs; distinguished scanner infrastructure abort from actual prior finding. No source changes, tests or vulnerability reproduction.",
+      "follow_up": "Resume after #143; maintenance-only, no generic sweep."
+    },
+    {
+      "area": "dependencies",
+      "checked_at": "2026-11-18",
+      "result": "Nov16 OSV reports GHSA-474x-hrwr-fgx4 in docs fast-xml-parser 5.11.1, fixed 5.12.0. Read existing #464 diff and both checks/statuses: docs, dependency review and external test stages pass; maintainer approvals pending. No duplicate fix or suppression change.",
+      "follow_up": "Existing exceptions remain time-bound; latest scan ended before OSV."
+    },
+    {
       "area": "release",
-      "checked_at": "2026-11-17",
-      "result": "Latest release is now v0.1.147, published Nov 17 with storage client-ID fix and workflow/docs changes. This static investigation adds no release-worthy code; maintenance-only new PR limit remains zero.",
+      "checked_at": "2026-11-18",
+      "result": "Latest v0.1.147 published Nov17. Investigation-only maintenance run adds no release-worthy code or release PR.",
       "follow_up": null
     }
   ],
@@ -398,8 +404,8 @@
     },
     {
       "task": 2,
-      "item": "Resume investigation after #131",
-      "note": "Wrapped after #471 to untouched #131. Await existing audience/identity/design decisions; assess next untouched issue without repeating unanswered comments. #131 keyboard/locale work is capacity-deferred."
+      "item": "Resume investigation after #143",
+      "note": "#143 has evidence and existing #464 dependency fix; await complete main Security scan. Skip prior investigations and active fixes; maintenance-only candidates stay deferred."
     },
     {
       "task": 3,
