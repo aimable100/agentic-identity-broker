@@ -2,7 +2,7 @@
   "version": 1,
   "cursors": {
     "labelling_after": null,
-    "investigation_after": 143
+    "investigation_after": 346
   },
   "issues": [
     {
@@ -244,6 +244,18 @@
       "state": "commented",
       "updated_at": "2026-11-18",
       "note": "Separated Nov17 govulncheck data-fetch reset from Nov16 OSV fast-xml-parser finding. Existing #464 fixes 5.11.1 to 5.12.0; both check types pass tests/docs but approvals pending. Recommend review then complete main Security rerun; keep issue open. No new exception or scan pass."
+    },
+    {
+      "number": 346,
+      "state": "commented",
+      "updated_at": "2026-11-18",
+      "note": "Verified merged #415 on release/v0.2, not main: messages/events and sloglint rules land there. Posted release-delivery boundary and event migration release-note request. Three focused race tests pass; no duplicate fix."
+    },
+    {
+      "number": 497,
+      "state": "awaiting_clarification",
+      "updated_at": "2026-11-18",
+      "note": "Labelled enhancement. Existing ServiceCard/Avatar and end-user logoUrl lack persisted provider/Admin/session plumbing. Asked same-origin asset vs broker import; Constitution XI bars third-party image loads. Flagged retained Avatar imageError on src changes; no browser/security reproduction."
     }
   ],
   "fixes": [
@@ -253,7 +265,7 @@
       "branch": "repo-assist/fix-issue-367-authorization-readiness-17a1d83b98b8ce0c",
       "status": "blocked",
       "updated_at": "2026-11-16",
-      "note": "Review fixes published at live head 71c02faa (squashed from submitted 161f3b62). Still dirty; external pipeline cannot start: no accountable user. DCO passes; classification missing. Main/ADR045+046 merge remains size-blocked; no repeat push."
+      "note": "Live head 71c02faa still dirty; review fixes published, main ADR045/046 integration outstanding. New bundle transport may remove prior format-patch size blocker; not retried this run. External accountable-user/classification blockers persist."
     },
     {
       "issue": 212,
@@ -267,9 +279,9 @@
       "issue": 416,
       "pr": 432,
       "branch": "repo-assist/fix-issue-416-broker-access-denied-d7b29c16dd0ed650",
-      "status": "blocked",
-      "updated_at": "2026-11-12",
-      "note": "Prior merge publication rejected: 9689 KB > 4096 KB. Live head 4426935 still dirty; DCO/pipeline pass only old head. Preserve denial/recovery plus downstream telemetry in maintainer conflict recovery; no repeat oversized push."
+      "status": "open",
+      "updated_at": "2026-11-18",
+      "note": "Submitted append-only main merge a49d997e through newly configured bundle transport (accepted; live publication/CI unverified). Preserves recovery URI and downstream span status. Check/build/ExtProc race units and 102 non-Agentgateway E2E pass; verify timed out in gosec. Confirm live head next run."
     },
     {
       "issue": 244,
@@ -326,52 +338,10 @@
       "follow_up": "Task 8 fell back to Task 9; added high-value context logging regressions with #414 instead of speculative optimization."
     },
     {
-      "area": "build",
-      "checked_at": "2026-11-12",
-      "result": "Broker/frontend builds pass on #403 integration; ExtProc build passes on #432 integration.",
-      "follow_up": null
-    },
-    {
-      "area": "tooling",
-      "checked_at": "2026-11-12",
-      "result": "just check passes zero lint issues on both integrations. First full verify timed out at govulncheck; completed retry stopped at GO-2026-6859, not infrastructure. No scan exceptions or dependency edits.",
-      "follow_up": null
-    },
-    {
-      "area": "tests",
-      "checked_at": "2026-11-17",
-      "result": "Maintained just test package/name override with -count=1 passed five existing thirdparty audience-update tests under race detection (7 leaf cases). Memory package was also compiled but matched no tests. No new behavior, PostgreSQL, static, build, E2E or full-gate pass claimed.",
-      "follow_up": null
-    },
-    {
-      "area": "qa",
-      "checked_at": "2026-11-17",
-      "result": "Static #131 finding: Card captures bubbling Enter/Space from descendant controls; Revoke stops only click events, and tests are mouse-only. SessionCard uses browser Intl locale with timestamp-only memoization; SPA lang remains English. No browser reproduction/audit.",
-      "follow_up": "Use native sibling navigation/revoke controls, multi-card keyboard/cancel-focus journey, shared explicit locale and memo dependencies. Frontend dependencies absent; no tests/build/full gate run."
-    },
-    {
-      "area": "repo_assist_prs",
-      "checked_at": "2026-11-18",
-      "result": "Read all nine live PR details/comments/reviews/threads and both check types; #490 page2 included. Heads unchanged, eight drafts and non-draft #424. No new review activity. #403/#432 still dirty and size-blocked; no repeat push or reminder.",
-      "follow_up": "Maintainer integration/classifications and authorized external pipeline starts; preserve #490 design gate."
-    },
-    {
       "area": "ci",
       "checked_at": "2026-11-18",
       "result": "Seven Repo Assist external test pipelines pass; #403/#490 pipeline-start blockers persist. Classifications fail #403/#420/#448. Latest main Security run aborts on vulnerability-data connection reset; previous run reaches OSV and finds fixable fast-xml-parser. Not a clean scan.",
       "follow_up": "Review existing #464 then rerun complete Security on main; keep #143 open."
-    },
-    {
-      "area": "hygiene",
-      "checked_at": "2026-11-18",
-      "result": "All 66 open issues and 27 open PRs labelled. No issue updated since prior summary; no new maintainer check-offs or acknowledgements. Task1 falls back to Task2; no label churn.",
-      "follow_up": null
-    },
-    {
-      "area": "code",
-      "checked_at": "2026-11-18",
-      "result": "Resumed oldest-first after #131 to untouched #143. Read scanner/workflow/exception configuration and three failed job logs; distinguished scanner infrastructure abort from actual prior finding. No source changes, tests or vulnerability reproduction.",
-      "follow_up": "Resume after #143; maintenance-only, no generic sweep."
     },
     {
       "area": "dependencies",
@@ -380,9 +350,51 @@
       "follow_up": "Existing exceptions remain time-bound; latest scan ended before OSV."
     },
     {
+      "area": "repo_assist_prs",
+      "checked_at": "2026-11-18",
+      "result": "Read all nine live details/comments/reviews/threads and both check types, including #490 page2. Seven pipelines pass; #403/#490 pipeline starts and #403/#420/#448 classifications blocked. Submitted #432 main merge via newly configured bundle transport; publication unverified.",
+      "follow_up": "Confirm live #432 head before claiming conflict resolution; #403 integration remains next maintenance candidate."
+    },
+    {
+      "area": "hygiene",
+      "checked_at": "2026-11-18",
+      "result": "70 open issues and 27 open PRs assessed. Only unlabelled #497 received enhancement; no PR label gaps. Reread monthly checklist and 40 outstanding issue comment threads; no new maintainer acknowledgements or check-offs.",
+      "follow_up": null
+    },
+    {
+      "area": "code",
+      "checked_at": "2026-11-18",
+      "result": "Oldest-first after #143: prior investigations/active specs and workflow reports skipped to untouched #346. Verified #415 release-only normalization and remaining release-note handoff. #432 integration preserves both ADR entries, denial recovery URI and downstream span status. No unrelated edits.",
+      "follow_up": null
+    },
+    {
+      "area": "qa",
+      "checked_at": "2026-11-18",
+      "result": "Static #497 investigation: service logoUrl/Avatar already exist, provider/Admin/session icon plumbing does not. Constitution XI bars direct third-party images; source and SVG policy need agreement. Avatar failure state persists across src changes. No browser audit or security reproduction.",
+      "follow_up": null
+    },
+    {
+      "area": "tests",
+      "checked_at": "2026-11-18",
+      "result": "Three focused release tests pass uncached with race detection for #346. #432 merge passes complete just extproc-test and 102/119 non-Agentgateway ExtProc E2E with race detection, 17 container scenarios excluded. Missing Ginkgo CLI handled with maintained just test override.",
+      "follow_up": null
+    },
+    {
+      "area": "tooling",
+      "checked_at": "2026-11-18",
+      "result": "#432 merge: just check passed zero lint issues; whitespace checks clean. just verify timed out after 180s during gosec, with later gates unrun. No complete security/full-gate pass claimed.",
+      "follow_up": null
+    },
+    {
+      "area": "build",
+      "checked_at": "2026-11-18",
+      "result": "just build and just extproc-build pass on #432 main integration a49d997e. No frontend build claimed.",
+      "follow_up": null
+    },
+    {
       "area": "release",
       "checked_at": "2026-11-18",
-      "result": "Latest v0.1.147 published Nov17. Investigation-only maintenance run adds no release-worthy code or release PR.",
+      "result": "Latest v0.1.147 published Nov17. No new release PR warranted by maintenance/triage. #346 event renames need v0.2 release-note mapping; release-branch work is not on main.",
       "follow_up": null
     }
   ],
@@ -399,13 +411,13 @@
   "priorities": [
     {
       "task": 6,
-      "item": "Maintainer recovery for #403/#432 publication blockers",
-      "note": "Both oversized merge updates rejected downstream; original heads remain dirty. Preserve posted semantic integration guidance. Do not retry size-limited pushes or claim new CI; required classifications also need maintainers."
+      "item": "Confirm #432 publication; integrate #403 with main",
+      "note": "#432 merge a49d997e accepted as bundle, not yet live-confirmed. New bundle configuration addresses old format-patch failure; #403 still needs human-only readiness and observed-refresh-rejection integration, tests and pipeline/classification attention."
     },
     {
       "task": 2,
-      "item": "Resume investigation after #143",
-      "note": "#143 has evidence and existing #464 dependency fix; await complete main Security scan. Skip prior investigations and active fixes; maintenance-only candidates stay deferred."
+      "item": "Resume oldest-first investigation after #346",
+      "note": "#346 release delivery/migration note and out-of-order unlabelled #497 source-policy question posted. #347 merged only on release/v0.2; avoid security reproduction. Maintenance-only, no new PR."
     },
     {
       "task": 3,
