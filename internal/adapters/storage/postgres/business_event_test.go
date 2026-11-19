@@ -3,6 +3,10 @@ package postgres
 import (
 	"context"
 	"database/sql/driver"
+	"errors"
+	"fmt"
+	"io"
+	"net"
 	"testing"
 	"time"
 
@@ -14,6 +18,7 @@ import (
 
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/id"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/model"
+	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/storage"
 )
 
 func postgresSpanBusinessEvent() *model.BusinessEvent {
@@ -41,6 +46,7 @@ func TestBusinessEventAppendStorageSpans(t *testing.T) {
 		{name: "duplicate", config: signingKeyRepoTestConfig{queryErr: &pgconn.PgError{Code: "23505"}}, wantError: true, outcome: "conflict"},
 		{name: "deadline", config: signingKeyRepoTestConfig{queryErr: context.DeadlineExceeded}, wantError: true, status: codes.Error, errorType: "timeout"},
 		{name: "connection", config: signingKeyRepoTestConfig{queryErr: driver.ErrBadConn}, wantError: true, status: codes.Error, errorType: "connection"},
+		{name: "trigger rejection", config: signingKeyRepoTestConfig{queryErr: &pgconn.PgError{Code: "P0001"}}, wantError: true, status: codes.Error, errorType: "unknown"},
 		{name: "validation", invalid: true, wantError: true, outcome: "validation"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -83,6 +89,7 @@ func TestBusinessEventDeleteStorageSpans(t *testing.T) {
 		{name: "success", config: signingKeyRepoTestConfig{rowsAffected: 7}},
 		{name: "deadline", config: signingKeyRepoTestConfig{execErr: context.DeadlineExceeded}, wantError: true, status: codes.Error, errorType: "timeout"},
 		{name: "connection", config: signingKeyRepoTestConfig{execErr: driver.ErrBadConn}, wantError: true, status: codes.Error, errorType: "connection"},
+		{name: "trigger rejection", config: signingKeyRepoTestConfig{execErr: &pgconn.PgError{Code: "P0001"}}, wantError: true, status: codes.Error, errorType: "unknown"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			recorder := recordStorageSpans(t)
@@ -102,6 +109,41 @@ func TestBusinessEventDeleteStorageSpans(t *testing.T) {
 			for _, attribute := range span.Attributes() {
 				assert.NotContains(t, string(attribute.Key), "principal")
 			}
+		})
+	}
+}
+
+func TestBusinessEventStorageErrorClassification(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		cause error
+		kind  storage.ErrorKind
+	}{
+		{name: "trigger rejection", cause: &pgconn.PgError{Code: "P0001"}, kind: storage.ErrorKindUnknown},
+		{name: "check violation", cause: &pgconn.PgError{Code: "23514"}, kind: storage.ErrorKindUnknown},
+		{name: "unexpected error", cause: errors.New("unexpected driver result"), kind: storage.ErrorKindUnknown},
+		{name: "duplicate ID", cause: &pgconn.PgError{Code: "23505"}, kind: storage.ErrorKindConflict},
+		{name: "deadline", cause: context.DeadlineExceeded, kind: storage.ErrorKindTimeout},
+		{name: "canceled", cause: context.Canceled, kind: storage.ErrorKindTimeout},
+		{name: "statement timeout", cause: &pgconn.PgError{Code: "57014", Message: "canceling statement due to statement timeout"}, kind: storage.ErrorKindTimeout},
+		{name: "bad connection", cause: driver.ErrBadConn, kind: storage.ErrorKindConnection},
+		{name: "closed connection", cause: pgconn.ErrConnClosed, kind: storage.ErrorKindConnection},
+		{name: "EOF", cause: io.EOF, kind: storage.ErrorKindConnection},
+		{name: "unexpected EOF", cause: io.ErrUnexpectedEOF, kind: storage.ErrorKindConnection},
+		{name: "network failure", cause: &net.OpError{Op: "read", Net: "tcp", Err: errors.New("connection reset")}, kind: storage.ErrorKindConnection},
+		{name: "connection exception", cause: &pgconn.PgError{Code: "08006"}, kind: storage.ErrorKindConnection},
+		{name: "admin shutdown", cause: &pgconn.PgError{Code: "57P01"}, kind: storage.ErrorKindConnection},
+		{name: "crash shutdown", cause: &pgconn.PgError{Code: "57P02"}, kind: storage.ErrorKindConnection},
+		{name: "cannot connect", cause: &pgconn.PgError{Code: "57P03"}, kind: storage.ErrorKindConnection},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cause := fmt.Errorf("wrapped: %w", test.cause)
+			err := businessEventStorageError("Append", cause, "append failed")
+			var storageErr *storage.StorageError
+			require.ErrorAs(t, err, &storageErr)
+			assert.Equal(t, test.kind, storageErr.Kind)
+			assert.Equal(t, "Append", storageErr.Operation)
+			assert.ErrorIs(t, err, test.cause)
 		})
 	}
 }

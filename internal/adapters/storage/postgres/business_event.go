@@ -2,8 +2,12 @@ package postgres
 
 import (
 	"context"
+	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"io"
+	"net"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -84,10 +88,23 @@ func businessEventStorageError(operation string, err error, message string) erro
 		return storage.NewStorageError(operation, storage.ErrorKindTimeout, err, "operation cancelled or timed out")
 	}
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-		return storage.NewStorageError(operation, storage.ErrorKindConflict, err, "business event already exists")
+	var connectErr *pgconn.ConnectError
+	var netErr net.Error
+	kind := storage.ErrorKindUnknown
+	switch {
+	case errors.As(err, &pgErr):
+		switch {
+		case pgErr.Code == "23505":
+			return storage.NewStorageError(operation, storage.ErrorKindConflict, err, "business event already exists")
+		case strings.HasPrefix(pgErr.Code, "08"), pgErr.Code == "57P01", pgErr.Code == "57P02", pgErr.Code == "57P03":
+			kind = storage.ErrorKindConnection
+		}
+	case errors.Is(err, driver.ErrBadConn), errors.Is(err, pgconn.ErrConnClosed),
+		errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF),
+		errors.As(err, &connectErr), errors.As(err, &netErr):
+		kind = storage.ErrorKindConnection
 	}
-	return storage.NewStorageError(operation, storage.ErrorKindConnection, err, message)
+	return storage.NewStorageError(operation, kind, err, message)
 }
 
 var _ ports.BusinessEventAppender = (*Adapter)(nil)

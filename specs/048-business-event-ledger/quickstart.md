@@ -106,8 +106,10 @@ FOR EACH ROW EXECUTE FUNCTION reject_business_event_insert();
 
 The trigger rejects inserts even for a PostgreSQL superuser, unlike `REVOKE INSERT` (T019).
 Revoke the grant as in section 2.
-Expected: `204`, the `grant revoked` record, one `business event write failed` record with
-`event=business_event.ledger.write_failed`, and `business_events.write_failures` increased by one.
+Expected: `204`, the `grant revoked` record, and one failure record with
+`event=business_event.ledger.write_failed` and `error_kind=unknown`.
+The `business_events.write_failures{error_kind="unknown"}` series increases by one, and
+`business_events.write.duration{outcome="failed"}` receives one measurement.
 The grant is gone, and the ledger has no row for this revocation.
 
 After the check, remove the trigger and its function, even if the expected signals are absent:

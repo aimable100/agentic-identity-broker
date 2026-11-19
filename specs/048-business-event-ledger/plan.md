@@ -65,10 +65,10 @@ The artifact prerequisites are complete. Task completion and remaining verificat
 - [x] **API Design First**: No API change. No endpoint is added or changed.
 - [x] **API Documentation**: Not applicable. The end-user API and the Admin API are not changed.
 - [x] **API Changes**: None.
-- [x] **Database Design**: Atomic migration `049_create_business_events` and schema-specific tests are present. PostgreSQL execution remains unvalidated locally (T014, T031).
+- [x] **Database Design**: Atomic migration `049_create_business_events` and schema-specific tests are present. PostgreSQL migration and repository execution passed through `just test-integration-infra` (T014, T031, T071, T089).
 - [x] **E2E Acceptance Tests**: All five mapped container-backed scenarios were written before foundation behavior and compile (T018–T020).
 - [x] **E2E Test Mapping**: One `It()` per scenario (table in Testing Strategy).
-- [x] **E2E Red Phase**: Compiling acceptance/performance tests with persistence assertions preceded foundation behavior. Docker was unavailable, so their first execution remains pending (T021, T084).
+- [x] **E2E Red Phase**: Compiling acceptance/performance tests with persistence assertions preceded foundation behavior. Docker was initially unavailable; the final PostgreSQL acceptance and SC-004 performance runs have now passed (T021, T084, T053, T055, T056).
 - [x] **Frontend Playwright E2E**: Not applicable. No UI change.
 - [x] **Frontend Screenshots**: Not applicable.
 
@@ -95,9 +95,11 @@ is unchanged, and a separate typed-event key guard is present.
 and the single consent event are implemented. Both committed-delete paths preserve their existing
 attributes and return behavior. A temporary production-bootstrap memory HTTP smoke verified
 `201` creation, `204` revocation, `404` retry, and exactly one enabled-ledger occurrence (zero when disabled).
-The smoke file was removed. PostgreSQL acceptance, migration execution, and SC-004 remain unvalidated
-without Docker. Final reachable checks and remaining gates are tracked in `tasks.md`.
-At implementation handoff, changes were uncommitted and PR #467 was unchanged. The user subsequently authorized committing; PR-description publication remains pending.
+The memory smoke file was removed. PostgreSQL acceptance, migration/repository execution, the
+documented retention quickstart, and SC-004 have now passed. The complete SC-004 environment and
+result record is published in PR #467. Only the full PR-readiness gate remains deferred under the
+user's explicit ledger-only scope decision; `tasks.md` records T083/T090 as incomplete.
+At implementation handoff, changes were uncommitted and PR #467 was unchanged. The user subsequently authorized committing. During implementation continuation on 2026-11-19, the required PR-description changelog, standard-amendment rationales, and onboarding review were published to [PR #467](https://github.com/zalando-incubator/agentic-identity-broker/pull/467); publication does not certify pushed code or PR readiness.
 
 ## Project Structure
 
@@ -336,15 +338,17 @@ event, reader API, UI, SSF delivery mechanism, or erasure operation is included.
 After Phase 2.5a, Phases 2.5b–2.5d can proceed independently against the stable ports. Phase 2.5e
 waits for all three; Phase 3 waits for integration; Phase 4 and Phase N verify the completed flow.
 
-**Implementation gate: code implemented — acceptance and PR readiness remain incomplete.**
-The final available static, race-enabled unit, self-contained integration, and backend E2E checks
-passed. Docker-backed validation, the full security/verification gate, and PR-description publication
-remain outstanding as recorded in `tasks.md`. The four accepted checklist deviations remain unchanged.
+**Implementation gate: ledger implementation and validation complete — full PR readiness deferred.**
+Static, race-enabled unit, self-contained/infrastructure integration, all five ledger acceptance
+scenarios, the backend E2E suite, the documented retention quickstart, and SC-004 passed.
+The user explicitly declined unrelated dependency/security-script remediation, so the full
+`just verify` gate and T083/T090 remain incomplete. PR #467 contains the required changelog,
+standard rationales, onboarding review, and complete performance environment/result record.
 
 The [specification-quality checklist](./checklists/requirements.md) retains four unchecked criteria.
 On 2026-11-18, the user explicitly accepted all four documented specification-quality deviations
 and authorized implementation. Checklist markers remain unchanged. This acceptance does not waive
-implementation, security, testing, or compliance requirements. The onboarding review remains T054.
+implementation, security, testing, or compliance requirements. The T054 onboarding review is published in PR #467.
 
 ## Testing Strategy
 
@@ -361,13 +365,13 @@ enabled, disabled, write failing; retention) → one `It` per scenario.
 
 | Spec Scenario | E2E Test | Test Description | Red before implementation because |
 |---|---|---|---|
-| US1.1 | `business_event_ledger_test.go:211`, `Label("docker")` | `It("stores exactly one consent.grant.revoked event with request and resource identities")` | No row is stored |
-| US1.2 | `business_event_ledger_test.go:235`, `Label("docker")` | `It("keeps exactly one event when a second revocation returns 404")` | The row of the first revocation is absent |
-| US1.3 | `business_event_ledger_test.go:246`, `Label("docker")` | `It("stores no event and still logs the revocation when the ledger is disabled")` | The audit record has `action`, not `event` |
-| US1.4 | `business_event_ledger_test.go:270`, `Label("docker")` | `It("returns 204 and reports exactly one failed write without losing the audit record")` | No failure is counted or logged, and the audit record has `action`, not `event` |
-| US2.1 | `business_event_ledger_test.go:293`, `Label("docker")` | `It("deletes only the expired event without a deletion log or counter")` | No events are stored; after onboarding but before retention, the expired row remains |
+| US1.1 | `business_event_ledger_test.go:120`, `Label("docker")` | `It("stores exactly one consent.grant.revoked event with request and resource identities")` | No row is stored |
+| US1.2 | `business_event_ledger_test.go:144`, `Label("docker")` | `It("keeps exactly one event when a second revocation returns 404")` | The row of the first revocation is absent |
+| US1.3 | `business_event_ledger_test.go:155`, `Label("docker")` | `It("stores no event and still logs the revocation when the ledger is disabled")` | The audit record has `action`, not `event` |
+| US1.4 | `business_event_ledger_test.go:179`, `Label("docker")` | `It("returns 204 and reports exactly one failed write without losing the audit record")` | No failure is counted or logged, and the audit record has `action`, not `event` |
+| US2.1 | `business_event_ledger_test.go:236`, `Label("docker")` | `It("deletes only the expired event without a deletion log or counter")` | No events are stored; after onboarding but before retention, the expired row remains |
 
-All five scenarios and `business_event_ledger_performance_test.go:93` compile against T017's scaffold. Docker-backed execution remains unvalidated because the local daemon is unavailable.
+All five mapped scenarios passed through `just test-e2e-docker`. The SC-004 test at `business_event_ledger_performance_test.go:94` passed through `GOMAXPROCS=14 just test-e2e-performance`, with unchanged assertions; its complete environment and latency record is published in PR #467.
 
 **Red Phase Requirements**: As in the plan template. No `XIt`, `PIt`, or `Skip()`. Assertions
 target the stored event (`Event`, `Principal`, `Actor`, `TraceID`, attribute keys), the HTTP
@@ -489,9 +493,9 @@ Keep the complete result of each acceptance run with its environment record, inc
 |-----------|------------|-------------------------------------|
 | The ledger is off by default | It stores principals, and an operator must choose the retention period first | On by default would store personal data in deployments that have not planned retention |
 
-## Unpublished PR-description draft
+## Published PR-description record
 
-PR #467 remains unchanged at the user's direction. This draft is not the published changelog record.
+The following changelog, amendment rationales, and onboarding review were published to [PR #467](https://github.com/zalando-incubator/agentic-identity-broker/pull/467) on 2026-11-19. The PR description explicitly retains the unresolved validation gates.
 
 ### Breaking changes
 

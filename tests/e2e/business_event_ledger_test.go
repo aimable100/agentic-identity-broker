@@ -3,7 +3,6 @@ package e2e_test
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -22,99 +21,9 @@ import (
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/ports"
 	"github.com/agentic-identity-broker/agentic-identity-broker/tests/e2e/bootstrap"
 	"github.com/agentic-identity-broker/agentic-identity-broker/tests/e2e/fixtures"
+	"github.com/agentic-identity-broker/agentic-identity-broker/tests/e2e/helpers"
 	"github.com/agentic-identity-broker/agentic-identity-broker/tests/e2e/matchers"
 )
-
-func businessEventConfig(connectionURL string, enabled bool) *ports.Config {
-	cfg := fixtures.DefaultOAuth2Config()
-	cfg.Storage = ports.StorageConfig{
-		Backend:  "postgres",
-		Postgres: ports.PostgresConfig{ConnectionURL: connectionURL},
-		Timeouts: ports.StorageTimeouts{Read: 5 * time.Second, Write: 5 * time.Second},
-	}
-	cfg.BusinessEvents = ports.BusinessEventsConfig{
-		Enabled:      enabled,
-		WriteTimeout: time.Second,
-		Retention: ports.BusinessEventsRetentionConfig{
-			Period:    2160 * time.Hour,
-			Interval:  time.Hour,
-			BatchSize: 1000,
-		},
-	}
-	fixtures.SetTraceResponseEnabled(cfg, true)
-	return cfg
-}
-
-func committedBusinessEvents(db *sql.DB) []model.BusinessEvent {
-	rows, err := db.QueryContext(context.Background(), `
-		SELECT id, event, occurred_at, recorded_at, principal, actor, trace_id, attributes
-		FROM business_events ORDER BY recorded_at, id`)
-	ExpectWithOffset(1, err).NotTo(HaveOccurred())
-	defer func() { ExpectWithOffset(1, rows.Close()).To(Succeed()) }()
-	events := make([]model.BusinessEvent, 0)
-	for rows.Next() {
-		var event model.BusinessEvent
-		var traceID sql.NullString
-		var attributes []byte
-		ExpectWithOffset(1, rows.Scan(&event.ID, &event.Event, &event.OccurredAt, &event.RecordedAt,
-			&event.Principal, &event.Actor, &traceID, &attributes)).To(Succeed())
-		event.TraceID = traceID.String
-		ExpectWithOffset(1, json.Unmarshal(attributes, &event.Attributes)).To(Succeed())
-		events = append(events, event)
-	}
-	ExpectWithOffset(1, rows.Err()).NotTo(HaveOccurred())
-	return events
-}
-
-func businessEventCounterValues(reader *sdkmetric.ManualReader) map[string]float64 {
-	var metrics metricdata.ResourceMetrics
-	ExpectWithOffset(1, reader.Collect(context.Background(), &metrics)).To(Succeed())
-	values := make(map[string]float64)
-	for _, scope := range metrics.ScopeMetrics {
-		for _, metric := range scope.Metrics {
-			key := scope.Scope.Name + "/" + metric.Name
-			switch data := metric.Data.(type) {
-			case metricdata.Sum[int64]:
-				if data.IsMonotonic {
-					for _, point := range data.DataPoints {
-						values[key] += float64(point.Value)
-					}
-				}
-			case metricdata.Sum[float64]:
-				if data.IsMonotonic {
-					for _, point := range data.DataPoints {
-						values[key] += point.Value
-					}
-				}
-			}
-		}
-	}
-	return values
-}
-
-func createBusinessEventGrant(client *http.Client, server *bootstrap.TestServer, agentID id.AgentID) id.GrantID {
-	req, err := http.NewRequest(http.MethodPost, server.BaseURL()+"/api/consent/agents/"+agentID.String()+"/grants",
-		psJSON(map[string]any{"granted_permission_sets": map[string][]string{
-			fixtures.PlaceholderPermissionSetID.String(): {fixtures.PlaceholderServiceID.String()},
-		}}))
-	ExpectWithOffset(1, err).NotTo(HaveOccurred())
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Remote-User", fixtures.DefaultPrincipal().String())
-	resp, err := client.Do(req)
-	ExpectWithOffset(1, err).NotTo(HaveOccurred())
-	defer func() { ExpectWithOffset(1, resp.Body.Close()).To(Succeed()) }()
-	body, err := io.ReadAll(resp.Body)
-	ExpectWithOffset(1, err).NotTo(HaveOccurred())
-	ExpectWithOffset(1, resp.StatusCode).To(Equal(http.StatusCreated), "%s", body)
-	var grant struct {
-		Data struct {
-			ID id.GrantID `json:"id"`
-		} `json:"data"`
-	}
-	ExpectWithOffset(1, json.Unmarshal(body, &grant)).To(Succeed())
-	ExpectWithOffset(1, grant.Data.ID).NotTo(BeZero())
-	return grant.Data.ID
-}
 
 var _ = Describe("Business event ledger", Label("docker"), func() {
 	var (
@@ -154,7 +63,7 @@ var _ = Describe("Business event ledger", Label("docker"), func() {
 		Expect(err).NotTo(HaveOccurred())
 		db, err = sql.Open("pgx", postgres.ConnectionURL)
 		Expect(err).NotTo(HaveOccurred())
-		cfg = businessEventConfig(postgres.ConnectionURL, true)
+		cfg = fixtures.BusinessEventConfig(postgres.ConnectionURL, true)
 		logger, logs = bootstrap.NewBufferedJSONLogger(slog.LevelInfo)
 		store, err = storageadapter.NewAdapter(&cfg.Storage)
 		Expect(err).NotTo(HaveOccurred())
@@ -178,8 +87,8 @@ var _ = Describe("Business event ledger", Label("docker"), func() {
 		Expect(err).NotTo(HaveOccurred())
 		server, err = bootstrap.NewEndUserTestServer(application, logger)
 		Expect(err).NotTo(HaveOccurred())
-		grantID = createBusinessEventGrant(client, server, agent.ID)
-		Expect(committedBusinessEvents(db)).To(BeEmpty(), "ordinary grant creation is not a business event")
+		grantID = helpers.CreateBusinessEventGrant(client, server, agent.ID)
+		Expect(helpers.CommittedBusinessEvents(db)).To(BeEmpty(), "ordinary grant creation is not a business event")
 	})
 
 	AfterEach(func() {
@@ -210,7 +119,7 @@ var _ = Describe("Business event ledger", Label("docker"), func() {
 		// Scenario US1.1 from specs/048-business-event-ledger/spec.md (User Story 1)
 		It("stores exactly one consent.grant.revoked event with request and resource identities", func() {
 			traceID := revoke(http.StatusNoContent)
-			events := committedBusinessEvents(db)
+			events := helpers.CommittedBusinessEvents(db)
 			Expect(events).To(HaveLen(1))
 			Expect(events).To(matchers.HaveBusinessEvent("consent.grant.revoked", fixtures.DefaultPrincipal().String()))
 			Expect(events[0].ID).NotTo(BeZero())
@@ -227,14 +136,14 @@ var _ = Describe("Business event ledger", Label("docker"), func() {
 		var original []model.BusinessEvent
 		JustBeforeEach(func() {
 			revoke(http.StatusNoContent)
-			original = committedBusinessEvents(db)
+			original = helpers.CommittedBusinessEvents(db)
 			Expect(original).To(HaveLen(1))
 		})
 
 		// Scenario US1.2 from specs/048-business-event-ledger/spec.md (User Story 1)
 		It("keeps exactly one event when a second revocation returns 404", func() {
 			revoke(http.StatusNotFound)
-			Expect(committedBusinessEvents(db)).To(Equal(original))
+			Expect(helpers.CommittedBusinessEvents(db)).To(Equal(original))
 			Expect(proactiveEvents(logs, "consent.grant.revoked")).To(HaveLen(1))
 		})
 	})
@@ -245,7 +154,7 @@ var _ = Describe("Business event ledger", Label("docker"), func() {
 		// Scenario US1.3 from specs/048-business-event-ledger/spec.md (User Story 1)
 		It("stores no event and still logs the revocation when the ledger is disabled", func() {
 			traceID := revoke(http.StatusNoContent)
-			Expect(committedBusinessEvents(db)).To(BeEmpty())
+			Expect(helpers.CommittedBusinessEvents(db)).To(BeEmpty())
 			records := proactiveEvents(logs, "consent.grant.revoked")
 			Expect(records).To(HaveLen(1))
 			Expect(records[0]).To(HaveKeyWithValue("trace_id", traceID))
@@ -268,10 +177,43 @@ var _ = Describe("Business event ledger", Label("docker"), func() {
 
 		// Scenario US1.4 from specs/048-business-event-ledger/spec.md (User Story 1)
 		It("returns 204 and reports exactly one failed write without losing the audit record", func() {
-			before := businessEventCounterValues(reader)["business_events/business_events.write_failures"]
+			before := helpers.BusinessEventCounterValues(reader)["business_events/business_events.write_failures"]
 			traceID := revoke(http.StatusNoContent)
-			Expect(committedBusinessEvents(db)).To(BeEmpty())
-			Expect(businessEventCounterValues(reader)["business_events/business_events.write_failures"] - before).To(Equal(float64(1)))
+			Expect(helpers.CommittedBusinessEvents(db)).To(BeEmpty())
+			Expect(helpers.BusinessEventCounterValues(reader)["business_events/business_events.write_failures"] - before).To(Equal(float64(1)))
+			var metrics metricdata.ResourceMetrics
+			Expect(reader.Collect(context.Background(), &metrics)).To(Succeed())
+			var unknownFailures int64
+			var failedDurations uint64
+			for _, scope := range metrics.ScopeMetrics {
+				if scope.Scope.Name != "business_events" {
+					continue
+				}
+				for _, metric := range scope.Metrics {
+					switch metric.Name {
+					case "business_events.write_failures":
+						data, ok := metric.Data.(metricdata.Sum[int64])
+						Expect(ok).To(BeTrue())
+						for _, point := range data.DataPoints {
+							kind, _ := point.Attributes.Value("error_kind")
+							if kind.AsString() == "unknown" {
+								unknownFailures += point.Value
+							}
+						}
+					case "business_events.write.duration":
+						data, ok := metric.Data.(metricdata.Histogram[float64])
+						Expect(ok).To(BeTrue())
+						for _, point := range data.DataPoints {
+							outcome, _ := point.Attributes.Value("outcome")
+							if outcome.AsString() == "failed" {
+								failedDurations += point.Count
+							}
+						}
+					}
+				}
+			}
+			Expect(unknownFailures).To(Equal(int64(1)), "the rejected insert must use the unknown failure series")
+			Expect(failedDurations).To(Equal(uint64(1)), "the rejected insert must record one failed duration")
 			audit := proactiveEvents(logs, "consent.grant.revoked")
 			failed := proactiveEvents(logs, "business_event.ledger.write_failed")
 			Expect(audit).To(HaveLen(1))
@@ -280,6 +222,7 @@ var _ = Describe("Business event ledger", Label("docker"), func() {
 			Expect(failed[0]).To(HaveKeyWithValue("trace_id", traceID))
 			Expect(failed[0]).To(HaveKeyWithValue("level", "ERROR"))
 			Expect(failed[0]).To(HaveKeyWithValue("failed_event", "consent.grant.revoked"))
+			Expect(failed[0]).To(HaveKeyWithValue("error_kind", "unknown"))
 		})
 	})
 
@@ -292,16 +235,16 @@ var _ = Describe("Business event ledger", Label("docker"), func() {
 		// Scenario US2.1 from specs/048-business-event-ledger/spec.md (User Story 2)
 		It("deletes only the expired event without a deletion log or counter", func() {
 			revoke(http.StatusNoContent)
-			first := committedBusinessEvents(db)
+			first := helpers.CommittedBusinessEvents(db)
 			Expect(first).To(HaveLen(1))
-			secondGrant := createBusinessEventGrant(client, server, agent.ID)
+			secondGrant := helpers.CreateBusinessEventGrant(client, server, agent.ID)
 			Expect(secondGrant).NotTo(Equal(grantID))
 			revoke(http.StatusNoContent)
-			both := committedBusinessEvents(db)
+			both := helpers.CommittedBusinessEvents(db)
 			Expect(both).To(HaveLen(2), "both real revocations must be committed before either event is aged")
 			Expect(both[0].ID).To(Equal(first[0].ID))
 			Expect(both[1].Attributes).To(HaveKeyWithValue("grant_id", secondGrant.String()))
-			counters := businessEventCounterValues(reader)
+			counters := helpers.BusinessEventCounterValues(reader)
 			logs.Reset()
 			result, err := db.ExecContext(context.Background(), `
 				UPDATE business_events SET recorded_at = now() - interval '2 days' WHERE id = $1`, first[0].ID)
@@ -309,12 +252,12 @@ var _ = Describe("Business event ledger", Label("docker"), func() {
 			changed, err := result.RowsAffected()
 			Expect(err).NotTo(HaveOccurred())
 			Expect(changed).To(Equal(int64(1)))
-			Eventually(func() []model.BusinessEvent { return committedBusinessEvents(db) }, 5*time.Second, 50*time.Millisecond).
+			Eventually(func() []model.BusinessEvent { return helpers.CommittedBusinessEvents(db) }, 5*time.Second, 50*time.Millisecond).
 				Should(Equal(both[1:]))
 			records, err := logs.Records()
 			Expect(err).NotTo(HaveOccurred())
 			Expect(records).To(BeEmpty(), "successful retention must not log deletion")
-			Expect(businessEventCounterValues(reader)).To(Equal(counters), "successful retention must not increment a counter")
+			Expect(helpers.BusinessEventCounterValues(reader)).To(Equal(counters), "successful retention must not increment a counter")
 		})
 	})
 })

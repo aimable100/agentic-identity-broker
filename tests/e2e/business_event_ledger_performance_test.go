@@ -18,6 +18,7 @@ import (
 	storagedomain "github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/storage"
 	"github.com/agentic-identity-broker/agentic-identity-broker/tests/e2e/bootstrap"
 	"github.com/agentic-identity-broker/agentic-identity-broker/tests/e2e/fixtures"
+	"github.com/agentic-identity-broker/agentic-identity-broker/tests/e2e/helpers"
 )
 
 var _ = Describe("Business event ledger SC-004 performance", Label("performance"), func() {
@@ -51,7 +52,7 @@ var _ = Describe("Business event ledger SC-004 performance", Label("performance"
 		}
 		agent = fixtures.ValidAgent()
 		for i := range servers {
-			cfg := businessEventConfig(postgres.ConnectionURL, i == 1)
+			cfg := fixtures.BusinessEventConfig(postgres.ConnectionURL, i == 1)
 			logger, capture := bootstrap.NewBufferedJSONLogger(slog.LevelInfo)
 			logs[i] = capture
 			stores[i], err = storageadapter.NewAdapter(&cfg.Storage)
@@ -94,10 +95,10 @@ var _ = Describe("Business event ledger SC-004 performance", Label("performance"
 		samples := [2][]time.Duration{make([]time.Duration, 0, 1000), make([]time.Duration, 0, 1000)}
 		for block := range 11 {
 			for broker, server := range servers {
-				before := committedBusinessEvents(db)
+				before := helpers.CommittedBusinessEvents(db)
 				Expect(proactiveEvents(logs[broker], "business_event.ledger.write_failed")).To(BeEmpty())
 				for range 100 {
-					createBusinessEventGrant(client, server, agent.ID)
+					helpers.CreateBusinessEventGrant(client, server, agent.ID)
 					req, err := http.NewRequest(http.MethodDelete,
 						server.BaseURL()+"/api/consent/agents/"+agent.ID.String()+"/grants", nil)
 					Expect(err).NotTo(HaveOccurred())
@@ -120,7 +121,7 @@ var _ = Describe("Business event ledger SC-004 performance", Label("performance"
 						samples[broker] = append(samples[broker], elapsed)
 					}
 				}
-				after := committedBusinessEvents(db)
+				after := helpers.CommittedBusinessEvents(db)
 				expectedWrites := 0
 				if broker == 1 {
 					expectedWrites = 100
