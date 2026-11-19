@@ -409,7 +409,7 @@ func TestExchangeCodeWithRetryRejectsReselectedDiscoveryContext(t *testing.T) {
 	service.WithClientIdentityRepository(identityObservationRepository{observe: func(context.Context, id.ServiceID, id.ClientID, ports.ClientIdentityObservation) (ports.ClientIdentityState, bool, bool, error) {
 		return ports.ClientIdentityState{}, false, false, nil
 	}})
-	token, err := service.exchangeCodeWithRetry(context.Background(), "https://broker.example.test/callback", initial, identityPointer("current-client"), "code", "verifier")
+	token, _, err := service.exchangeCodeWithRetry(context.Background(), "https://broker.example.test/callback", initial, identityPointer("current-client"), "code", "verifier")
 	assert.Nil(t, token)
 	assert.ErrorIs(t, err, ErrInvalidStateToken)
 }

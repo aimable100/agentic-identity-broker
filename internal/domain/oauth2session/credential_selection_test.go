@@ -451,6 +451,7 @@ func TestCredentialSelection_ReselectionKeepsReplacementSecretAtCurrentEndpoint(
 			principal := id.Principal("snapshot@example.com")
 			flow := h.initiate(t, principal, provider.ID)
 			currentEndpoint := newCredentialTokenEndpoint(t)
+			currentEndpoint.setResponseBody(`{"access_token":"credential-access","refresh_token":"established-refresh","token_type":"Bearer","expires_in":3600,"scope":"repo,user"}`)
 			var updateOnce sync.Once
 			var updateErr error
 			update := func() error {
@@ -463,6 +464,7 @@ func TestCredentialSelection_ReselectionKeepsReplacementSecretAtCurrentEndpoint(
 					canonical := "current"
 					current.CanonicalID = &canonical
 					current.Endpoints.TokenEndpoint = currentEndpoint.server.URL
+					current.Flavor = model.OAuth2FlavorGitHub
 					updateErr = h.providers.Update(context.Background(), current, &current.Version)
 				})
 				return updateErr
@@ -474,13 +476,14 @@ func TestCredentialSelection_ReselectionKeepsReplacementSecretAtCurrentEndpoint(
 				h.callback(t, principal, provider.ID, flow.StateToken)
 			} else {
 				h.reader.afterPair = update
-				entity, err := h.providers.GetForTokenAcquisition(context.Background(), provider.ID)
-				require.NoError(t, err)
 				established := id.ClientID("same-client")
-				token, err := h.service.RefreshAccessToken(context.Background(), entity, "established-refresh", &established)
+				h.seedSession(t, principal, provider.ID, &established)
+				_, err := h.service.ForceRefreshSession(context.Background(), principal, provider.ID)
 				require.NoError(t, err)
-				assert.Equal(t, "credential-access", token.AccessToken)
 			}
+			persisted, err := h.sessions.FindByPrincipalAndService(context.Background(), principal, provider.ID)
+			require.NoError(t, err)
+			assert.ElementsMatch(t, []string{"repo", "user"}, persisted.Scope)
 			for _, request := range h.endpoint.captured(t) {
 				assert.Equal(t, "retired-secret", request.secret, "the retired endpoint must never receive replacement credentials")
 			}
@@ -490,7 +493,7 @@ func TestCredentialSelection_ReselectionKeepsReplacementSecretAtCurrentEndpoint(
 				assert.Equal(t, "same-client", request.clientID)
 				assert.Equal(t, "replacement-secret", request.secret)
 				if operation == "refresh" {
-					assert.Equal(t, "established-refresh", request.form.Get("refresh_token"))
+					assert.Equal(t, "legacy-refresh", request.form.Get("refresh_token"))
 				} else {
 					assert.Equal(t, "credential-code", request.form.Get("code"))
 				}

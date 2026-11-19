@@ -589,7 +589,7 @@ func (s *OAuth2SessionService) exchangeCodeWithRetry(
 	established *id.ClientID,
 	code string,
 	verifier string,
-) (resultToken *oauth2.Token, resultErr error) {
+) (resultToken *oauth2.Token, resultProvider *model.ThirdpartyOAuth2ProviderEntity, resultErr error) {
 	defer func() {
 		if resultErr != nil && ctx.Err() != nil && ctx.Value(sharedRefreshContextKey{}) != true {
 			resultErr = callerCanceledError(ctx, OperationCodeExchange, resultErr)
@@ -600,19 +600,19 @@ func (s *OAuth2SessionService) exchangeCodeWithRetry(
 	for attempt := range s.config.MaxRetries {
 		clientID, clientSecret, selected, err := s.selectCredentials(ctx, service, credentialOperationExchange, established)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if (selected.Discovery.ResourceURL != nil) != (service.Discovery.ResourceURL != nil) ||
 			(selected.Discovery.ResourceURL != nil && (selected.IssuerURI != service.IssuerURI || selected.AuthorizationParams["resource"] != service.AuthorizationParams["resource"])) {
-			return nil, ErrInvalidStateToken
+			return nil, nil, ErrInvalidStateToken
 		}
 		config, err := s.buildOAuth2Config(selected, callbackURL)
 		if err != nil {
-			return nil, sessionOperationError(ctx, OperationCodeExchange, DetailConfiguration, errors.Join(ErrInvalidConfiguration, err))
+			return nil, nil, sessionOperationError(ctx, OperationCodeExchange, DetailConfiguration, errors.Join(ErrInvalidConfiguration, err))
 		}
 		client, err := s.tokenHTTPClient(selected)
 		if err != nil {
-			return nil, sessionOperationError(ctx, OperationCodeExchange, DetailConfiguration, errors.Join(ErrInvalidConfiguration, err))
+			return nil, nil, sessionOperationError(ctx, OperationCodeExchange, DetailConfiguration, errors.Join(ErrInvalidConfiguration, err))
 		}
 		attemptCtx := context.WithValue(ctx, oauth2.HTTPClient, client)
 		// Try to exchange code for token
@@ -628,12 +628,12 @@ func (s *OAuth2SessionService) exchangeCodeWithRetry(
 		}
 		if selected.IsCIMDConfidentialClient() {
 			if s.cimdAssertionSigner == nil {
-				return nil, NewOperationError(NewErrorMetadata(OperationCodeExchange, DetailConfiguration).WithDependency(DependencySigning), ports.ErrCIMDKeyUnavailable)
+				return nil, nil, NewOperationError(NewErrorMetadata(OperationCodeExchange, DetailConfiguration).WithDependency(DependencySigning), ports.ErrCIMDKeyUnavailable)
 			}
 			assertion, err := s.cimdAssertionSigner.SignClientAssertion(ctx, selected.ClientID, selected.Endpoints.TokenEndpoint)
 			if err != nil {
 				failure := sessionOperationError(ctx, OperationCodeExchange, DetailProviderUnavailable, errors.Join(ports.ErrCIMDKeyUnavailable, err))
-				return nil, failure.WithMetadata(failure.Metadata().WithDependency(DependencySigning))
+				return nil, nil, failure.WithMetadata(failure.Metadata().WithDependency(DependencySigning))
 			}
 			opts = append(opts,
 				oauth2.SetAuthURLParam("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"),
@@ -644,7 +644,7 @@ func (s *OAuth2SessionService) exchangeCodeWithRetry(
 		config.ClientSecret = clientSecret
 		token, err := config.Exchange(attemptCtx, code, opts...)
 		if err == nil {
-			return token, nil
+			return token, selected, nil
 		}
 		if selected.CredentialSource == model.CredentialSourceFilesystem && credentialProviderRejected(err) {
 			s.auditCredentialProviderRejection(ctx, service.ID, credentialOperationExchange)
@@ -655,11 +655,11 @@ func (s *OAuth2SessionService) exchangeCodeWithRetry(
 			lastErr = safeTokenExchangeError(err)
 		}
 		if (selected.IsCIMDConfidentialClient() || selected.Discovery.ClientMethod == model.ClientBootstrapDCR) && tokenExchangeErrorIsPermanent(err) {
-			return nil, lastErr
+			return nil, nil, lastErr
 		}
 
 		if ctx.Err() != nil {
-			return nil, sessionOperationError(ctx, OperationCodeExchange, DetailCallerCanceled, errors.Join(lastErr, ctx.Err()))
+			return nil, nil, sessionOperationError(ctx, OperationCodeExchange, DetailCallerCanceled, errors.Join(lastErr, ctx.Err()))
 		}
 		if attempt == s.config.MaxRetries-1 || !shouldRetryTokenExchange(err) {
 			break
@@ -679,11 +679,11 @@ func (s *OAuth2SessionService) exchangeCodeWithRetry(
 		case <-time.After(delay):
 			// Continue to next retry
 		case <-ctx.Done():
-			return nil, sessionOperationError(ctx, OperationCodeExchange, DetailCallerCanceled, errors.Join(lastErr, ctx.Err()))
+			return nil, nil, sessionOperationError(ctx, OperationCodeExchange, DetailCallerCanceled, errors.Join(lastErr, ctx.Err()))
 		}
 	}
 
-	return nil, lastErr
+	return nil, nil, lastErr
 }
 
 // =============================================================================
@@ -994,7 +994,7 @@ func (s *OAuth2SessionService) HandleCallback(
 
 	// Exchange authorization code for tokens (with retry)
 	s.logger.InfoContext(ctx, "exchanging authorization code for token", "service_id", req.ServiceID, "operation", OperationCodeExchange)
-	token, err := s.exchangeCodeWithRetry(ctx, callbackURL, service, claims.UpstreamClientID, req.Code, claims.PKCEVerifier)
+	token, selected, err := s.exchangeCodeWithRetry(ctx, callbackURL, service, claims.UpstreamClientID, req.Code, claims.PKCEVerifier)
 	if err != nil {
 		if errors.Is(err, model.ErrCredentialSourceUnavailable) {
 			return nil, err
@@ -1024,7 +1024,7 @@ func (s *OAuth2SessionService) HandleCallback(
 	scopes := make([]string, 0)
 	if scopeVal := token.Extra("scope"); scopeVal != nil {
 		if scopeStr, ok := scopeVal.(string); ok && scopeStr != "" {
-			separator := service.Flavor.ScopeSeparator()
+			separator := selected.Flavor.ScopeSeparator()
 			for _, s := range strings.Split(scopeStr, separator) {
 				if trimmed := strings.TrimSpace(s); trimmed != "" {
 					scopes = append(scopes, trimmed)
@@ -1034,7 +1034,7 @@ func (s *OAuth2SessionService) HandleCallback(
 	}
 	if len(scopes) == 0 {
 		// Fall back to service scopes
-		for _, scope := range service.Scopes {
+		for _, scope := range selected.Scopes {
 			scopes = append(scopes, scope.ScopeValue)
 		}
 	}
@@ -1081,7 +1081,8 @@ func (s *OAuth2SessionService) RefreshAccessToken(
 			s.auditCredentialSourceFailure(ctx, entity.ID, credentialOperationRefresh, resultErr)
 		}
 	}()
-	return s.refreshAccessToken(ctx, entity, refreshToken, established)
+	token, _, err := s.refreshAccessToken(ctx, entity, refreshToken, established)
+	return token, err
 }
 
 func (s *OAuth2SessionService) refreshAccessToken(
@@ -1089,17 +1090,17 @@ func (s *OAuth2SessionService) refreshAccessToken(
 	entity *model.ThirdpartyOAuth2ProviderEntity,
 	refreshToken string,
 	established *id.ClientID,
-) (resultToken *oauth2.Token, resultErr error) {
+) (resultToken *oauth2.Token, resultProvider *model.ThirdpartyOAuth2ProviderEntity, resultErr error) {
 	defer func() {
 		if resultErr != nil && ctx.Err() != nil && ctx.Value(sharedRefreshContextKey{}) != true {
 			resultErr = callerCanceledError(ctx, OperationRefresh, resultErr)
 		}
 	}()
 	if err := ctx.Err(); err != nil {
-		return nil, sessionOperationError(ctx, OperationRefresh, DetailProviderUnavailable, err)
+		return nil, nil, sessionOperationError(ctx, OperationRefresh, DetailProviderUnavailable, err)
 	}
 	if entity == nil {
-		return nil, sessionOperationError(ctx, OperationRefresh, DetailConfiguration, errors.New("service entity cannot be nil"))
+		return nil, nil, sessionOperationError(ctx, OperationRefresh, DetailConfiguration, errors.New("service entity cannot be nil"))
 	}
 
 	isCIMDClient := entity.IsCIMDConfidentialClient()
@@ -1107,13 +1108,13 @@ func (s *OAuth2SessionService) refreshAccessToken(
 		if isCIMDClient {
 			s.auditCIMDTokenAcquisition(ctx, entity.ID, "refresh", "rejected")
 		}
-		return nil, sessionOperationError(ctx, OperationRefresh, DetailConfiguration, fmt.Errorf("%w: %w", ErrInvalidConfiguration, err))
+		return nil, nil, sessionOperationError(ctx, OperationRefresh, DetailConfiguration, fmt.Errorf("%w: %w", ErrInvalidConfiguration, err))
 	}
 	if refreshToken == "" {
 		if isCIMDClient {
 			s.auditCIMDTokenAcquisition(ctx, entity.ID, "refresh", "rejected")
 		}
-		return nil, sessionOperationError(ctx, OperationRefresh, DetailRefreshUnavailable, ErrRefreshNotAvailable)
+		return nil, nil, sessionOperationError(ctx, OperationRefresh, DetailRefreshUnavailable, ErrRefreshNotAvailable)
 	}
 
 	clientID, clientSecret, selected, err := s.selectCredentials(ctx, entity, credentialOperationRefresh, established)
@@ -1121,7 +1122,7 @@ func (s *OAuth2SessionService) refreshAccessToken(
 		if isCIMDClient {
 			s.auditCIMDTokenAcquisition(ctx, entity.ID, "refresh", "rejected")
 		}
-		return nil, err
+		return nil, nil, err
 	}
 	entity = selected
 	isCIMDClient = entity.IsCIMDConfidentialClient()
@@ -1130,7 +1131,7 @@ func (s *OAuth2SessionService) refreshAccessToken(
 		if isCIMDClient {
 			s.auditCIMDTokenAcquisition(ctx, entity.ID, "refresh", "rejected")
 		}
-		return nil, sessionOperationError(ctx, OperationRefresh, DetailConfiguration, errors.Join(ErrInvalidConfiguration, err))
+		return nil, nil, sessionOperationError(ctx, OperationRefresh, DetailConfiguration, errors.Join(ErrInvalidConfiguration, err))
 	}
 
 	attempts := max(s.config.MaxRetries, 1)
@@ -1142,7 +1143,7 @@ func (s *OAuth2SessionService) refreshAccessToken(
 				s.auditCIMDTokenAcquisition(ctx, entity.ID, "refresh", "success")
 			}
 			s.logger.InfoContext(ctx, "access token refreshed", "service_id", entity.ID, "operation", OperationRefresh, "attempt", attempt+1)
-			return token, nil
+			return token, entity, nil
 		}
 		lastErr = err
 		if !outcome.retryable || attempt == attempts-1 || ctx.Err() != nil {
@@ -1175,7 +1176,7 @@ func (s *OAuth2SessionService) refreshAccessToken(
 	if isCIMDClient {
 		s.auditCIMDTokenAcquisition(ctx, entity.ID, "refresh", "rejected")
 	}
-	return nil, lastErr
+	return nil, nil, lastErr
 }
 
 // refreshAttemptOutcome tells the retry loop whether a failed attempt may be repeated.
@@ -1929,7 +1930,7 @@ func (s *OAuth2SessionService) refreshSessionTokens(ctx context.Context, session
 		return sessionOperationError(ctx, OperationRefresh, DetailRefreshUnavailable, ErrRefreshNotAvailable)
 	}
 
-	newToken, err := s.refreshAccessToken(ctx, service, refreshToken, session.UpstreamClientID)
+	newToken, selected, err := s.refreshAccessToken(ctx, service, refreshToken, session.UpstreamClientID)
 	if ctx.Err() == nil && (err == nil || sessionFailureMetadata(err).Detail() == DetailRefreshRejected) {
 		if _, identityErr := s.checkSessionIdentity(ctx, session, OperationRefresh); identityErr != nil {
 			return identityErr
@@ -1946,7 +1947,7 @@ func (s *OAuth2SessionService) refreshSessionTokens(ctx context.Context, session
 		return sessionOperationError(ctx, OperationRefresh, DetailProviderResponseInvalid, errors.New("upstream provider returned nil token"))
 	}
 
-	if err := s.setSessionTokens(ctx, session, newToken, service.Flavor); err != nil {
+	if err := s.setSessionTokens(ctx, session, newToken, selected.Flavor); err != nil {
 		s.logger.ErrorContext(ctx, "failed to update session with refreshed tokens", "service_id", serviceID, "oauth2_session", sessionFailureMetadata(err))
 		return err
 	}

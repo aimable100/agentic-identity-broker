@@ -704,6 +704,7 @@ These options control the authorization-code flow and token refresh for third-pa
 - If a reconnect omits `refresh_token`, the broker accepts the new access token and clears the stored refresh token and any recorded rejection. This prevents combining credentials from different upstream accounts. The connection requires login again after the new access token expires. To restore automatic refresh, obtain a new refresh token through provider consent. For providers that require it, configure `prompt=consent` through the service's authorization parameters.
 - The broker does not infer or record refresh-token expiry from provider-specific lifetime fields. It records only an observed provider `invalid_grant` rejection, which requires the user to log in again. Provider rejection remains authoritative.
 - The broker accepts access-token `expires_in` values as JSON numbers or numeric strings. During refresh, absent or null metadata leaves expiry unspecified. Malformed or unrepresentable values, including positive lifetimes below one second, fail with `provider_response_invalid`. Other positive fractions are truncated to whole seconds. Refresh commits explicit token type and scope with the new tokens. An omitted scope retains the stored scope; an explicit empty scope clears it. GitHub scopes use comma separators.
+- After credential reselection, callback and refresh scope processing uses the provider snapshot that supplied the successful token request, including its scope separator and callback fallback scopes.
 
 **Notes:**
 

@@ -32,7 +32,7 @@ func TestExchangeCodeWithRetry_UsesConfiguredClientTimeout(t *testing.T) {
 	}
 	provider := &model.ThirdpartyOAuth2ProviderEntity{ClientID: "client", TokenEndpointAuthMethod: model.TokenEndpointAuthMethodNone, Endpoints: model.OAuth2Endpoints{TokenEndpoint: server.URL}}
 
-	token, err := service.exchangeCodeWithRetry(context.Background(), "", provider, nil, "code", "verifier")
+	token, _, err := service.exchangeCodeWithRetry(context.Background(), "", provider, nil, "code", "verifier")
 	require.Nil(t, token)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 }
@@ -65,7 +65,7 @@ func TestExchangeCodeWithRetry_DoesNotRetryNonTransientResponses(t *testing.T) {
 			}
 			provider := &model.ThirdpartyOAuth2ProviderEntity{ClientID: "client", TokenEndpointAuthMethod: model.TokenEndpointAuthMethodNone, Endpoints: model.OAuth2Endpoints{TokenEndpoint: server.URL}}
 
-			token, err := service.exchangeCodeWithRetry(context.Background(), "", provider, nil, "code", "verifier")
+			token, _, err := service.exchangeCodeWithRetry(context.Background(), "", provider, nil, "code", "verifier")
 			require.Nil(t, token)
 			require.ErrorIs(t, err, ErrTokenExchange)
 			require.Equal(t, int32(1), requests.Load())
@@ -97,7 +97,7 @@ func TestExchangeCodeWithRetry_RetriesNetworkFailure(t *testing.T) {
 	}
 	provider := &model.ThirdpartyOAuth2ProviderEntity{ClientID: "client", TokenEndpointAuthMethod: model.TokenEndpointAuthMethodNone, Endpoints: model.OAuth2Endpoints{TokenEndpoint: server.URL}}
 
-	token, err := service.exchangeCodeWithRetry(context.Background(), "", provider, nil, "code", "verifier")
+	token, _, err := service.exchangeCodeWithRetry(context.Background(), "", provider, nil, "code", "verifier")
 	require.NoError(t, err)
 	require.Equal(t, "retried", token.AccessToken)
 	require.Equal(t, int32(2), requests.Load())

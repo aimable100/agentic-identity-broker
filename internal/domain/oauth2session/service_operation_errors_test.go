@@ -386,7 +386,7 @@ func TestExchangeAndRefreshLogsOmitURLAndCredentialMaterial(t *testing.T) {
 				require.NoError(t, err)
 				service.config.MaxRetries = 2
 				service.config.RetryBaseDelay = time.Nanosecond
-				_, err = service.exchangeCodeWithRetry(context.Background(), "", provider, nil, "sentinel-code", "sentinel-verifier")
+				_, _, err = service.exchangeCodeWithRetry(context.Background(), "", provider, nil, "sentinel-code", "sentinel-verifier")
 				assert.ErrorIs(t, err, cause)
 				assert.NotContains(t, err.Error(), "sentinel-")
 			} else {
