@@ -9,8 +9,8 @@ on:
   github-app:
     client-id: ${{ vars.AGENTIC_WORKFLOWS_APP_CLIENT_ID }}
     private-key: ${{ secrets.AGENTIC_WORKFLOWS_APP_PRIVATE_KEY }}
-    owner: zalando-incubator
-    repositories: [agentic-identity-broker]
+    owner: ${{ github.repository_owner }}
+    repositories: ["${{ github.repository }}"]
 
 permissions:
   contents: read
@@ -27,8 +27,8 @@ safe-outputs:
   github-app:
     client-id: ${{ vars.AGENTIC_WORKFLOWS_APP_CLIENT_ID }}
     private-key: ${{ secrets.AGENTIC_WORKFLOWS_APP_PRIVATE_KEY }}
-    owner: zalando-incubator
-    repositories: [agentic-identity-broker]
+    owner: ${{ github.repository_owner }}
+    repositories: ["${{ github.repository }}"]
   threat-detection:
     # Keep detection on its small default model; without this it inherits the pinned agent model.
     model: ${{ vars.GH_AW_MODEL_DETECTION_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'detection' }}
@@ -133,7 +133,7 @@ Submit a review using `submit_pull_request_review` with your overall verdict. Se
 - Use `REQUEST_CHANGES` when there are issues that must be fixed before merging.
 - (Optionally) use `COMMENT` when you only have non-blocking observations.
 
-If the pull request's author is `zalando-incubator-agent-workflows[bot]`, always use `COMMENT`: this workflow reviews as that App, and GitHub rejects approving or requesting changes on its own pull request. Start the review body with `**Verdict: approve**` or `**Verdict: changes requested**` so a maintainer still sees your conclusion.
+If the pull request's author is a bot (a login ending in `[bot]`), always use `COMMENT`: this workflow reviews as the repository's Agentic Workflows App, you cannot tell which bot that is, and GitHub rejects approving or requesting changes on the App's own pull request. Start the review body with `**Verdict: approve**` or `**Verdict: changes requested**` so a maintainer still sees your conclusion.
 
 Always submit a review, including when you find nothing to fix. `noop` is only for the duplicate invocation in Step 1.
 
