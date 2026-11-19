@@ -495,6 +495,7 @@ Invalidation and recovery MUST have equivalent semantics across supported persis
 ### Frontend/Design System Requirements *(if applicable - document before implementation)*
 
 The existing consent and session-management experiences must distinguish a usable connection from one requiring sign-in. Use the repository's design system, semantic tokens, keyboard-accessible actions, and WCAG 2.1 AA contrast. No new visual language or universal component is prescribed. Preserve the existing tab-local return-state behavior, and avoid navigation loops after a failed reconnection. Browser acceptance tests must cover automatic consent, restored selections, failure/retry, and meaningful connection states with screenshots.
+Reuse the existing button variants for sign-in and recovery actions. Do not add feature-specific colors or green button overrides.
 
 ### Key Entities *(include if feature involves data)*
 

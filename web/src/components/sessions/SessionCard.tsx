@@ -130,7 +130,7 @@ export const SessionCard: React.FC<SessionCardProps> = ({
               size="sm"
               onClick={() => onLogin(session.service_id)}
               disabled={loading}
-              className="flex-shrink-0 bg-success-hover hover:bg-success-dark focus:ring-success-dark"
+              className="flex-shrink-0"
             >
               Login
             </Button>

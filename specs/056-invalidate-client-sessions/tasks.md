@@ -641,6 +641,8 @@ The primary and supplemental non-container acceptance journeys pass. Same-ID rot
 
 The six required captures are published in `tests/e2e/screenshots/`. Browser tests cover restored selections, original authorization completion, real provider denial, failure/retry, and keyboard actions. The status label changed from `Login required` to `Sign-in required`; badge-visibility assertions remain. The user selected darker existing semantic tokens for Login controls only. All unrelated badge, indicator, scope, and Refresh styling is unchanged. Changed Login text contrast is 5.49:1; its focus ring exceeds 3:1. This does not claim remediation of pre-existing contrast outside the changed sign-in states.
 
+The darker Login styling and its contrast figures in this historical record are superseded by the UI color correction below.
+
 | Validation | Observed result |
 |---|---|
 | `just check` | Passed, zero lint issues |
@@ -764,3 +766,9 @@ Validation performed:
 - Structural quality-delta remains non-clean. It reports normalized-constructor/bootstrap duplication and growth in the concurrency test. No suppression or acknowledgment was added.
 
 All requested Go, PostgreSQL/integration, backend E2E, and Docker E2E gates pass. No requested package was omitted. The security, frontend E2E, and ExtProc E2E gates were not rerun. No commit or push was made.
+
+### UI color correction — 2026-11-19
+
+The spec requires existing button variants without feature-specific colors. Session and service-requirement Login buttons use the standard secondary variant without green overrides. Existing success indicators remain unchanged.
+
+Validation: 54 component tests, ESLint, the production frontend build, and all eight client-identity browser recovery journeys passed. All six screenshot states were captured and inspected. The three affected session sign-in, reconnection-failure, and reconnection-decline screenshots were refreshed; the other tracked captures remain unchanged.
