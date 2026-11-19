@@ -1,10 +1,8 @@
 # Research: Service Icon Delivery and SVG Security
 
-## 1. Security contract selected during planning
+## 1. Browser rendering boundary
 
 **Decision:** Browser secure animated image mode is the primary boundary. Use bounded XML validation and named active-construct rejection at upload; retain accepted source exactly. Do not claim complete static detection of CSS, indirect-resource or animation capabilities.
-
-**Approval:** During this planning run, the stakeholder selected the image-mode option, including an explicit specification change. The alternative was to keep comprehensive upload rejection as an unresolved design blocker. The stakeholder separately instructed: “descope this. no need to be concerned here as svg is operator-provided” for rendering-resource budgets. The spec reflects both decisions. This does not approve unrelated API changes.
 
 **Rationale:** SVG 2 secure animated mode disables scripts, external references and interaction while permitting declarative animation. Same-document and data references are distinct from external references. This closely matches broad visual compatibility without implementing a browser parser.
 
@@ -14,7 +12,7 @@
 
 ## 2. Library findings
 
-**Decision:** Standard Go XML/UTF-8 parsing plus direct named-construct checks is sufficient for the newly narrowed upload policy. No SVG sanitizer dependency is selected. This is a parser-backed policy for explicit constructs, not a general-purpose sanitizer or comprehensive security certification of source.
+**Decision:** Use standard Go XML/UTF-8 parsing and direct checks for the upload policy in [contracts/service-icons.md](contracts/service-icons.md). No SVG sanitizer dependency is needed. This is not a general-purpose sanitizer or security certification of source.
 
 **Rationale:** Reviewed candidates do not satisfy the former full contract. [bluemonday](https://github.com/microcosm-cc/bluemonday) is an HTML allowlist sanitizer. [DOMPurify's threat model](https://github.com/cure53/DOMPurify/wiki/Security-Goals-%26-Threat-Model) excludes complete CSS and external-request prevention; its sanitized result, not inspection of removed items, is the security output. [svg-hush](https://github.com/cloudflare/svg-hush) rewrites a finite SVG vocabulary and allows same-origin paths. [PHP svg-sanitizer](https://github.com/darylldoyle/svg-sanitizer) documents best-effort CSS handling. These findings do not prove a complete validator is impossible; they do rule out an unsupported turnkey-library claim here.
 
@@ -32,7 +30,7 @@
 
 ## 4. Delivery and persistence
 
-**Decision:** Embed exact source in existing authenticated JSON and encode it only into an img data source. No navigable SVG endpoint, public assets, provider discovery, remote fetch or operator image URL. Existing field proposals remain subject to API confirmation.
+**Decision:** Embed exact source in existing authenticated JSON and encode it only into an img data source. No navigable SVG endpoint, public assets, provider discovery, remote fetch or operator image URL. The [contract](contracts/service-icons.md) records the API fields and explicit stakeholder approval in this conversation.
 
 **Rationale:** Authentication already scopes metadata access. A source change changes the image input without a revision protocol. JSON text is not an SVG active document. Source is not safe for arbitrary downstream inline/document use; document this explicitly in API descriptions.
 
@@ -44,8 +42,8 @@
 
 **Decision:** Existing service aggregate, presence-aware Admin handling, memory/PostgreSQL records, current consent/session projections and one service-specific frontend image composition. No new entity, repository, config, telemetry or infrastructure.
 
-**Source evidence:** ServiceRequest.UnmarshalJSON retains request presence; provider prepareUpdate reads persisted state and applies existing field merges. SPA currently sets frame-ancestors only. Extend these existing paths, preserve row versions and add no icon-only mandatory If-Match. The agent-referenced available_services correction and all external field additions require API review.
+**Source evidence:** ServiceRequest.UnmarshalJSON retains request presence; provider prepareUpdate reads persisted state and applies existing field merges. SPA currently sets frame-ancestors only. Extend these paths, preserve row versions and add no icon-only mandatory If-Match. Permission-set rows derive names from existing data.services; carry iconSvg through that mapping without adding a catalog. AppLayout uses userInfo.pictureUrl, so a new same-origin-only img-src policy would break remote avatars.
 
 **Rationale:** Session source must reflect the current service, never a session-creation snapshot. Key only image failure state by source so recovery does not remount actions. Existing consent/session caches remain authoritative; fresh-response observation is required.
 
-**Remaining gates:** API confirmation and publication, an Accepted timestamp-named ADR, glossary/architecture updates and test-first implementation. There is no unresolved technical mechanism selection under the approved contract. Tasks must be regenerated; no implementation has occurred.
+**Remaining gates:** Canonical API publication, security review, an Accepted timestamp-named ADR, glossary/architecture updates and test-first implementation. Stakeholder API approval is complete, as recorded in the contract. It does not supply security review or ADR acceptance.

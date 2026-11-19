@@ -1,11 +1,11 @@
 openapi: 3.0.3
 info:
-  title: Proposed service icon schema additions
+  title: Service icon schema additions
   version: 0.1.0
   description: >-
-    Design artifact only. Merge these properties into the existing canonical Admin
-    and end-user schemas after stakeholder confirmation. Paths, authentication,
-    response envelopes, concurrency and errors remain in the canonical contracts.
+    API fields explicitly approved by the stakeholder in this conversation;
+    see service-icons.md for the approval record. Merge these properties into the
+    canonical schemas before implementation. Existing API semantics stay unchanged.
 paths: {}
 components:
   schemas:
@@ -41,8 +41,9 @@ components:
     ConsentServiceIconProperties:
       type: object
       description: >-
-        Add to ThirdpartyService and ServiceRequirementForUser. Authenticated
-        JSON only. Server omits absent values; consumers accept omitted or null.
+        Add to ServiceRequirementForUser in data.services, also reused by
+        permission-set service rows. Authenticated JSON only. Server omits absent
+        values; consumers accept omitted or null. No additional catalog is needed.
       properties:
         iconSvg:
           $ref: '#/components/schemas/ServiceIconSvg'
@@ -54,13 +55,4 @@ components:
         consumers accept omitted or null.
       properties:
         service_icon_svg:
-          $ref: '#/components/schemas/ServiceIconSvg'
-    AvailableServiceIconProperties:
-      type: object
-      description: >-
-        Add to AvailableService entries in the authenticated available_services
-        catalog. Deduplicate by service ID across the agent's requirements and
-        assigned permission sets; do not repeat SVG in permission-set scopes.
-      properties:
-        icon_svg:
           $ref: '#/components/schemas/ServiceIconSvg'

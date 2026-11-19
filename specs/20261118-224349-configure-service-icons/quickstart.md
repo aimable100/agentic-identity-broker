@@ -4,7 +4,7 @@ This guide describes checks after implementation, not current capabilities. See 
 
 ## Prerequisites
 
-Use Go/Node versions in the manifests, just, existing test tools and Playwright browsers. PostgreSQL restart/migration cases require Docker or Podman. Complete API confirmation/publication and ADR/glossary/test-first gates before behavior changes. Use original synthetic artwork, never a required third-party logo or local download.
+Use Go/Node versions in the manifests, just, existing test tools and Playwright Chromium. PostgreSQL restart/migration cases require Docker or Podman. Stakeholder API approval is recorded in [the contract](contracts/service-icons.md). Publish the approved canonical contract and complete security review, ADR/glossary and test-first gates before behavior changes. Use original synthetic artwork, never a required third-party logo or local download.
 
 ## Commands
 
@@ -24,14 +24,14 @@ Run just verify before the PR per CONTRIBUTING.md. Record actual results and una
 
 ## Journeys
 
-1. Create Atlas Files with the original inline SVG from spec.md; read/list exact source. Establish consent/grant/session with existing fixtures. Restart against the same PostgreSQL database without reseeding; inspect actual consent/session images.
+1. Create Atlas Files with the original inline SVG from spec.md; read/list exact source. Establish consent/grant/session with existing fixtures. In the backend Docker suite, restart against the same PostgreSQL database without reseeding. Verify exact source in fresh authenticated consent/session responses. Keep restart support out of the browser harness.
 2. Replace source and obtain genuinely fresh responses. Omission preserves; null clears and restores each original fallback. The other service sharing the same artwork remains unchanged. Existing five-/two-minute caches are not bypassed by merely invoking a cached refetch.
 3. Submit malformed XML, empty input, URL/path input, prohibited active constructs and a 65,537-byte SVG. Reject atomically even alongside credentials/metadata edits. Accept a valid exactly-65,536-byte source; cover decoded UTF-8 bytes rather than wire characters.
-4. Submit valid visual examples with styles, filters, masks, patterns, text, local reuse, inert media and declarative animation. Check visual fidelity against browser image mode, with equal animation timeline points. No exhaustive drawing vocabulary is required.
-5. Include external references in otherwise accepted source, including CSS and animated values. With built SPA in actual supported browsers, observe zero external loads, script execution or interaction; inspect no inline SVG insertion. Explicit script/event/hyperlink/foreignObject constructs still reject upload. Do not confuse accepted source with safe inline/document markup.
+4. Submit valid visual examples with styles, filters, masks, patterns, text, local reuse, inert media, animation and a DOCTYPE without an internal subset. Verify exact source through API round trips and decoded data URIs. In Chromium, verify image complete and naturalWidth > 0. Keep meaningful-state screenshots; no pixel comparisons or synchronized animation checks are required. Reject internal subsets, entity declarations and unknown entity references without resolving a DTD.
+5. Include external references in otherwise accepted source, including CSS and animated values. With the built SPA in Chromium, observe zero icon-related external loads, script execution or interaction; inspect no inline SVG insertion. Verify remote user avatars still render under the revised CSP. Explicit script/event/hyperlink/foreignObject constructs still reject upload. Do not confuse accepted source with safe inline/document markup.
 6. Without authentication, read every actual delivery path; existing failures must contain no SVG bytes.
 7. Cause a deterministic browser image error with valid stored source, retain usable controls/fallback, replace source and observe recovery in the open page without remounting actions. Verify decorative alt/focus behavior and narrow/wide views. Save configured/unset/failed/recovered screenshots under tests/e2e/screenshots/.
 
 ## Evidence and limits
 
-Map all twelve scenario IDs to one canonical It each as in plan.md. Record production migration up/down/up, unchanged preexisting rows and real PostgreSQL restart results. Verify actual built-SPA security headers and browser isolation, not only mocked events. No rendering-resource budget or stress suite is required; operator artwork may be expensive. This planning command does not claim runtime verification.
+Map all twelve scenario IDs to one canonical It each as in plan.md. Record production migration up/down/up, unchanged preexisting rows and backend Docker restart results. Verify built-SPA security headers and Chromium isolation, not only mocked events. No new browser matrix, browser restart harness or image-diff tooling is required. Rendering-resource budgets and stress tests are out of scope; operator artwork can be expensive. These planned checks are not runtime evidence.

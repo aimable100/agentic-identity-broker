@@ -10,10 +10,8 @@ The existing third-party service owns an optional **Service Icon**: an absent va
 | Admin create/update input | Presence + nullable SVG string | Three distinct states: absent, null, value |
 | Memory service record | Optional SVG string | Copy/round-trip with existing service metadata |
 | PostgreSQL service row | Nullable `icon_svg` text | NULL means absent; decoded UTF-8 source is 1–65,536 bytes |
-| Consent service projection | Optional `iconSvg` | Current service source, independent of granted scopes |
-| Consent requirement projection | Optional `iconSvg` | Current source for mandatory and optional requirements |
+| Consent service/requirement projection | Optional `iconSvg` | Current source on existing `ServiceRequirementForUser` entries, reused by permission-set rows |
 | Session summary/detail projection | Optional `service_icon_svg` | Current referenced service source, not a session snapshot |
-| Available-service catalog | Optional `icon_svg` per distinct service | Agent-referenced requirements and permission-set services, redacted and deduplicated |
 
 `contracts/service-icons.md` defines named XML rejection checks and external JSON semantics. Database checks protect null/nonempty/size shape; application validation enforces the input contract. SQL `octet_length` measures bytes, not characters.
 

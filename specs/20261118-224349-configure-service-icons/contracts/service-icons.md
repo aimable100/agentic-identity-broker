@@ -1,8 +1,8 @@
-# Proposed Service Icon Contract
+# Service Icon Contract
 
-Status: designed for stakeholder review, not approval to implement. Incorporate the schemas in `schemas.yaml` into both canonical OpenAPI documents, with endpoint examples and existing authentication/error definitions, before behavior changes. Additive icon fields do not authorize changes to any existing field or API versioning rule.
+**API approval:** The stakeholder explicitly approved all outstanding API drafts in this conversation: “I approve all outstanding API drafts. mark them accordingly”. This approval covers Admin `icon_svg`, consent `ServiceRequirementForUser.iconSvg`, session `service_icon_svg`, and the omission/null/value semantics below. The [consent scope correction](https://github.com/zalando-incubator/agentic-identity-broker/pull/510#discussion_r4632042688) remains part of the approved contract. No separate `available_services` response or `ThirdpartyService` extension is approved or required.
 
-**Approved design — 2026-11-19**: Browser image mode is the primary rendering security boundary. Upload checks reject malformed/oversized source and named active constructs, not every possible unsafe CSS/reference/animation behavior. Rendering-resource budgets are explicitly out of scope for operator-provided artwork. API field/delivery approval and ADR acceptance remain separate implementation gates.
+Publish the approved schemas in `schemas.yaml` in both canonical OpenAPI documents before behavior changes. Include endpoint examples and existing authentication/error definitions. Additive icon fields do not authorize changes to existing fields or API versioning rules. This API approval does not supply security review or ADR acceptance; both remain separate implementation gates.
 
 ## Admin API
 
@@ -14,31 +14,29 @@ Successful writes retain existing 201/200 status, response envelope, authorizati
 
 | Existing schema | New property | Consumers |
 |---|---|---|
-| `ThirdpartyService` | `iconSvg` | Scoped consent service identities |
-| `ServiceRequirementForUser` | `iconSvg` | Mandatory and optional service requirements |
+| `ServiceRequirementForUser` | `iconSvg` | Existing `data.services` entries, reused by service cards, requirement rows and permission-set service rows |
 | `UserSessionSummary` | `service_icon_svg` | Session list and inherited `SessionStatus` details |
-| `AvailableService` | `icon_svg` | Deduplicated `available_services` catalog for permission-set-only service rows |
 
 Example consent service excerpt:
 
 ```json
-{"serviceId":"880e8400-e29b-41d4-a716-446655440010","displayName":"Atlas Files","iconSvg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path fill=\"currentColor\" d=\"M4 4h16v16H4z\"/></svg>","scopes":[{"value":"files.read","description":"Read files"}]}
+{"serviceId":"880e8400-e29b-41d4-a716-446655440010","serviceName":"Atlas Files","iconSvg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path fill=\"currentColor\" d=\"M4 4h16v16H4z\"/></svg>","requirementType":"mandatory","requiredScopes":[{"name":"files.read","description":"Read files"}],"connectionStatus":"connected"}
 ```
 
-Session list/detail use the same source under `service_icon_svg`. Requirement entries use `iconSvg` beside their existing `serviceId` and `serviceName`. These extend the existing authenticated consent and `/api/third-party/sessions` responses; no separate endpoint is added. Detail responses and any refresh response returning a session summary use the same projection.
+Session list/detail use the same source under `service_icon_svg`. Consent entries use `iconSvg` beside their existing `serviceId` and `serviceName`. These extend existing authenticated consent and `/api/third-party/sessions` responses; no separate endpoint is added. Detail responses and any refresh response returning a session summary use the same projection.
 
 The server omits absent source. Clients accept omission or null and replace their prior metadata rather than merging a cleared field back from stale state. A new source replaces the previous image; identical source is identical content. No revision token, image cache lifetime, or obsolete-resource status is needed. Existing JSON caching/authentication rules apply; do not introduce shared/public caching. Unauthenticated requests receive the existing route's authentication failure and no icon bytes.
 
-The current handler does not emit the already-documented `available_services` catalog. Emit one redacted entry per distinct service referenced by this agent's requirements or assigned permission sets, using `id`, `display_name` and optional `icon_svg`. Example: `{"id":"880e8400-e29b-41d4-a716-446655440010","display_name":"Atlas Files"}` for an absent icon. Resolve this catalog in the domain service, map it through the API client, and use it for permission-set identity rows. Do not place source documents on individual permission-set scope records. The catalog's agent-referenced scope and addition to actual responses require explicit review; do not assume the existing documentation authorizes an unrestricted service listing.
+Permission-set rows already obtain service names from `data.services`. Carry `iconSvg` through that same frontend mapping. Do not emit `available_services` or repeat SVG source on permission-set scope records. Preserve the existing service filtering and response scope.
 
-`ThirdpartyService.logoUrl` already appears in canonical documentation. It is not an operator icon source. Do not remove or change its released semantics without explicit approval and the applicable versioning decision; the feature renderer consumes only `iconSvg`. Reconcile its documented role and actual implementation during API review, rather than silently turning it into an alias or remote fallback.
+The unused canonical `ThirdpartyService` schema, including `logoUrl`, remains unchanged. It needs no icon property for this feature. Do not turn `logoUrl` into an SVG alias or remote fallback.
 
 ## Upload validation and rendering boundary
 
-The stakeholder selected image-mode isolation during planning. Upload validation is deliberately limited to well-formed input and named active constructs, not complete SVG/CSS capability detection. Accepted source is not safe for arbitrary inline/document use.
+Browser image mode is the primary rendering boundary. Upload validation checks well-formed input and named active constructs, not all SVG/CSS capabilities. Accepted source is not safe for arbitrary inline/document use.
 
 1. Measure after JSON decoding: valid UTF-8, nonempty, at most 65,536 bytes. Parse strict XML using standard encoding/xml without resource resolution. Require one root `svg` in the SVG namespace, properly nested elements and no trailing non-whitespace content. Reject malformed XML and duplicate attributes; accept ordinary comments, harmless metadata, aliases and visual content.
-2. Reject XML directives, DTD/entity declarations and processing instructions except a single initial UTF-8 XML declaration. Never install an external resolver or custom entity table.
+2. Permit at most one SVG DOCTYPE before the root, with an optional external PUBLIC or SYSTEM identifier and no internal subset. This includes standard SVG 1.1 exports. Reject internal subsets, entity declarations, other XML directives and processing instructions except a single initial UTF-8 XML declaration. Never resolve or fetch a DTD, install an external resolver or set a custom entity table. Unknown entity references still fail strict XML parsing.
 3. For every parsed element, reject local names `script`, `a` and `foreignObject`, compared ASCII case-insensitively regardless of namespace. Reject event-handler attributes whose local names start with ASCII-insensitive `on`, including namespaced forms. Check root and descendants equally.
 4. For decoded attribute values, reject a leading `javascript:` or `vbscript:` scheme after removing ASCII control/space characters and comparing ASCII-insensitively. This explicit check does not parse CSS or certify arbitrary attribute/animated values. The browser remains the primary boundary for those capabilities.
 5. Do not implement an SVG geometry/value vocabulary, CSS sanitizer, reference graph, animation analyzer, media decoder or rendering-cost model. Preserve accepted bytes exactly. No third-party artwork, hash or local download is required.
@@ -51,12 +49,12 @@ Rendering-resource budgets and stress tests are out of scope by explicit stakeho
 
 Use only `<img src="data:image/svg+xml;charset=utf-8,...">` with URI-encoded exact source and empty alt text. Never interpolate SVG markup or permit object/embed/iframe/document delivery. Do not expose a navigable SVG endpoint. JSON authentication controls receipt of bytes, not arbitrary reuse of bytes an authorized client copies.
 
-Preserve existing security headers and propose `frame-ancestors 'none'; img-src 'self' data:; object-src 'none'` for the built SPA. This policy requires API/ADR review of its SPA-wide effects. No new script/style permission is needed. Do not claim the parent CSP independently provides the SVG image-mode guarantees; verify the actual built image context in supported browsers.
+Preserve existing security headers. Use `frame-ancestors 'none'; object-src 'none'` for the built SPA, subject to security review and ADR acceptance. Add no `img-src` or `default-src` restriction: existing remote user avatars and agent images must remain available. No new script/style permission is needed. Parent CSP does not supply the SVG image-mode guarantees; verify the built image context in Chromium and retain remote-avatar coverage.
 
 Source-key only the image load/error state. Keep visible service names, original caller fallbacks and working controls during failure, replacement and clearing. Existing data refresh/cache lifetimes remain unchanged.
 
 ## Required security and contract cases
 
-Original visual examples must cover styles, text, effects, local reuse, embedded media and declarative animation. Named active constructs, malformed XML, directives and over-limit source must fail atomically, including when submitted with credential/metadata changes. Namespace and character-reference variants exercise the actual named checks.
+Original visual examples must cover styles, text, effects, local reuse, embedded media and declarative animation. Include an SVG 1.1 DOCTYPE without an internal subset as a positive case. Named active constructs, malformed XML, internal subsets, entity declarations, other directives and over-limit source must fail atomically, including alongside credential/metadata changes. Namespace and character-reference variants exercise the named checks.
 
-Accepted external references in attributes, CSS and animated values must remain inert when rendered as img; verify network and execution observables rather than expecting complete upload detection. Verify exact source through both storage adapters and restart, authentication, omit/null/value transitions, independent services, visual fidelity and fresh-source recovery. No renderer-resource stress suite or third-party asset is required.
+Accepted external references in attributes, CSS and animated values must remain inert in `<img>`. Verify network and execution observables in the existing Chromium suite. Verify exact source in API round trips and decoded data URIs, plus `complete` and `naturalWidth > 0`. Retain meaningful-state screenshots without pixel comparisons or synchronized animation checks. Storage integration tests and backend Docker acceptance cover persistence and restart; the browser suite needs no restart harness. Also cover authentication, omit/null/value transitions, independent services and fresh-source recovery. No rendering-resource stress suite or third-party asset is required.

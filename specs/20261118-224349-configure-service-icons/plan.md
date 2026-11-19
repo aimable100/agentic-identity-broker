@@ -2,13 +2,11 @@
 
 **Branch**: `221-configure-service-icons` | **Date**: 2026-11-19 | **Spec**: [spec.md](spec.md)
 
-Setup resolved the existing feature directory correctly but reported its timestamp label as `BRANCH`; the actual checked-out branch above was obtained separately. No new feature directory is created.
-
 ## Summary
 
 Store optional SVG source on the existing service. Carry it through existing authenticated Admin, consent and session JSON. Convert it to an encoded data image only at `<img>` rendering. Preserve source exactly, per-view fallbacks and controls. No image endpoint, asset service, remote fetching or third-party fixture.
 
-The stakeholder selected browser image mode as the primary rendering boundary during planning. Upload checks reject named active constructs rather than attempt complete SVG/CSS capability analysis. The stakeholder explicitly descoped browser rendering-resource budgets because operators provide the artwork. See [research.md](research.md) and [contracts/service-icons.md](contracts/service-icons.md).
+The [contract](contracts/service-icons.md) defines the upload rules, rendering boundary and API field decision. [research.md](research.md) records the rationale and alternatives.
 
 ## Technical Context
 
@@ -16,24 +14,20 @@ The stakeholder selected browser image mode as the primary rendering boundary du
 **Primary Dependencies**: Standard Go `encoding/xml`, `encoding/json`, `unicode/utf8`; existing chi, sqlx/pgx, React and API clients. Browser SVG image mode supplies capability isolation. No sanitizer, browser runtime on the server or new dependency.
 **Storage**: Existing service aggregate; nullable PostgreSQL text column and equivalent memory field. No session snapshot or icon repository.
 **Testing**: Existing Go unit tests, real PostgreSQL migrations/repository tests, Ginkgo acceptance and Playwright browser tests, Vitest caller/image tests.
-**Target Platform**: Broker and existing root-mounted SPA; supported test browsers must demonstrate image-mode isolation.
+**Target Platform**: Broker and existing root-mounted SPA; the existing Chromium suite verifies browser image-mode isolation. No browser matrix or CI expansion is required.
 **Performance Goals**: No dependency fetch during upload; zero extra image HTTP requests; no icon-only N+1 queries. Browser rendering quotas and stress tests are explicitly out of scope.
 **Constraints**: 65,536 decoded UTF-8 bytes, well-formed single SVG root, exact accepted source, named-construct rejection, authenticated JSON, image-only rendering. No full CSS/reference/animation analysis.
-**Scale/Scope**: Twelve acceptance scenarios; Admin lifecycle, consent cards/catalog/requirements, session cards/detail headers. No editor, standalone raster upload, configuration, Helm, token or unrelated avatar changes.
+**Scale/Scope**: Twelve acceptance scenarios; Admin lifecycle, existing consent services/requirements and permission-set rows, session cards/detail headers. No editor, standalone raster upload, configuration, Helm, token or unrelated avatar changes.
 
 ## Constitution Check
 
-### Before research
-
-The domain remains the existing service aggregate, no new entity or typed ID. Existing storage and SPA boundaries remain applicable. Research must resolve the security mechanism without restoring a visual-feature allowlist or assuming sanitizer output certifies original source.
-
-### After design
+The existing service aggregate owns the icon; no new entity or typed ID is needed. Existing storage and SPA boundaries remain applicable.
 
 | Principles | Decision and remaining gate |
 |---|---|
-| I, III | Standard XML parser plus named rejections; browser secure animated image mode. Stakeholder approved the narrower upload claim. T004 blocks implementation until security review resolves all blocking findings and the timestamp-named ADR is Accepted. The review covers upload/rendering boundaries, authenticated JSON, copied-source limitations, supported-browser isolation and SPA-wide CSP effects. Record the reviewer and outcome. No security toggle. |
+| I, III | Standard XML parser plus named rejections; browser secure animated image mode. T004 blocks implementation until security review resolves blocking findings and the timestamp-named ADR is Accepted. Review covers authenticated JSON, copied-source limitations, Chromium isolation and CSP effects, including remote-avatar compatibility. Record the reviewer and outcome. No security toggle. |
 | II, V | Add Service Icon glossary/trust-boundary text to ARCHITECTURE.md and record the approved source-versus-rendering distinction in the ADR. Accepted `004-storage-layer-architecture` and `035-root-mounted-spa` remain binding. |
-| IV, X | Proposed fields remain in contracts/. API approval is not inferred from the security decision. Obtain explicit confirmation, publish both canonical OpenAPI contracts and rendered docs before behavior. Preserve released logoUrl semantics. |
+| IV, X | The stakeholder explicitly approved the API drafts in this conversation, as recorded in contracts/service-icons.md. Publish both canonical OpenAPI contracts and rendered docs before behavior. Leave the unused ThirdpartyService schema and logoUrl unchanged; add no available_services response. |
 | VI, XII | Domain service enforces source invariants; existing ports/adapters persist/project. No handler-to-repository shortcut or routing construction. No new dependency requiring builder changes. |
 | VII | No runtime configuration; no YAML or Helm changes. |
 | VIII, XIII | Write twelve canonical complete-journey acceptance cases and focused unit tests before behavior. Browser cases include meaningful screenshots; no pending/skipped placeholders. |
@@ -41,13 +35,13 @@ The domain remains the existing service aggregate, no new entity or typed ID. Ex
 | XI, XIV | Existing semantic tokens, decorative image semantics, visible names, existing wireframes and original inline illustration. No required third-party artwork. |
 | XV | No new telemetry; review existing error paths so source/credentials never enter signals. Read binding standards before changing telemetry. |
 
-**Gate outcome:** Design is specified with no unresolved technical selection. Implementation remains blocked by security review, resolution of blocking findings, API confirmation/publication, glossary/ADR acceptance and test-first prerequisites. These gates are not waived. Rendering quotas are explicitly out of scope, not an unimplemented security promise. The regenerated `tasks.md` records these prerequisites and their execution order.
+**Gate outcome:** The stakeholder API approval is complete. Implementation remains blocked by security review, resolution of blocking findings, canonical API publication, glossary/ADR acceptance and test-first prerequisites. API approval does not supply security review or ADR acceptance. Rendering quotas are out of scope, not an unimplemented security promise. `tasks.md` records the execution order.
 
 ## Project Structure
 
 ### Documentation
 
-`spec.md`, `plan.md`, `research.md`, `data-model.md`, `contracts/service-icons.md`, `contracts/schemas.yaml`, `quickstart.md` and existing wireframes stay in this feature directory. `/speckit-tasks` regenerates `tasks.md` separately.
+`spec.md`, `plan.md`, `research.md`, `data-model.md`, `contracts/service-icons.md`, `contracts/schemas.yaml`, `quickstart.md`, `tasks.md` and existing wireframes stay in this feature directory.
 
 ### Source areas
 
@@ -55,7 +49,7 @@ Extend `internal/domain/model/` and `internal/domain/thirdparty/` for the option
 
 Extend existing memory/PostgreSQL service records and explicit SQL columns; use `migrations/NNN_service_icon_svg.{up,down}.sql` with the next unused number, not a reserved guessed slot. Preserve row versions and existing ETag behavior; do not add a mandatory icon-only If-Match requirement.
 
-Carry current service metadata through `internal/domain/consent/`, `internal/domain/oauth2session/`, existing handlers and session summary read models. The agent-referenced available_services catalog must cover requirement and permission-set-only services, redacted and deduplicated; do not expose unrelated administrative services or repeat source on scope records.
+Carry current service metadata through `internal/domain/consent/`, `internal/domain/oauth2session/`, existing handlers and session summary read models. Add `iconSvg` only to the existing `ServiceRequirementForUser` projection in `data.services`. Permission-set rows reuse that metadata through their current frontend mapping. Preserve service filtering; add no available_services catalog or source on permission-set scope records.
 
 Use one service-specific image composition under `web/src/components/services/`, existing consent/session callers and API mappings. Session details use TerminationDialog, not a new page. Preserve name-only session fallback and existing consent initials. Source-key only the image, never action controls. Do not alter generic avatars.
 
@@ -64,7 +58,7 @@ Use one service-specific image composition under `web/src/components/services/`,
 | Phase | Purpose |
 |---|---|
 | Setup | Read nearest scoped instructions; confirm exact migration slot and existing harness prerequisites. |
-| Mandatory design | Confirm API contract, accept ADR, update architecture/glossary, publish OpenAPI/docs and write acceptance tests. |
+| Mandatory design | Use the recorded stakeholder API approval, accept ADR, update architecture/glossary, publish OpenAPI/docs and write acceptance tests. |
 | Foundations | XML input policy, exact-source semantics, safe image composition and scoped SPA policy, each driven by tests. |
 | US1 | Presence-aware Admin writes, both adapters, current metadata projections and every identity surface. |
 | US2 | Prove named rejection and actual browser isolation, including CSS/animated/indirect references left in accepted source. |
@@ -81,11 +75,11 @@ Each row is one future Ginkgo It with its scenario ID. Proposed paths are design
 
 | Scenario | Suite | Complete observable |
 |---|---|---|
-| US1.1 | Browser/docker | Admin lifecycle and real PostgreSQL restart, then visible images beside service names. |
+| US1.1 | Backend/docker | Admin create/read/list and real PostgreSQL-backed broker restart, then exact source in fresh authenticated consent/session JSON. |
 | US1.2 | Backend | Replace source without changing identity, grants, sessions or OAuth configuration. |
 | US1.3 | Browser | Omission preserves displayed source; null clears it and fresh data restores original fallback. |
 | US1.4 | Browser | URL/path/empty input rejects atomically without fetch. |
-| US2.1 | Browser/docker | Original visual examples survive restart and match image-mode reference rendering. |
+| US2.1 | Browser | Original visual examples round-trip exactly and decode in consent/session images, with no icon-related external requests. |
 | US2.2 | Browser | Fresh metadata replaces predecessor image without changing the other service. |
 | US2.3 | Browser | Named active constructs fail atomically; accepted external references remain inert in actual image mode. |
 | US2.4 | Backend | Unauthenticated callers get no source through any actual delivery response. |
@@ -94,19 +88,19 @@ Each row is one future Ginkgo It with its scenario ID. Proposed paths are design
 | US3.3 | Browser | Fresh changed source recovers in the open page without remounting controls. |
 | US3.4 | Browser | Decorative images, readable names, keyboard controls and narrow/wide layout. |
 
-Backend cases belong in `tests/e2e/service_icons_test.go`; browser cases in `tests/e2e/frontend/service_icons_test.go`, with existing bootstrap/page objects and isolated fixtures. Restart tests retain actual PostgreSQL data without reseeding. Supplemental unit/integration checks do not duplicate canonical mappings.
+Backend cases belong in `tests/e2e/service_icons_test.go`; browser cases in `tests/e2e/frontend/service_icons_test.go`, using existing bootstrap/page objects and isolated fixtures. US1.1 uses the existing backend Docker restart pattern in `thirdparty_protected_resource_status_test.go`, retaining PostgreSQL data without reseeding. PostgreSQL integration tests cover exact-source persistence too. Do not add restart support to the browser harness. Supplemental checks do not duplicate canonical mappings.
 
 ### Unit, integration and browser proof
 
-Cover every named XML rejection, namespace/character-reference variants, valid Unicode, exact byte boundary, omit/null/value handling and exact accepted-source round trips. Positive examples include styles, filters, masks, text, patterns, local reuse, embedded media and animation. Do not reject all CSS, references or animation to pass negative tests.
+Cover every named XML rejection, namespace/character-reference variants, valid Unicode, exact byte boundary, omit/null/value handling and exact accepted-source round trips. Positive examples include styles, filters, masks, text, patterns, local reuse, embedded media, animation and SVG 1.1 DOCTYPE declarations without internal subsets. Reject internal subsets and entity declarations; never resolve a DTD. Do not reject all CSS, references or animation to pass negative tests.
 
-Use actual built SPA headers and browser network/execution observation. Test accepted references in styles, attributes and changing values; inspect absence of inline SVG children and script execution. Chromium/Firefox/WebKit coverage must establish the supported browser matrix before release. Compare animation at equal timeline points. Do not treat a brief render as a future security or resource-use proof.
+Use actual built SPA headers and Chromium network/execution observation. Test accepted references in styles, attributes and changing values; inspect absence of inline SVG children and script execution. Verify exact source in API round trips and decoded data URIs, with images complete and naturalWidth > 0. Preserve remote user-avatar rendering under the revised CSP. Retain meaningful-state screenshots; no image-diff tooling, synchronized animation comparisons or Firefox/WebKit CI changes are required. Do not treat a brief render as a future security or resource-use proof.
 
 Test memory/PostgreSQL parity, atomic rejected updates with simultaneous credentials/metadata changes, unchanged preexisting timestamps, migration rollback/reapply and restart durability. Use nullable text plus octet_length check; application XML validation remains authoritative for content.
 
 Consent/session caller and API-mapping unit tests precede caller integration. Existing caches last five/two minutes: observe a genuinely fresh network response through supported expiration/invalidation before asserting replacement/clear/recovery. Do not change cache lifetimes or introduce live push.
 
-Capture meaningful configured/unset/failed/recovered states at narrow/wide sizes under `tests/e2e/screenshots/`. Use original synthetic SVG only. Run commands in [quickstart.md](quickstart.md); no runtime tests were run by this planning command.
+Capture meaningful configured/unset/failed/recovered states at narrow/wide sizes under `tests/e2e/screenshots/`. Use original synthetic SVG only. Run the implementation checks in [quickstart.md](quickstart.md).
 
 ## Complexity Tracking
 

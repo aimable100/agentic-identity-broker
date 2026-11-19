@@ -31,10 +31,7 @@
 
 ## Notes
 
-- Planning on 2026-11-19 resolved the security mechanism with explicit stakeholder decisions. Browser image mode is the primary rendering boundary; upload checks reject named active constructs rather than promise complete static SVG/CSS capability detection.
-- The stakeholder separately descoped rendering-resource budgets for operator-provided artwork. The byte limit is not a renderer quota. The spec, plan, research, model, contract and validation guide record this limit without silent visual-feature restrictions.
-- Twelve scenario IDs, sixteen functional requirements, eleven security requirements and seven success criteria remain. US2.3 now separates explicit upload rejection from browser isolation of external references that can remain in accepted source.
-- All sixteen specification-review items remain satisfied under the approved contract. No parser, library or security promise depends on a required third-party logo, workstation file or hash.
-- Research cites official SVG processing-mode guidance and reviewed sanitizer limitations. The selected mechanism uses standard XML/UTF-8 parsing plus direct named checks and browser image-mode behavior, not a custom SVG/CSS sanitizer.
-- API confirmation/publication, ADR acceptance, glossary work and test-first implementation remain gates. API approval is not inferred from the stakeholder's security decisions. Regenerate tasks before coding.
-- Artifact checks are not runtime evidence. No application code or canonical OpenAPI contract changed and no runtime suites were claimed by planning.
+- The [contract](../contracts/service-icons.md) records explicit stakeholder approval of the API drafts in this conversation and the SVG upload/rendering rules.
+- Stakeholder API approval is complete. Canonical API publication, security review, ADR acceptance, glossary work and test-first implementation remain gates.
+- Twelve acceptance scenarios remain. The [plan](../plan.md) assigns restart persistence to backend Docker and storage integration tests, and rendering to Chromium.
+- Artifact checks are not runtime evidence. This PR changes planning documents, not application code or canonical OpenAPI contracts.
