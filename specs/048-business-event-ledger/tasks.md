@@ -189,7 +189,7 @@ and are wired, with the ledger off. No definition exists in production code yet.
 - [X] T051 [P] [US1] After T049–T050, update affected assertions in `internal/domain/consent/service_test.go`, `tests/integration/grant_lifecycle_audit_test.go`, and `tests/e2e/grant_diagnostics_test.go`. Replace the old discriminator with `event` for both revocation branches. Update the corresponding descriptions in `docs/configuration.md`, `ARCHITECTURE.md`, and `docs/reference/token-exchange.md`. Preserve cleanup-error and HTTP behavior. Do not assert message wording (SC-002; Principle XV).
 - [X] T052 [P] [US1] Alongside the implementation, align the Grant and Definition Lifecycle Audit entry in `ARCHITECTURE.md` with `coding-standards/LOGGING.md` section 8. Define all four Business Event terms and their relationship to `GrantRevoked` and existing domain events. Until then, keep the design in the feature documents and ADR only (Principles II, V).
 - [ ] T053 [US1] After T049–T050 and completion of code edits, run `tests/e2e/business_event_ledger_performance_test.go`, authored in T084, with unchanged assertions. Use `just test-e2e-performance` with Docker, locally or in CI. Follow the environment-recording protocol in `specs/048-business-event-ledger/plan.md` for each acceptance run. Record the environment, both p99 values, their difference, and both medians in the PR description, including failed runs (SC-004).
-- [ ] T054 [P] [US1] After T049–T050, fill `specs/048-business-event-ledger/checklists/onboarding.md` in the PR description. Verify at most three consent production files onboard the single event, without migration, API, or builder changes. Record both identifier renames and standard-amendment rationales under `Breaking changes` (FR-004, FR-012; SC-001; Principle XV).
+- [ ] T054 [P] [US1] After T049–T050, review FR-012 and SC-001 and record the result in the PR description. Verify the single package-local definition, explicit owner visibility, top-level event, post-commit emission, canonical resource attributes, and distinct refresh-cleanup outcome against LOGGING.md sections 2, 8, and 10. Verify service tests cover committed deletion, rejected or unchanged operations, and cleanup failure; apply SR-001's credential-absence requirement where applicable. Verify at most three consent production files onboard the single event, without migration, API, or builder changes. Apply these scope limits to event onboarding, not to the shared ledger foundation. Record both identifier renames and standard-amendment rationales under `Breaking changes` (FR-004, FR-012; SR-001; SC-001; Principle XV).
 - [ ] T055 [US1] After T047–T054, run `just check`, `just test`, `just test-integration`, and `just test-e2e-backend` from `justfile`. Verify all four US1 scenarios in `tests/e2e/business_event_ledger_test.go` pass unchanged through `just test-e2e-docker`, locally or in CI (US1.1–US1.4; SC-003; Principles VIII, XIII).
 
 **Checkpoint**: User Story 1 works end to end.
@@ -329,7 +329,7 @@ After T049–T050, assign these independent tasks:
 
 ```text
 T051: Update the affected log-contract assertions and audit documentation.
-T054: Review specs/048-business-event-ledger/checklists/onboarding.md and record the result in the PR description.
+T054: Review FR-012 and SC-001 and record the result in the PR description.
 ```
 
 T051 owns test and documentation edits. T054 changes only the PR description.

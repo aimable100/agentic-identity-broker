@@ -71,7 +71,7 @@ previous provider in cleanup, and do not run those global-mutating cases in para
 | `Enabled` | True for `slog.LevelInfo` and above (FR-008). |
 | `Handle` | No definition in the record or in the accumulated attributes: return nil. Otherwise build the event (research R7), call `Append` with `context.WithoutCancel(ctx)` and `writeTimeout`, record the duration, and on error follow research R8. Always return nil. |
 | `WithAttrs` | Return a handler that includes the attributes, under the current group. |
-| `WithGroup` | Return a handler that nests later attributes under the group. The reserved keys `event`, `principal`, `actor`, and `trace_id` are read only at the top level. A definition under a group is not a business event and is not stored (FR-001). The onboarding checklist forbids such a call. |
+| `WithGroup` | Return a handler that nests later attributes under the group. The reserved keys `event`, `principal`, `actor`, and `trace_id` are read only at the top level. A definition under a group is not a business event and is not stored (FR-001). FR-012 requires the revocation event at the top level. |
 
 For duplicate keys in the same JSON object, the last attribute wins, matching the value obtained
 by decoding the operational JSON record. Process inherited attributes in attachment order,

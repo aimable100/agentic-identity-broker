@@ -19,12 +19,11 @@ In scope:
 - Append and retention ports only. Read ports belong to the future features that consume them.
 - Retention: the broker deletes rows that are older than a configured period. It does not depend
   on any event type.
-- The first business event: `consent.grant.revoked`. It is onboarded by the
-  [onboarding checklist](./checklists/onboarding.md), which later features reuse.
+- The first business event: `consent.grant.revoked`.
 
 Out of scope:
 
-- Every other business event. A later feature onboards each one by the onboarding checklist.
+- Every other business event. Later features onboard them separately.
 - Erasure of the events of one principal on request. Retention limits how long a row stays.
 - An API or UI that reads the ledger (issue #188 presentation requirements).
 - SSF streams, Security Event Tokens, and their delivery guarantee.
@@ -365,7 +364,9 @@ it.
   failure logs remain unchanged.
 - **FR-010**: A stored ledger row MUST NOT be updated by any operation. A row is removed only by FR-009.
 - **FR-011**: Both storage adapters (memory and PostgreSQL) MUST implement the ledger repository.
-- **FR-012**: The onboarding of `consent.grant.revoked` MUST satisfy the [onboarding checklist](./checklists/onboarding.md).
+- **FR-012**: `consent.grant.revoked` MUST be declared once in the consent service package and logged as a top-level `event` only after committed grant deletion.
+  A rejected or unchanged operation MUST emit no business event. Both committed-delete branches MUST retain the existing resource attributes.
+  The event MUST distinguish failed refresh-session cleanup from successful cleanup without changing the operation's result.
 
 ### Domain Model
 

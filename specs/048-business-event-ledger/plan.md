@@ -116,8 +116,7 @@ specs/048-business-event-ledger/
 │   ├── configuration.md
 │   └── observability.md
 └── checklists/
-    ├── requirements.md
-    └── onboarding.md
+    └── requirements.md
 ```
 
 ### Source Code (repository root)
@@ -313,7 +312,7 @@ all existing resource attributes, and the unchanged HTTP behavior. A missing gra
 Update only the affected log-contract assertions and documentation; record both identifier renames.
 
 **Exit**: The four US1 acceptance scenarios pass unchanged, including insert rejection and disabled
-mode. The onboarding checklist establishes the package-local change limit. Run SC-004's actual
+mode. SC-001 establishes the package-local change limit, verified by T054. Run SC-004's actual
 PostgreSQL request benchmark, with untimed persistence checks described below; a no-op ledger
 must not satisfy the latency criterion.
 
@@ -342,9 +341,11 @@ The final available static, race-enabled unit, self-contained integration, and b
 passed. Docker-backed validation, the full security/verification gate, and PR-description publication
 remain outstanding as recorded in `tasks.md`. The four accepted checklist deviations remain unchanged.
 
+The [specification-quality checklist](./checklists/requirements.md) retains four unchecked criteria.
 On 2026-11-18, the user explicitly accepted all four documented specification-quality deviations
 and authorized implementation. Checklist markers remain unchanged. This acceptance does not waive
 implementation, security, testing, or compliance requirements. The onboarding review remains T054.
+
 ## Testing Strategy
 
 ### End-to-End (E2E) Acceptance Tests
