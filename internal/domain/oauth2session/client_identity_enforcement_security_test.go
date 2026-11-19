@@ -328,24 +328,37 @@ func TestClientIdentityRefreshRechecksCurrentIdentityInsideSessionLock(t *testin
 }
 
 func TestClientIdentityInFlightRefreshCannotReleasePreviousRevision(t *testing.T) {
-	service, provider, session, store, _ := newIdentityEnforcementFixture(t, "public")
-	service.httpClient.Transport = operationTransport(func(*http.Request) (*http.Response, error) {
-		provider.ClientIdentityRevision += 2
-		return operationTokenResponse(200, `{"access_token":"previous-revision-result","refresh_token":"previous-revision-refresh","expires_in":3600}`), nil
-	})
-	got, token, err := service.GetValidAccessToken(context.Background(), session.Principal, session.ServiceID)
-	assert.Nil(t, got)
-	assert.Empty(t, token)
-	var source *model.CredentialSourceError
-	require.ErrorAs(t, err, &source)
-	assert.Equal(t, model.CredentialSourceReasonIdentitySuperseded, source.Reason)
-	persisted, err := store.find(context.Background(), session.Principal, session.ServiceID)
-	require.NoError(t, err)
-	assert.Equal(t, int64(4), persisted.UpstreamClientRevision, "refresh never rewrites establishment evidence")
-	got, token, err = service.GetValidAccessToken(context.Background(), session.Principal, session.ServiceID)
-	assert.Nil(t, got)
-	assert.Empty(t, token)
-	assert.ErrorIs(t, err, model.ErrCredentialSourceUnavailable)
+	for _, response := range []struct {
+		name   string
+		status int
+		body   string
+	}{
+		{name: "success", status: 200, body: `{"access_token":"previous-revision-result","refresh_token":"previous-revision-refresh","expires_in":3600}`},
+		{name: "rejection", status: 400, body: `{"error":"invalid_grant"}`},
+	} {
+		t.Run(response.name, func(t *testing.T) {
+			service, provider, session, store, _ := newIdentityEnforcementFixture(t, "public")
+			before, err := store.find(context.Background(), session.Principal, session.ServiceID)
+			require.NoError(t, err)
+			service.httpClient.Transport = operationTransport(func(*http.Request) (*http.Response, error) {
+				provider.ClientIdentityRevision += 2
+				return operationTokenResponse(response.status, response.body), nil
+			})
+			got, token, err := service.GetValidAccessToken(context.Background(), session.Principal, session.ServiceID)
+			assert.Nil(t, got)
+			assert.Empty(t, token)
+			var source *model.CredentialSourceError
+			require.ErrorAs(t, err, &source)
+			assert.Equal(t, model.CredentialSourceReasonIdentitySuperseded, source.Reason)
+			persisted, err := store.find(context.Background(), session.Principal, session.ServiceID)
+			require.NoError(t, err)
+			assert.Equal(t, before, persisted)
+			got, token, err = service.GetValidAccessToken(context.Background(), session.Principal, session.ServiceID)
+			assert.Nil(t, got)
+			assert.Empty(t, token)
+			assert.ErrorIs(t, err, model.ErrCredentialSourceUnavailable)
+		})
+	}
 }
 
 func TestClientIdentityMatchingFastPathUsesOneMetadataReadWithoutSecretDecryption(t *testing.T) {

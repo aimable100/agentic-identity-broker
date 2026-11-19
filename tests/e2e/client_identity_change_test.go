@@ -25,6 +25,7 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 		serviceID  id.ServiceID
 		agent      *domainstorage.Agent
 		alice, bob string
+		verifier   string
 	)
 	ctx := context.Background()
 
@@ -35,6 +36,7 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 		DeferCleanup(journey.Close)
 		alice, bob = fixtures.DefaultPrincipal().String(), fixtures.AnotherPrincipal().String()
 		journey.Upstream.WithExpiresIn(3600)
+		verifier = helpers.PKCEVerifier()
 	})
 
 	connectService := func(principal string, target id.ServiceID) {
@@ -221,7 +223,7 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 		query := url.Values{
 			"client_id": {agent.ID.String()}, "response_type": {"code"},
 			"redirect_uri": {agent.RedirectURIs[0]}, "scope": {"openid profile"}, "state": {"reports-agent-state"},
-			"code_challenge": {helpers.GenerateCodeChallenge(helpers.PKCEVerifier())}, "code_challenge_method": {"S256"},
+			"code_challenge": {helpers.GenerateCodeChallenge(verifier)}, "code_challenge_method": {"S256"},
 		}
 		response, err := journey.EndUser.AuthenticatedGET("/oauth2/authorize?"+query.Encode(), alice)
 		Expect(err).NotTo(HaveOccurred())
@@ -414,30 +416,36 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 				Expect(session(alice)).To(Equal(current))
 				Expect(exchange(alice, http.StatusOK)).To(HaveKeyWithValue("access_token", "current-callback-token"))
 
-				By("discarding a refresh that returns after the identity changes through " + source)
-				changeIdentity(source, fixtures.ReportsClientV1, fixtures.ReportsSecretV1)
-				connect(alice)
-				before = session(alice)
-				journey.Upstream.WithAccessToken("obsolete-refresh-token")
-				refreshBarrier := journey.Upstream.GateTokenGrant("refresh_token")
-				DeferCleanup(refreshBarrier.Release)
-				refreshResult := make(chan proactiveExchangeResult, 1)
-				go func() {
-					response, err := journey.Refresh(serviceID)
-					refreshResult <- proactiveExchangeResult{response: response, err: err}
-				}()
-				Eventually(refreshBarrier.Entered).Should(BeClosed())
-				changeIdentity(source, fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
-				refreshBarrier.Release()
-				Eventually(refreshResult).Should(Receive(&delayed))
-				body := proactiveExchangeBody(delayed, http.StatusConflict)
-				Expect(body).To(HaveKeyWithValue("error", "refresh_unavailable"))
-				Expect(body).NotTo(HaveKey("access_token"))
-				Expect(session(alice)).To(Equal(before))
-				expectDenied(alice)
-				journey.Upstream.WithAccessToken("current-refresh-reconnect-token")
-				connect(alice)
-				Expect(exchange(alice, http.StatusOK)).To(HaveKeyWithValue("access_token", "current-refresh-reconnect-token"))
+				for _, outcome := range []string{"success", "invalid_grant"} {
+					By("discarding a refresh " + outcome + " after the identity changes through " + source)
+					changeIdentity(source, fixtures.ReportsClientV1, fixtures.ReportsSecretV1)
+					connect(alice)
+					before = session(alice)
+					journey.Upstream.WithAccessToken("obsolete-refresh-token")
+					if outcome == "invalid_grant" {
+						journey.Upstream.WithErrorResponse("invalid_grant")
+					}
+					refreshBarrier := journey.Upstream.GateTokenGrant("refresh_token")
+					DeferCleanup(refreshBarrier.Release)
+					refreshResult := make(chan proactiveExchangeResult, 1)
+					go func() {
+						response, err := journey.Refresh(serviceID)
+						refreshResult <- proactiveExchangeResult{response: response, err: err}
+					}()
+					Eventually(refreshBarrier.Entered).Should(BeClosed())
+					changeIdentity(source, fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
+					refreshBarrier.Release()
+					Eventually(refreshResult).Should(Receive(&delayed))
+					body := proactiveExchangeBody(delayed, http.StatusConflict)
+					Expect(body).To(HaveKeyWithValue("error", "refresh_unavailable"))
+					Expect(body).NotTo(HaveKey("access_token"))
+					Expect(body).NotTo(HaveKey("refresh_token"))
+					Expect(session(alice)).To(Equal(before))
+					expectDenied(alice)
+					journey.Upstream.WithSuccessfulTokenResponse().WithAccessToken("current-refresh-reconnect-token")
+					connect(alice)
+					Expect(exchange(alice, http.StatusOK)).To(HaveKeyWithValue("access_token", "current-refresh-reconnect-token"))
+				}
 			}
 		})
 
@@ -585,6 +593,13 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 			Expect(completed.String()).To(HavePrefix(agent.RedirectURIs[0]))
 			Expect(completed.Query().Get("code")).NotTo(BeEmpty())
 			Expect(completed.Query().Get("state")).To(Equal("reports-agent-state"))
+			tokenResponse := exchangeAuthorizationCode(journey.EndUser, agent.ID.String(), completed.Query().Get("code"), agent.RedirectURIs[0], verifier)
+			tokens, err := helpers.CredentialResponseObject(tokenResponse)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(tokenResponse.StatusCode).To(Equal(http.StatusOK), "%v", tokens)
+			Expect(tokens["token_type"]).To(Equal("Bearer"))
+			Expect(tokens["access_token"]).To(BeAssignableToTypeOf(""))
+			Expect(tokens["access_token"]).NotTo(BeEmpty())
 			Expect(exchange(alice, http.StatusOK)).To(HaveKey("access_token"))
 		})
 

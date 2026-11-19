@@ -29,6 +29,8 @@ var _ = Describe("Client identity browser recovery", Label("client-identity-chan
 		sessionsPage  *pages.SessionsPage
 		beforeSession *storage.UserSession
 		beforeGrant   *storage.UserGrant
+		requiredSetID id.PermissionSetID
+		optionalSetID id.PermissionSetID
 	)
 	ctx := context.Background()
 
@@ -60,6 +62,7 @@ var _ = Describe("Client identity browser recovery", Label("client-identity-chan
 			ServiceID: calendarID, Scopes: []string{"profile"}, RequirementType: storage.RequirementTypeOptional,
 		})
 		optional := fixtures.ClientIdentityPermissionSet(serviceID, "Additional Reports Access")
+		requiredSetID, optionalSetID = required.ID, optional.ID
 		Expect(journey.Storage.PermissionSets().Create(ctx, required)).To(Succeed())
 		Expect(journey.Storage.PermissionSets().Create(ctx, optional)).To(Succeed())
 		agent = fixtures.ClientIdentityAgent(serviceID, required.ID, optional.ID)
@@ -245,6 +248,15 @@ var _ = Describe("Client identity browser recovery", Label("client-identity-chan
 			Expect(err).NotTo(HaveOccurred())
 			Expect(completed.Query().Get("code")).NotTo(BeEmpty())
 			Expect(completed.Query().Get("state")).To(Equal("reports-browser-state"))
+			response, err := journey.EndUser.AuthenticatedGET("/api/consent/agents/"+agent.ID.String()+"/grants", journey.Principal)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(response.StatusCode).To(Equal(http.StatusOK))
+			body, err := helpers.CredentialResponseObject(response)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(body["data"]).To(HaveKeyWithValue("granted_permission_sets", Equal(map[string]any{
+				requiredSetID.String(): []any{serviceID.String()},
+				optionalSetID.String(): []any{serviceID.String()},
+			})))
 			Expect(exchange(http.StatusOK)).To(HaveKey("access_token"))
 		})
 
