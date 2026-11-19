@@ -1,0 +1,63 @@
+openapi: 3.0.3
+info:
+  title: Proposed service icon schema additions
+  version: 0.1.0
+  description: >-
+    Design artifact only. Merge these properties into the existing canonical Admin
+    and end-user schemas after stakeholder confirmation. Paths, authentication,
+    response envelopes, concurrency and errors remain in the canonical contracts.
+paths: {}
+components:
+  schemas:
+    ServiceIconSvg:
+      type: string
+      nullable: true
+      minLength: 1
+      description: >-
+        Optional static SVG document, limited to 65536 UTF-8 bytes after JSON
+        decoding and validated against contracts/service-icons.md. This is not a
+        URL. Byte size and the permitted XML profile require semantic validation;
+        OpenAPI character-length keywords alone cannot enforce them.
+      example: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="currentColor"/></svg>'
+    AdminServiceIconWriteProperties:
+      type: object
+      description: >-
+        Add properties to ServiceCreateRequest and ServiceUpdateRequest. Omitted
+        on create means absent; omitted on update preserves; null clears.
+      properties:
+        icon_svg:
+          $ref: '#/components/schemas/ServiceIconSvg'
+    AdminServiceIconReadProperties:
+      type: object
+      description: >-
+        Add to service create/update/detail/list response objects. Server omits
+        the property when absent; non-null values are exact accepted source.
+      properties:
+        icon_svg:
+          $ref: '#/components/schemas/ServiceIconSvg'
+    ConsentServiceIconProperties:
+      type: object
+      description: >-
+        Add to ThirdpartyService and ServiceRequirementForUser. Authenticated
+        JSON only. Server omits absent values; consumers accept omitted or null.
+      properties:
+        iconSvg:
+          $ref: '#/components/schemas/ServiceIconSvg'
+    SessionServiceIconProperties:
+      type: object
+      description: >-
+        Add to UserSessionSummary, inherited by SessionStatus. Current service
+        source rather than a session snapshot. Server omits absent values;
+        consumers accept omitted or null.
+      properties:
+        service_icon_svg:
+          $ref: '#/components/schemas/ServiceIconSvg'
+    AvailableServiceIconProperties:
+      type: object
+      description: >-
+        Add to AvailableService entries in the authenticated available_services
+        catalog. Deduplicate by service ID across the agent's requirements and
+        assigned permission sets; do not repeat SVG in permission-set scopes.
+      properties:
+        icon_svg:
+          $ref: '#/components/schemas/ServiceIconSvg'
