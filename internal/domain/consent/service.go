@@ -450,12 +450,6 @@ func grantAuditValidUntil(validUntil *time.Time) any {
 	return validUntil.UTC().Format(time.RFC3339Nano)
 }
 
-// ValidateSubmission validates that every included service and mandatory Agent service
-// has a usable session. It does not add services to the submitted selection.
-func (s *Service) ValidateSubmission(ctx context.Context, agent *storage.Agent, grantedPS []storage.GrantedPermissionSetEntry, activeSessionServiceIDs []id.ServiceID) error {
-	return validateSubmissionServices(submissionServiceIDs(agent, grantedPS), activeSessionServiceIDs)
-}
-
 func validateSubmissionServices(requiredServices map[id.ServiceID]bool, activeSessionServiceIDs []id.ServiceID) error {
 	// Build set of active session service IDs for O(1) lookup
 	activeSet := make(map[id.ServiceID]bool, len(activeSessionServiceIDs))

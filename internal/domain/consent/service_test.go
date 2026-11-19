@@ -2130,7 +2130,7 @@ func TestService_GetAgentConsentDetail_WithPermissionSets(t *testing.T) {
 	})
 }
 
-func TestService_ValidateSubmission(t *testing.T) {
+func TestValidateSubmissionServices(t *testing.T) {
 	t.Parallel()
 
 	svcID1 := id.NewServiceID()
@@ -2145,16 +2145,6 @@ func TestService_ValidateSubmission(t *testing.T) {
 		Description: "Test agent",
 	}
 
-	svc := newTestConsentService(
-		&mockAgentRepo{},
-		nil,
-		&mockGrantRepo{grants: map[id.GrantID]*storage.UserGrant{}},
-		nil,
-		&mockConsentRefreshRepo{},
-		nil,
-		slog.Default(),
-	)
-
 	t.Run("passes when all included services have active sessions", func(t *testing.T) {
 		t.Parallel()
 
@@ -2163,7 +2153,7 @@ func TestService_ValidateSubmission(t *testing.T) {
 		}
 		activeSessionServiceIDs := []id.ServiceID{svcID1, svcID2, svcID3}
 
-		err := svc.ValidateSubmission(context.Background(), agent, grantedPS, activeSessionServiceIDs)
+		err := validateSubmissionServices(submissionServiceIDs(agent, grantedPS), activeSessionServiceIDs)
 		assert.NoError(t, err)
 	})
 
@@ -2175,7 +2165,7 @@ func TestService_ValidateSubmission(t *testing.T) {
 		}
 		activeSessionServiceIDs := []id.ServiceID{svcID1} // svcID2 not connected
 
-		err := svc.ValidateSubmission(context.Background(), agent, grantedPS, activeSessionServiceIDs)
+		err := validateSubmissionServices(submissionServiceIDs(agent, grantedPS), activeSessionServiceIDs)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, ErrUnconnectedServices)
 		assert.Contains(t, err.Error(), svcID2.String())
@@ -2184,7 +2174,7 @@ func TestService_ValidateSubmission(t *testing.T) {
 	t.Run("passes with empty granted permission sets", func(t *testing.T) {
 		t.Parallel()
 
-		err := svc.ValidateSubmission(context.Background(), agent, nil, nil)
+		err := validateSubmissionServices(submissionServiceIDs(agent, nil), nil)
 		assert.NoError(t, err)
 	})
 
@@ -2198,7 +2188,7 @@ func TestService_ValidateSubmission(t *testing.T) {
 		}
 		activeSessionServiceIDs := []id.ServiceID{svcID1, svcID2} // svcID3 not connected
 
-		err := svc.ValidateSubmission(context.Background(), agent, grantedPS, activeSessionServiceIDs)
+		err := validateSubmissionServices(submissionServiceIDs(agent, grantedPS), activeSessionServiceIDs)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, ErrUnconnectedServices)
 		assert.Contains(t, err.Error(), svcID3.String())
