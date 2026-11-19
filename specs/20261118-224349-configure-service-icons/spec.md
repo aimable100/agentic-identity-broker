@@ -1,0 +1,459 @@
+# Feature Specification: Configurable Third-Party Service Icons
+
+**Feature Branch**: `221-configure-service-icons`
+
+**Created**: 2026-11-18
+
+**Status**: Draft
+
+**Input**: [Issue #497 — Configurable Icons for Third-Party Services](https://github.com/zalando-incubator/agentic-identity-broker/issues/497)
+
+Operators can assign an optional SVG document to each third-party service through the Admin API.
+Users see that icon beside the service name in consent and session views.
+Missing or broken icons retain the existing fallback and never prevent consent or session actions.
+
+**Scope correction — 2026-11-19**: Operator-supplied image URLs, including same-origin image paths, are out of scope. SVG documents are the only supported icon input. Validated SVG MUST be rendered through `<img>`, never inserted into the page DOM. Planning will choose the delivery mechanism; this specification does not require broker-generated image URLs or a separate icon endpoint.
+
+## User Scenarios & Testing *(mandatory)*
+
+Each numbered acceptance scenario requires one corresponding E2E scenario under `tests/e2e/`.
+Browser scenarios also require Playwright coverage and screenshots of meaningful states, as required by Constitution XIII.
+
+### User Story 1 - Configure a Service Icon from an SVG Document (Priority: P1)
+
+An operator supplies a static SVG document for a service. Users recognize that service in consent and session views.
+The operator can replace or clear the icon without changing the service identity or its permissions.
+
+**Why this priority**: This provides the requested operator control and visible service identity without a separate asset deployment process.
+
+**Independent Test**: Create a service with an SVG document. Read its configuration and open its consent and session views.
+
+**Acceptance Scenarios**:
+
+1. **US1.1 — Create and retain**: **Given** a permitted SVG document and an authorized operator, **When** the operator creates a service with that document, **Then** Admin reads and listings report the SVG. After a broker restart, fresh consent and session views show it beside the service name.
+2. **US1.2 — Replace**: **Given** a service with an icon, **When** the operator supplies a different permitted SVG document, **Then** fresh service views show the replacement. The service ID, grants, session state, and OAuth2 settings remain unchanged.
+3. **US1.3 — Preserve and clear**: **Given** an existing icon, **When** an otherwise valid service update omits the SVG field, **Then** the icon remains unchanged. A subsequent update with an explicit null clears it, and fresh views return to their existing fallback.
+4. **US1.4 — Reject invalid input**: **Given** an existing service, **When** an operator submits a URL or an empty value instead of an SVG document, **Then** the request fails validation. The previous service configuration remains unchanged, and no icon-related network request occurs.
+
+### User Story 2 - Supply a Safe SVG Icon (Priority: P1)
+
+An operator supplies SVG content without deploying a separate image file. Users see a static icon, not executable page content.
+
+**Why this priority**: Operator-supplied SVG documents must preserve the browser trust boundary.
+
+**Independent Test**: Create a service with a static SVG document. Open its service views and verify image-mode rendering without page-DOM insertion, executable content, or external requests. Verify that unauthenticated callers cannot obtain icon content through the feature's delivery mechanism.
+
+**Acceptance Scenarios**:
+
+1. **US2.1 — Create and render SVG**: **Given** an authorized operator and a permitted SVG document, **When** the operator creates the service with that document, **Then** the broker retains it across restart. Admin reads report the SVG source, and authenticated users see it in consent and session views through `<img>`, without inserting its SVG elements into the page DOM, executing content, or requesting external resources.
+2. **US2.2 — Replace SVG**: **Given** a configured service, **When** the operator replaces its SVG document, **Then** the accepted update replaces the previous document. Fresh service data makes views display the current icon rather than a cached predecessor, regardless of the delivery mechanism.
+3. **US2.3 — Reject unsafe SVG**: **Given** a service with a valid icon, **When** an operator submits malformed, oversized, or prohibited SVG content, including scripts, event handlers, or external-resource references, **Then** the request fails validation even though the UI uses image-mode rendering. The previous icon and other service properties remain unchanged. Rejected content never becomes available as a service image, executes, or causes a referenced resource to be fetched.
+4. **US2.4 — Protect icon access**: **Given** a configured SVG icon and no authenticated principal, **When** a caller attempts to obtain its content through consent, session, or other icon-delivery access selected during planning, **Then** existing end-user authentication rejects the request. The response contains no SVG content.
+
+### User Story 3 - Keep Service Views Usable Without an Image (Priority: P1)
+
+A user can identify a service and use its controls even when its image is absent or broken.
+After an operator replaces a broken icon, the same open view can display the new source when it receives fresh service data.
+
+**Why this priority**: Icons are optional decoration. Their absence must not disrupt consent, connection, refresh, or termination actions.
+
+**Independent Test**: Open service views with unset and broken images. Refresh their data with a valid replacement while the views remain open.
+
+**Acceptance Scenarios**:
+
+1. **US3.1 — Existing services**: **Given** services created without icon metadata, including services from before this feature, **When** a user opens consent or sessions, **Then** each view retains its existing initials, placeholder, or name-only fallback. Service names and controls remain available.
+2. **US3.2 — Broken image**: **Given** a stored SVG that fails to render in the browser, **When** a user opens the service views, **Then** they show their existing fallback rather than a broken-image marker. The image failure does not block service actions or show a page-level error.
+3. **US3.3 — Broken to valid**: **Given** an open service view that shows the fallback after an image error, **When** an operator replaces the SVG document and the view receives fresh service data, **Then** it attempts to render the new content and shows it on success. Recovery does not require a full page reload.
+4. **US3.4 — Accessible service identity**: **Given** configured, unset, and broken icon states, **When** a user reviews consent and sessions at narrow and wide viewport sizes, **Then** the service name remains readable. The icon adds no keyboard stop or duplicate service announcement, and all existing controls remain operable.
+
+### Edge Cases
+
+- Existing clients omit the SVG field on creation and update. Creation has no icon, and update preserves the current icon.
+- A permitted SVG document replaces the previous document.
+- An explicit null clears the icon.
+- Empty or whitespace-only SVG values are invalid, not aliases for removal.
+- A URL or image path supplied instead of an SVG document is invalid, whether same-origin or remote.
+- The browser fails to render the configured SVG. The view retains its fallback without requesting an external image.
+- An SVG is exactly 65,536 UTF-8 bytes or exceeds that limit. The boundary is measured after JSON string decoding.
+- A malformed or prohibited icon accompanies other service changes. The entire write fails without partial changes.
+- A view retains an earlier SVG in memory or cache after replacement or removal. Fresh service data must display the current document or the no-icon fallback, independent of how the document is delivered.
+- Several services use identical SVG documents. Replacing or clearing one service's icon must not alter another service.
+
+## Concrete Example Journeys *(mandatory)*
+
+**Shared cast**: Operator Olivia (`olivia@example.com`) administers service **Atlas Files** (`880e8400-e29b-41d4-a716-446655440010`).
+User Alice (`alice@example.com`) reviews agent **Data Analysis Assistant** (`550e8400-e29b-41d4-a716-446655440000`).
+By 10:04, Alice has a session for Atlas Files and permission to review that agent.
+The end-user origin is `https://broker.example.com`. No separately deployed image assets are required.
+The Admin API uses `https://admin.broker.example.com`. The trusted proxies authenticate both actors and set `X-Remote-User`.
+All values are synthetic. Times are UTC on 2026-11-18.
+
+The Admin SVG field below is a proposed external contract, not an existing capability.
+Planning must define end-user icon delivery, reconcile the examples with both OpenAPI documents, and obtain stakeholder agreement before implementation.
+Response excerpts omit unrelated fields and the end-user icon-delivery representation, which remains a planning decision. No new runtime configuration or token claims are involved.
+
+### Journey 1 — Configure and Replace an SVG Document (US1.1–US1.2, US3.1, US3.4)
+
+**Step 1 — 10:00:00: Olivia creates Atlas Files with its SVG icon**
+
+```http
+POST /api/services HTTP/1.1
+Host: admin.broker.example.com
+X-Remote-User: olivia@example.com
+Content-Type: application/json
+
+{
+  "display_name": "Atlas Files",
+  "client_id": "atlas-broker-public",
+  "token_endpoint_auth_method": "none",
+  "issuer_uri": "https://atlas.example.com",
+  "discovery": {"enable_discovery": false},
+  "endpoints": {
+    "authorize_endpoint": "https://atlas.example.com/authorize",
+    "token_endpoint": "https://atlas.example.com/token"
+  },
+  "scopes": [{"scope_value": "files.read", "description": "Read files"}],
+  "icon_svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path fill=\"currentColor\" d=\"M4 4h16v16H4z\"/></svg>"
+}
+
+HTTP/1.1 201 Created
+Content-Type: application/json
+
+{
+  "id": "880e8400-e29b-41d4-a716-446655440010",
+  "display_name": "Atlas Files",
+  "icon_svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path fill=\"currentColor\" d=\"M4 4h16v16H4z\"/></svg>"
+}
+```
+
+At 10:01, Olivia assigns Atlas Files to the agent through the existing permission-set workflow.
+At 10:03, Alice connects to Atlas Files through the existing OAuth2 flow. Those unchanged exchanges are outside this example.
+
+**Step 2 — 10:05:00: Alice opens the agent's consent view after the broker restarts**
+
+```http
+GET /api/consent/agents/550e8400-e29b-41d4-a716-446655440000 HTTP/1.1
+Host: broker.example.com
+X-Remote-User: alice@example.com
+
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "data": {
+    "services": [{
+      "serviceId": "880e8400-e29b-41d4-a716-446655440010",
+      "displayName": "Atlas Files",
+      "scopes": [{"value": "files.read", "description": "Read files"}]
+    }]
+  }
+}
+```
+
+State A — the existing fallback for a service without an icon:
+
+![State A: consent initials and a name-only session header](wireframes/service-icons-unset.svg)
+
+<details><summary>Wireloom source</summary>
+
+```wireloom
+window "Service identity - no icon":
+  header:
+    text "Agentic Identity Broker" bold
+  section "Agent consent":
+    text "Data Analysis Assistant" bold
+    panel:
+      row:
+        avatar "A" size=medium
+        text "Atlas Files" bold
+      text "Read files" muted
+      button "Connect"
+  section "Third-party sessions":
+    panel:
+      text "Atlas Files" bold
+      status "Active" kind=success
+      row:
+        button "Refresh"
+        button "Terminate"
+```
+
+</details>
+
+Action: Olivia assigns the icon in step 1. Alice opens fresh consent and session views.
+For this comparison, State A uses the same service without icon metadata. The connected session belongs to Alice, independently of the agent's delegation.
+
+State B — both views show the configured image:
+
+![State B: the Atlas icon beside both service headings](wireframes/service-icons-configured.svg)
+
+<details><summary>Wireloom source</summary>
+
+```wireloom
+window "Service identity - configured icon":
+  header:
+    text "Agentic Identity Broker" bold
+  section "Agent consent":
+    text "Data Analysis Assistant" bold
+    panel:
+      row:
+        image label="Atlas" width=36 height=36
+        text "Atlas Files" bold
+      text "Read files" muted
+      button "Connect"
+  section "Third-party sessions":
+    panel:
+      row:
+        image label="Atlas" width=36 height=36
+        text "Atlas Files" bold
+      status "Active" kind=success
+      row:
+        button "Refresh"
+        button "Terminate"
+```
+
+</details>
+
+The image boxes represent the configured icon, not new text labels.
+The service name remains visible in every state. Equivalent service identity rows in consent use the same metadata.
+
+**Step 3 — 10:10:00: Olivia replaces the image**
+
+Olivia sends a full `PUT /api/services/880e8400-e29b-41d4-a716-446655440010` replacement.
+Its body repeats the creation fields, except `icon_svg` is `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle fill="currentColor" cx="12" cy="12" r="8"/></svg>`.
+The response is `200 OK` with the replacement document. Existing concurrency requirements remain applicable.
+After Alice receives fresh service data, her view renders the replacement SVG through `<img>` using the delivery mechanism chosen during planning.
+
+**Observable result**: Atlas Files shows the replacement icon in consent and sessions. Its ID, permissions, session status, and controls do not change.
+
+### Journey 2 — Validate and Render SVG Content Safely (US2.1–US2.4)
+
+**Step 1 — 10:15:00: Olivia supplies a static SVG**
+
+```http
+PUT /api/services/880e8400-e29b-41d4-a716-446655440010 HTTP/1.1
+Host: admin.broker.example.com
+X-Remote-User: olivia@example.com
+Content-Type: application/json
+
+{
+  "display_name": "Atlas Files",
+  "client_id": "atlas-broker-public",
+  "token_endpoint_auth_method": "none",
+  "issuer_uri": "https://atlas.example.com",
+  "discovery": {"enable_discovery": false},
+  "endpoints": {
+    "authorize_endpoint": "https://atlas.example.com/authorize",
+    "token_endpoint": "https://atlas.example.com/token"
+  },
+  "scopes": [{"scope_value": "files.read", "description": "Read files"}],
+  "icon_svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path fill=\"currentColor\" d=\"M4 4h16v16H4z\"/></svg>"
+}
+
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "id": "880e8400-e29b-41d4-a716-446655440010",
+  "display_name": "Atlas Files",
+  "icon_svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path fill=\"currentColor\" d=\"M4 4h16v16H4z\"/></svg>"
+}
+```
+
+The SVG replaces the previous document. Only SVG documents can be supplied; their delivery to end-user views remains a planning decision.
+
+**Step 2 — 10:16:00: Alice opens sessions and sees the SVG icon**
+
+```http
+GET /api/third-party/sessions HTTP/1.1
+Host: broker.example.com
+X-Remote-User: alice@example.com
+
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "data": {
+    "sessions": [{
+      "id": "990e8400-e29b-41d4-a716-446655440020",
+      "service_id": "880e8400-e29b-41d4-a716-446655440010",
+      "service_display_name": "Atlas Files",
+      "token_type": "Bearer",
+      "scope": ["files.read"],
+      "initiated_at": "2026-11-18T10:03:00Z",
+      "requires_reauthentication": false,
+      "is_expired": false,
+      "access_token_expired": false,
+      "has_refresh_token": true,
+      "dependent_agent_count": 1,
+      "is_encrypted": true
+    }]
+  }
+}
+```
+
+The browser receives the principal header from the trusted proxy, not from application JavaScript.
+The end-user icon representation is intentionally omitted from this excerpt. Whatever delivery planning selects, consent and sessions render the validated SVG through `<img>`, never as SVG elements inserted into the page DOM.
+The layout remains State B from Journey 1. Icon display causes no script execution or requests to third-party origins.
+
+**Step 3 — 10:20:00: Olivia attempts an unsafe replacement**
+
+Olivia repeats the step 1 request with `icon_svg` containing `<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>`.
+
+```http
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+
+{"error":"validation failed","message":"icon_svg contains prohibited content"}
+```
+
+At 10:21, a caller without an authenticated principal attempts to obtain the icon through the end-user delivery selected during planning. Existing end-user authentication rejects the request and returns no SVG content. This check also applies to consent and session responses that carry icon content; it does not require a separate icon route.
+
+**Observable result**: The safe SVG remains available after restart. The rejected document never replaces it or executes in Alice's browser.
+
+### Journey 3 — Recover from a Broken Image and Remove It (US1.3–US1.4, US3.2–US3.3)
+
+**Step 1 — 10:25:00: Alice's browser fails to load the current SVG icon**
+
+The service still holds a permitted SVG document, but Alice's browser reports an image-rendering failure. This example does not assume a separate image request or a particular response status.
+
+After the image fails, Alice's views show State A from Journey 1. Image failure and absence intentionally have the same visible fallback.
+
+**Step 2 — 10:26:00: Olivia replaces the SVG while Alice keeps the view open**
+
+Olivia repeats the replacement from Journey 1 with a different permitted `icon_svg` document. When Alice receives fresh service data, the view recognizes the changed icon and attempts to render the replacement content.
+Action: Alice refreshes the service data without reloading the page. The view transitions from State A to State B from Journey 1.
+The previous image error does not suppress the new image attempt.
+
+**Step 3 — 10:27:00: Olivia preserves, then clears the icon**
+
+Olivia submits an otherwise valid full replacement without `icon_svg`. A subsequent Admin read still reports the current SVG document.
+She then repeats the request with `"icon_svg": null`. The response is `200 OK` without the SVG field.
+Fresh consent and session data indicate that the icon is absent, and Alice's views return to State A.
+An attempted replacement with `"icon_svg": "https://images.example.net/atlas.svg"` or `"icon_svg": "/service-icons/atlas.svg"` returns `400 Bad Request` without a network request.
+
+**Observable result**: Alice can use service controls throughout the failure, recovery, and removal sequence. Unrelated service data does not change.
+
+## Requirements *(mandatory)*
+
+### Functional Requirements
+
+- **FR-001**: Authorized operators MUST be able to create and update a service with an optional SVG document as its icon. Operator-supplied image URLs and paths are not supported.
+- **FR-002**: Admin create, update, detail, and list responses MUST report the configured SVG document when present.
+- **FR-003**: Icon metadata MUST survive production restarts and behave consistently in development and production storage.
+- **FR-004**: Writes MUST apply the omission, null, replacement, and validation behavior in the source semantics table.
+- **FR-005**: Icon input MUST be an SVG document, not a URL or image path. The broker and browser MUST NOT import or request third-party images.
+- **FR-006**: SVG sources MUST satisfy the security requirements. Views MUST render validated SVG through `<img>`, never insert SVG markup into the page DOM. The delivery mechanism is a planning decision.
+- **FR-007**: Consent service data MUST support displaying the current configured icon for scoped services and mandatory or optional service requirements, using the delivery contract selected during planning.
+- **FR-008**: Consent service cards, permission-set service rows, and service requirement rows MUST show the icon beside their service identity label.
+- **FR-009**: Session list and detail data MUST support displaying the service's current icon. Their service identity headers MUST show that icon, using the delivery contract selected during planning.
+- **FR-010**: Unset and failed images MUST retain each view's existing fallback. They MUST NOT block service controls or cause a page-level error.
+- **FR-011**: When a view learns that the configured SVG document has changed, it MUST attempt to render the new content even after an earlier rendering failure.
+- **FR-012**: After replacement or removal, fresh service data MUST make views render the current SVG or the no-icon fallback. This MUST NOT require a broker restart or new user session and MUST NOT depend on a particular URL or revision format.
+- **FR-013**: Invalid icon input MUST reject the entire service write. It MUST NOT change existing metadata, credentials, grants, or sessions.
+- **FR-014**: Icons MUST remain non-interactive decoration. The service name MUST remain visible and accessible independently of the image.
+- **FR-015**: Icon-only edits MUST preserve the service ID and unrelated configuration. Existing authorization and concurrency requirements MUST remain in effect.
+
+**Source semantics**: `icon_svg` is an optional, nullable string in writes. A supplied non-null value must be a nonempty, permitted SVG document. There is no operator-supplied URL field.
+
+| Input | Create result | Update result |
+| --- | --- | --- |
+| Field absent | No icon | Preserve existing icon |
+| Permitted SVG document | Set that document | Replace existing document |
+| Explicit null | No icon | Clear existing icon |
+| Empty, whitespace-only, malformed, prohibited, or oversized document; URL or image path | Reject | Reject without changes |
+
+### Domain Model *(if applicable - document before API or database design)*
+
+**Aggregate**: The existing third-party service owns its icon metadata. An icon has no independent identity or user-specific lifecycle.
+
+**Value object**: A service icon is absent or a permitted SVG document. Only one state can apply at a time.
+Image availability is a presentation state, not a change to the stored source or the service's connection status.
+
+The service icon term and its relationship to the service must enter the `ARCHITECTURE.md` glossary before implementation.
+
+### API Requirements *(if applicable - design before database)*
+
+- **API-001**: Extend the existing Admin service create and replacement contracts with `icon_svg` only. Preserve unrelated field and precondition semantics.
+- **API-002**: Admin responses MUST omit `icon_svg` for no icon. Accepted SVG content remains readable administratively.
+- **API-003**: Planning MUST define the end-user icon-delivery contract for consent services, service requirements, session summaries, and session details. This specification does not prescribe icon field names, payload embedding, or a separate image resource.
+- **API-004**: The selected contract MUST unambiguously represent the absence of an icon. Consumers MUST tolerate omitted or null icon data and retain the fallback.
+- **API-005**: Planning MUST select and justify the delivery mechanism, considering response size for SVG documents up to 64 KiB each, request count, caching, authentication, and image-mode isolation. No separate icon endpoint is required by this specification.
+- **API-006**: Planning MUST define how the selected contract communicates icon replacement and removal so that fresh data meets FR-011 and FR-012. Broker-generated URLs, revision query parameters, and obsolete-resource status codes are not required.
+- **API-007**: Invalid icon input MUST return `400` using the existing Admin error format. Missing authentication MUST retain the applicable server's existing behavior.
+- **API-008**: Document all additions, examples, authentication, errors, size limits, and omission semantics in both applicable OpenAPI files before implementation.
+- **API-009**: Render the changed end-user contract in `docs/api/`. Obtain stakeholder confirmation and follow existing API versioning and Zalando API guidelines.
+
+Icon delivery must not expose service credentials, tokens, or the service's other administrative configuration.
+An SVG rendering failure uses the display fallback. No operator-supplied image URL is fetched or validated for availability.
+
+### Database Requirements *(if applicable)*
+
+- **DB-001**: Both in-memory and PostgreSQL adapters MUST retain the icon source and return equivalent service and session metadata.
+- **DB-002**: Existing services MUST acquire an absent icon without changes to their IDs, credentials, grants, sessions, or timestamps.
+- **DB-003**: Required schema changes MUST use atomic migrations with apply, rollback, and reapply coverage against production migrations.
+- **DB-004**: Rollback MUST preserve unrelated service data. No independent asset lifecycle or remote image store is required.
+
+### Security Requirements *(mandatory for security-critical features)*
+
+**Security rationale**: Operator-supplied SVG is untrusted content. Rendering through `<img>` uses the browser's SVG image mode, which disables scripts and interactivity and isolates the SVG from the surrounding page DOM. Directly inserting SVG markup into the page does not provide that boundary. Image-mode isolation is defense in depth, not a replacement for the validation and external-resource restrictions below.
+
+The isolation comes from the image rendering context, not from using a separate endpoint: an SVG data URL in `<img>` also uses image mode. Planning will select delivery without weakening this boundary. Its security review must address any access outside image mode exposed by the chosen mechanism; directly opening an SVG document does not inherit `<img>` restrictions. This does not mandate an image endpoint or a particular response-header policy.
+
+- **SR-001**: Only existing authorized Admin callers can change icon sources. End-user callers cannot modify them.
+- **SR-002**: Icon input MUST reject URLs and image paths, including same-origin paths. Only permitted SVG documents can become service icons.
+- **SR-003**: Icon display MUST cause zero requests to third-party origins. The chosen delivery mechanism MUST preserve existing frontend security controls, and planning MUST define any additional browser policy needed to enforce this restriction.
+- **SR-004**: SVG content MUST be a well-formed UTF-8 SVG document of at most 65,536 decoded bytes. Empty documents and non-SVG roots are invalid.
+- **SR-005**: SVG content MUST contain only static vector content. Scripts, event handlers, hyperlinks, foreign content, animation, document types, and entity declarations are prohibited.
+- **SR-006**: SVG content MUST NOT load external fonts, styles, images, or documents. These restrictions also apply to embedded styling and URL references.
+- **SR-007**: Accepted SVG MUST be rendered through `<img>`. Its markup MUST NOT be inserted into the page DOM or loaded through `<object>`, `<embed>`, or `<iframe>`. This requirement applies regardless of whether the chosen delivery mechanism carries SVG content in existing responses or retrieves it separately. Image-mode isolation MUST NOT replace validation under SR-004–SR-006.
+- **SR-008**: Rejected sources MUST remain unavailable to users. Rejection MUST NOT attempt to fetch referenced resources or silently accept a modified unsafe document.
+- **SR-009**: SVG content and image delivery MUST NOT introduce credentials or personal data into logs, traces, or metrics.
+
+### Frontend/Design System Requirements *(if applicable - document before implementation)*
+
+- **FE-001**: Reuse the existing design-system image, avatar, and fallback patterns. Keep the current light theme and semantic tokens.
+- **FE-002**: Preserve existing icon sizing where present. New icon slots MUST fit the existing service heading without displacing controls or stretching the image.
+- **FE-003**: The adjacent service name supplies the accessible identity. Decorative images MUST NOT duplicate that name for screen readers or add focus stops.
+- **FE-004**: Configured and fallback states MUST meet WCAG 2.1 AA and remain usable at narrow and wide viewport sizes.
+- **FE-005**: Shared image-error recovery MUST apply consistently to every affected service identity view. This feature does not redesign unrelated avatars or agent logos.
+
+### Key Entities *(include if feature involves data)*
+
+- **Third-party service**: The existing provider definition whose display identity includes optional icon metadata.
+- **Service icon**: The service-owned visual value described in the domain model, separate from OAuth2 provider credentials and connection status.
+- **User session**: An existing connection whose displayed service identity reflects current service metadata, not a copied icon from session creation.
+
+## Success Criteria *(mandatory)*
+
+### Measurable Outcomes
+
+- **SC-001**: In every acceptance fixture, users see the assigned icon beside the correct service identity across consent and session views.
+- **SC-002**: All create, replace, preserve, and clear journeys produce the specified state after a fresh read. Configured icons survive a production restart.
+- **SC-003**: All missing and failed image fixtures retain a readable service identity and usable controls, with zero page-level errors caused by icons.
+- **SC-004**: Every broken-to-valid replacement fixture recovers on the first delivery of fresh service data, without a full page reload.
+- **SC-005**: All prohibited-source fixtures fail without changing stored service data. Icon display causes zero third-party network requests or executable content.
+- **SC-006**: Keyboard and screen-reader review finds zero new focus stops or duplicate service announcements attributable to icons.
+
+## Assumptions
+
+- Operator-supplied SVG documents are the only icon input. Same-origin image paths, remote image URLs, remote import, and arbitrary URL proxying are excluded.
+- Planning owns the delivery mechanism and end-user representation. Neither a separate icon endpoint nor inclusion of SVG documents in service responses is required by this specification.
+- The 64 KiB SVG limit is a conservative default for small service icons. The limit applies uniformly to create and update requests.
+- Service identity cards, rows, and headers in consent and sessions are in scope. Service names inside explanatory prose and confirmation text do not gain decoration.
+- An Admin icon editor, raster uploads, icon discovery from providers, and changes to agent or user logos are out of scope.
+- Existing end-user authentication, Admin authorization, and service concurrency controls remain authoritative.
+- Existing data refresh and cache lifetimes remain in effect. This feature requires correct fresh data and source-change recovery, not live push updates.
+- Planning must finalize the documented external contracts before implementation. This specification does not itself approve or modify the OpenAPI documents.
+
+**Acceptance traceability**:
+
+| Requirements | Acceptance scenarios |
+| --- | --- |
+| FR-001–FR-003, FR-007–FR-009 | US1.1, US2.1 |
+| FR-004 | US1.3, US1.4, US2.2 |
+| FR-005–FR-006, SR-001–SR-009 | US1.4, US2.1, US2.3, US2.4 |
+| FR-010 | US3.1, US3.2 |
+| FR-011–FR-012 | US2.2, US3.3 |
+| FR-013, FR-015 | US1.2, US1.4, US2.3 |
+| FR-014, FE-001–FE-005 | US3.1–US3.4 |
+| API-003–API-006 | US2.1, US2.2, US2.4, US3.1, US3.3 |
