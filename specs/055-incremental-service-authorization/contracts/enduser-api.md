@@ -5,9 +5,9 @@
 `api/enduser/openapi.yaml` before it writes code (Principles IV and X). It also renders them in
 `docs/api/enduser-api.md` and `docs/reference/token-exchange.md`.
 
-**Version**: `info.version` changes from `1.2.0` to `1.3.0`. The default branch already took
-`1.2.0` for ADR 046's observed refresh rejection (#378), so this feature's additions need the next
-minor version. All changes are additive, or they
+**Version**: `info.version` changes from `1.3.0` to `1.4.0`. `1.2.0` is ADR 046's observed refresh
+rejection (#378) and `release/v0.2` took `1.3.0` for the AuthZEN delegation PDP (ADR 048), so this
+feature's additions need the next minor version. All changes are additive, or they
 change the target of the existing optional `error_uri` action link within its documented recovery
 purpose (ARCHITECTURE.md › API versioning; research R13).
 

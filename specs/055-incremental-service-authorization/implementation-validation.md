@@ -8,8 +8,8 @@ and final evidence audits are not declared complete. Container-backed results ar
 
 The supplied approval is mjungsbluth's 2026-11-08 approval of all 15 items at
 https://github.com/zalando-incubator/agentic-identity-broker/pull/323#issuecomment-6708996503.
-Implementation records this in ADRs 048, 049, approved ADR 049 Revision 1 and DEC-006's evidence record.
-The local `origin/main` tree contains neither ADR 048 nor ADR 049; Revision 1 is a pre-merge revision,
+Implementation records this in ADRs 049, 050, approved ADR 050 Revision 1 and DEC-006's evidence record.
+The local `origin/main` tree contains neither ADR 049 nor ADR 050; Revision 1 is a pre-merge revision,
 not an amendment of a default-branch ADR. The feature-local ADR revision becomes a reference pointer.
 The specification and plan are unchanged.
 
@@ -19,7 +19,7 @@ The specification and plan are unchanged.
   requests add no lookups; no provider-session or grant-coverage dependency is introduced.
 - `400 invalid_scope` and lookup-failure `500 server_error` do not consume upstream credentials.
   Valid requests strip virtual scopes, preserve unrelated form values and retain upstream rotation.
-- End-User OpenAPI becomes `1.3.0`, with explicit continuation error/state/callback precedence.
+- End-User OpenAPI becomes `1.4.0`, with explicit continuation error/state/callback precedence.
 - Dot-segment canonical IDs remain unchanged; the guide documents issue #446 and another-ID/no-ID
   workarounds. No emission, page or recovery UUID fallback is implemented.
 - Feature-owned security records use canonical event attributes, bounded reasons/error kinds and

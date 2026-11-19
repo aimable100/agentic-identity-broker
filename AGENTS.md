@@ -204,9 +204,9 @@ See Principle II in `.specify/memory/constitution.md`.
 | 046 | `adrs/046-observed-refresh-token-rejection.md` | Observed provider refresh rejection replaces predicted refresh expiry; `requires_reauthentication`; no schema change |
 | 047 | `adrs/047-unique-agent-external-id-reconcile.md` | Unique Agent external IDs, collection PUT reconciliation, safe migration 047, and Admin API 3.0.0 |
 | 048 | `adrs/048-authzen-delegation-pip.md` | AuthZEN delegation PDP sharing exchange resolution; opt-in ExtProc grant-context resolver with bounded permit freshness and identity-safe permit-bound result reuse; `granted_permission_sets` deprecation |
-| 048 | `adrs/048-service-session-recovery-return.md` | Service-page recovery return (`/sessions/<identifier>`); rejected sessions follow ADR 046 (Feature 055) |
-| 049 | `adrs/049-virtual-service-scopes.md` | Virtual service scopes, shared usability/coverage in `domain/servicescope/` and immutable refresh assurance (Feature 055) |
-| 049 Revision 1 | `adrs/049-virtual-service-scopes-revision-1.md` | Proxy refresh pre-forward syntax/existence/eligibility checks; dot-segment canonical-ID limitation deferred to #446 |
+| 049 | `adrs/049-service-session-recovery-return.md` | Service-page recovery return (`/sessions/<identifier>`); rejected sessions follow ADR 046 (Feature 055) |
+| 050 | `adrs/050-virtual-service-scopes.md` | Virtual service scopes, shared usability/coverage in `domain/servicescope/` and immutable refresh assurance (Feature 055) |
+| 050 Revision 1 | `adrs/050-virtual-service-scopes-revision-1.md` | Proxy refresh pre-forward syntax/existence/eligibility checks; dot-segment canonical-ID limitation deferred to #446 |
 
 ## Domain Glossary
 

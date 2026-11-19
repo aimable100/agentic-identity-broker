@@ -17,7 +17,7 @@ import (
 var ErrRequestedServiceNotSatisfied = errors.New("requested service not satisfied")
 
 // WithRequestedServices enables requested-service coverage in consent detail and enforcement
-// on grant submission (ADR 049).
+// on grant submission (ADR 050).
 func (s *Service) WithRequestedServices(resolver *servicescope.Resolver, evaluator *servicescope.Evaluator) *Service {
 	s.requestedServices = resolver
 	s.serviceEvaluator = evaluator

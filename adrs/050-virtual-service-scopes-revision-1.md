@@ -1,26 +1,26 @@
-# ADR 049 Revision 1 — Proxy-Refresh Validation and Dot-Segment Canonical IDs
+# ADR 050 Revision 1 — Proxy-Refresh Validation and Dot-Segment Canonical IDs
 
 **Status**: Accepted (approved by mjungsbluth on 2026-11-13: https://github.com/zalando-incubator/agentic-identity-broker/pull/323#issuecomment-6857846872)
 **Date**: 2026-11-07
-**Revises**: [ADR 049](049-virtual-service-scopes.md), introduced and accepted in
+**Revises**: [ADR 050](050-virtual-service-scopes.md), introduced and accepted in
 this pull request. Under Principle II, the same pull request may revise it before merge.
 The supplied approval covers this revision; implementation applied the changes below to
-`adrs/049-virtual-service-scopes.md` and recorded the approval there.
+`adrs/050-virtual-service-scopes.md` and recorded the approval there.
 
 ## Context
 
-Reanalysis of Feature 055 found two gaps in ADR 049:
+Reanalysis of Feature 055 found two gaps in ADR 050:
 
 - **I2**: Decision 6 says that proxy refresh removes virtual scopes and forwards the upstream
   outcome. FR-002 also requires the broker to reject malformed, unknown and ineligible broker
-  service scopes. ADR 049 does not say how proxy refresh rejects them.
+  service scopes. ADR 050 does not say how proxy refresh rejects them.
 - **U4**: Canonical-ID validation accepts the complete identifiers `.` and `..`. Browsers normalize
   these path segments, so the emitted scope, service page and recovery link of such a service do
   not reliably name it.
 
 The maintainer directed the resolution of both gaps in the plan run on PR #323.
 
-## Changes to ADR 049
+## Changes to ADR 050
 
 ### Decision 6 (Proxy), second bullet
 
@@ -59,7 +59,7 @@ with:
 - Proxy refresh with an invalid broker service scope fails before any upstream call. The upstream
   refresh token stays valid.
 - Proxy refresh adds a service lookup only when the request carries a broker-prefixed scope.
-- The dot-segment defect stays visible in ADR 049 until issue #446 removes it.
+- The dot-segment defect stays visible in ADR 050 until issue #446 removes it.
 
 ## References
 

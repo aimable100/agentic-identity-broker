@@ -1,5 +1,5 @@
 // Package servicescope owns Virtual Service Scopes: the broker-only scope grammar, requested
-// service resolution, grant coverage and requested-service evaluation (ADR 049).
+// service resolution, grant coverage and requested-service evaluation (ADR 050).
 package servicescope
 
 import (

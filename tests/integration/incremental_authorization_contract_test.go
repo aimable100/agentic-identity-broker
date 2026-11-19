@@ -34,7 +34,7 @@ func incrementalAuthorizationSchema(t *testing.T, compiler *jsonschema.Compiler,
 
 func TestIncrementalAuthorizationRevisionContract(t *testing.T) {
 	document, compiler := incrementalAuthorizationContract(t)
-	assert.Equal(t, "1.3.0", document["info"].(map[string]any)["version"])
+	assert.Equal(t, "1.4.0", document["info"].(map[string]any)["version"])
 	paths := document["paths"].(map[string]any)
 	authorize := paths["/oauth2/authorize"].(map[string]any)["get"].(map[string]any)
 	description := authorize["description"].(string)

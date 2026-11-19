@@ -2,8 +2,8 @@
 
 Use this guide to let an MCP client recover a tool call that failed because one broker-managed
 third-party service is not usable, without a silent reauthorization loop. The design is recorded in
-[ADR 048](https://github.com/zalando-incubator/agentic-identity-broker/blob/main/adrs/048-service-session-recovery-return.md) and
-[ADR 049](https://github.com/zalando-incubator/agentic-identity-broker/blob/main/adrs/049-virtual-service-scopes.md).
+[ADR 049](https://github.com/zalando-incubator/agentic-identity-broker/blob/main/adrs/049-service-session-recovery-return.md) and
+[ADR 050](https://github.com/zalando-incubator/agentic-identity-broker/blob/main/adrs/050-virtual-service-scopes.md).
 
 Every configured service has a broker-only **Virtual Service Scope**:
 
@@ -123,5 +123,5 @@ leaves the refresh token valid, and only interactive authorization can add it.
   fallback. [Issue #446](https://github.com/zalando-incubator/agentic-identity-broker/issues/446)
   owns the validation fix. Give the service another canonical ID or none (which emits its UUID);
   explicitly requesting the UUID form remains valid.
-- **Rollback.** Rolling back migration `048` discards stored service bindings and requires rolling
+- **Rollback.** Rolling back migration `049` discards stored service bindings and requires rolling
   back the broker version; affected clients authorize again.
