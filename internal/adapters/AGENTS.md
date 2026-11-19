@@ -123,7 +123,7 @@ Use `docs/STORAGE_TROUBLESHOOTING.md` for operational faults.
 
 Business-event append and retention live in `internal/adapters/storage/memory/business_event.go`
 and `internal/adapters/storage/postgres/business_event.go`. Read
-`specs/048-business-event-ledger/contracts/ports.md` before changes. Both PostgreSQL methods use
+`specs/20261118-125900-business-event-ledger/contracts/ports.md` before changes. Both PostgreSQL methods use
 the connection pool, not a transaction from context. Keep these ports write-only. Memory tests
 inspect the private occurrence slice; PostgreSQL tests use explicit-column SQL. Store rendered
 principal values unchanged, and add no principal attributes to storage spans.

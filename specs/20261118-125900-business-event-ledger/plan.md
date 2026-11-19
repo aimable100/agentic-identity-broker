@@ -2,7 +2,7 @@
 
 **Branch**: `048-business-event-ledger` (one branch, one pull request) | **Date**: 2026-11-12 | **Spec**: [spec.md](./spec.md)
 
-**Input**: Feature specification from `/specs/048-business-event-ledger/spec.md`
+**Input**: Feature specification from `/specs/20261118-125900-business-event-ledger/spec.md`
 
 ## Summary
 
@@ -11,7 +11,7 @@ in a ledger that the activity page and, later, an SSF transmitter read. A busine
 audit log record that `coding-standards/LOGGING.md` already requires, with a typed
 `bizevent.Definition` as its `event` value. A `slog.Handler` in the builder's logger chain stores
 each such record as one row of the table `business_events`, after the state change has committed
-([ADR 048](../../adrs/048-business-events-as-typed-log-records.md)). The table has seven promoted
+([ADR 20261118-125900-business-events-as-typed-log-records](../../adrs/20261118-125900-business-events-as-typed-log-records.md)). The table has seven promoted
 columns and one JSONB attribute document, so a new event needs no migration. Retention deletes old
 rows and does not depend on an event type. This feature ends with the first stored event,
 `consent.grant.revoked`. It is delivered on one branch and in one
@@ -26,21 +26,21 @@ pull request.
 **Target Platform**: Linux server (broker Deployment). ExtProc is not changed.
 **Project Type**: single (Go backend). No frontend change.
 **Performance Goals**: The 99th percentile of the grant revocation request rises by at most 5 ms with the ledger on, on PostgreSQL (SC-004)
-**Constraints**: The write is outside the state change's transaction (ADR 048, Decision 5). A failed write never changes the result of the logging operation (FR-006). Disabled by default (FR-007).
+**Constraints**: The write is outside the state change's transaction (ADR 20261118-125900-business-events-as-typed-log-records, Decision 5). A failed write never changes the result of the logging operation (FR-006). Disabled by default (FR-007).
 **Scale/Scope**: One event type, grant revocation, kept for 90 days by default: well below one row per user per day ([data-model.md](./data-model.md#volume-estimate))
 
 ## Approval Items
 
 | ID | Item | Where | Status |
 |---|---|---|---|
-| ADR-048 | Business events are typed log records; the ledger row is written after the commit, with the loss window that Decision 5 accepts | [ADR 048](../../adrs/048-business-events-as-typed-log-records.md) | Decisions 5 and 9 approved by jbspeakr on 2026-11-12. ADR accepted as a whole by jbspeakr on 2026-11-12 |
+| ADR-048 | Business events are typed log records; the ledger row is written after the commit, with the loss window that Decision 5 accepts | [ADR 20261118-125900-business-events-as-typed-log-records](../../adrs/20261118-125900-business-events-as-typed-log-records.md) | Decisions 5 and 9 approved by jbspeakr on 2026-11-12. ADR accepted as a whole by jbspeakr on 2026-11-12 |
 | STD-LOGGING-8 | Amendment of LOGGING.md section 8 (ledger as projection; no audit record inside a transaction). T025 removes the interim sentence "Feature 048 delivers the definition type and the handler; until they merge, no record is persisted." | Tasks T003 and T025 | Approved by jbspeakr on 2026-11-12. Extension for the T025 removal approved by jbspeakr on 2026-11-12 |
 | STD-LOGGING-1 | Amendment of LOGGING.md section 1: the handler chain has a ledger branch, and the ledger handler sends its failure record through a context handler to the operational sinks | Task T025 | Approved by jbspeakr on 2026-11-12, as described here. T025 writes the text; a change beyond this description needs a new approval |
 | STD-LOGGING-2.2 | Amend LOGGING.md section 2.2 for the typed definition and the PR-description changelog record for event renames. Add the guard test in section 9 and one line for the typed-definition rule to the section 10 review checklist | Task T025 | Approved by jbspeakr on 2026-11-12, as described here. Extension for the section 10 line approved by jbspeakr on 2026-11-12. T025 writes the text; a change beyond this description needs a new approval |
 | STD-OTEL-2 | Amendment of OPENTELEMETRY.md section 2: add the instrumentation scope `business_events`, owned by the ledger handler | Task T025 | Approved by jbspeakr on 2026-11-12, as described here. T025 writes the text; a change beyond this description needs a new approval |
 | DB-048 | Table `business_events`, retention index, and principal/agent history indexes | [data-model.md](./data-model.md) | Original table and two-index design approved by jbspeakr on 2026-11-12. Retention-only revision approved by the user on 2026-11-18; superseded for index scope by the user's subsequent explicit request, "we should create indexes on principal and agent". Preserve retention and add both history indexes; no reader is introduced. |
 | CFG-BE | Configuration keys `business_events.*` | [contracts/configuration.md](./contracts/configuration.md) | Approved by jbspeakr on 2026-11-12 |
-| REVIEW-048 | Ledger behind principal policy with typed-marker preservation; authoritative visibility; append/retention-only ports; retention recovery; duplicate-key precedence; CLI precedence; safe instrument-initialization warnings | `048-business-events-as-typed-log-records` Decisions 3, 7, 10; contracts/ports.md; contracts/configuration.md; contracts/observability.md; research R3, R10–R12, R14; spec SC-005 | Approved explicitly by the user in this conversation on 2026-11-18: "I approve the outstanding approvals. complete the documented prerequisites" |
+| REVIEW-048 | Ledger behind principal policy with typed-marker preservation; authoritative visibility; append/retention-only ports; retention recovery; duplicate-key precedence; CLI precedence; safe instrument-initialization warnings | `20261118-125900-business-events-as-typed-log-records` Decisions 3, 7, 10; contracts/ports.md; contracts/configuration.md; contracts/observability.md; research R3, R10–R12, R14; spec SC-005 | Approved explicitly by the user in this conversation on 2026-11-18: "I approve the outstanding approvals. complete the documented prerequisites" |
 
 No approval is inferred. Task T004 retains the original approvals and records review-revision
 approval separately. Phase 2.5 starts only after revised approval items and all Phase 2
@@ -76,7 +76,7 @@ The artifact prerequisites are complete. Task completion and remaining verificat
 
 - **Security-First**: The ledger adds no data class beyond LOGGING.md section 6. It is off by default because it stores principals; an enabled ledger always runs retention (SR-003). The default is a data-minimisation default, not a disabled security control.
 - **Architecture Docs**: `ARCHITECTURE.md` includes the ADR index, four glossary terms, implemented ledger behavior, and linked non-functional requirements (T002, T007, T052).
-- **ADRs**: `048-business-events-as-typed-log-records`, including the explicitly approved review revisions.
+- **ADRs**: `20261118-125900-business-events-as-typed-log-records`, including the explicitly approved review revisions.
 - **Library-First Security**: No cryptography.
 - **Zalando Guidelines**: Not applicable. No API change.
 - **End-User Docs**: `docs/configuration.md` and `docs/operations/business-events.md` (T010).
@@ -106,7 +106,7 @@ At implementation handoff, changes were uncommitted and PR #467 was unchanged. T
 ### Documentation (this feature)
 
 ```text
-specs/048-business-event-ledger/
+specs/20261118-125900-business-event-ledger/
 ├── spec.md
 ├── plan.md
 ├── research.md
@@ -124,7 +124,7 @@ specs/048-business-event-ledger/
 ### Source Code (repository root)
 
 ```text
-adrs/048-business-events-as-typed-log-records.md
+adrs/20261118-125900-business-events-as-typed-log-records.md
 coding-standards/LOGGING.md
 coding-standards/OPENTELEMETRY.md
 internal/domain/bizevent/{definition.go,definition_test.go}
@@ -195,7 +195,7 @@ Container-backed tests may first run in CI when no local container runtime is av
 ### Phase 2 completion: executable design prerequisites
 
 **Entry**: Preserve original approvals and obtain the review-revision approvals of T004. The
-architecture remains governed by `048-business-events-as-typed-log-records`.
+architecture remains governed by `20261118-125900-business-events-as-typed-log-records`.
 
 Complete T007, T009–T011, and T025 before foundation implementation. T017 supplies only the types,
 ports, and empty methods needed to compile acceptance tests. T018–T020 define the five complete

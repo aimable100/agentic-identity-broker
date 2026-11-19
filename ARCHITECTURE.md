@@ -1217,8 +1217,8 @@ The consent package declares `GrantRevoked` for `consent.grant.revoked`, the fir
 
 A process stop between commit and logging can lose the event without a failure metric. A timed-out append has an unknown outcome and can still commit. These are accepted limits, not transactional delivery guarantees.
 
-Non-functional requirements remain in the [success criteria](specs/048-business-event-ledger/spec.md#success-criteria-mandatory), [configuration contract](specs/048-business-event-ledger/contracts/configuration.md), [storage and retention contract](specs/048-business-event-ledger/contracts/ports.md), and [observability contract](specs/048-business-event-ledger/contracts/observability.md).
-[048-business-events-as-typed-log-records](adrs/048-business-events-as-typed-log-records.md) governs principal policy, post-commit persistence, and the accepted loss window.
+Non-functional requirements remain in the [success criteria](specs/20261118-125900-business-event-ledger/spec.md#success-criteria-mandatory), [configuration contract](specs/20261118-125900-business-event-ledger/contracts/configuration.md), [storage and retention contract](specs/20261118-125900-business-event-ledger/contracts/ports.md), and [observability contract](specs/20261118-125900-business-event-ledger/contracts/observability.md).
+[20261118-125900-business-events-as-typed-log-records](adrs/20261118-125900-business-events-as-typed-log-records.md) governs principal policy, post-commit persistence, and the accepted loss window.
 
 ## 5. External Integrations / APIs
 
@@ -1359,7 +1359,7 @@ Partial supersessions and amendments apply only to the subjects named in those d
 | [045-agent-subject-impersonation.md](adrs/045-agent-subject-impersonation.md) | Accepted | Self-agent issuance without human delegation. Partly supersedes ADR 032 |
 | [046-observed-refresh-token-rejection.md](adrs/046-observed-refresh-token-rejection.md) | Accepted | Observed rejection replaces predicted refresh expiry. Partly supersedes ADR 038 |
 | [047-unique-agent-external-id-reconcile.md](adrs/047-unique-agent-external-id-reconcile.md) | Accepted | Unique Agent external IDs, domain reconciliation, atomic migration `047`, and Admin API `3.0.0` |
-| [048-business-events-as-typed-log-records.md](adrs/048-business-events-as-typed-log-records.md) | Accepted | Typed audit log records; policy-rendered post-commit ledger projection; append and retention only |
+| [20261118-125900-business-events-as-typed-log-records.md](adrs/20261118-125900-business-events-as-typed-log-records.md) | Accepted | Typed audit log records; policy-rendered post-commit ledger projection; append and retention only |
 
 ## 11. Project Identification
 
@@ -1628,7 +1628,7 @@ As [LOGGING.md section 8](coding-standards/LOGGING.md#8-audit-records) requires,
 
 **Domain Event**: A security-relevant fact in a bounded context, such as GrantRevoked or ApprovalApproved. This term describes meaning, not a second event bus, recorder API, or persistence guarantee.
 
-The four business-event terms implement [048-business-events-as-typed-log-records](adrs/048-business-events-as-typed-log-records.md).
+The four business-event terms implement [20261118-125900-business-events-as-typed-log-records](adrs/20261118-125900-business-events-as-typed-log-records.md).
 The [business event ledger](#43-business-event-ledger) section describes storage and its limits.
 
 **Business Event Definition**: An immutable declaration of an identifier and authoritative owner-visibility permission, represented by `bizevent.Definition`. A service logs the definition under `event` to mark an audit record as a Business Event. The consent package declares `consent.GrantRevoked` once with explicit owner visibility and identifier `consent.grant.revoked`. It records the existing GrantRevoked domain fact.

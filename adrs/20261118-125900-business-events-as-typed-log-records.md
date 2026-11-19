@@ -1,8 +1,8 @@
-# ADR 048: Business Events as Typed Log Records
+# ADR 20261118-125900-business-events-as-typed-log-records: Business Events as Typed Log Records
 
 **Status**: Accepted (approved by jbspeakr on 2026-11-12); review revisions to Decisions 3, 7, and 10 explicitly approved by the user in this conversation on 2026-11-18.
 **Date**: 2026-11-12
-**Feature**: 048-business-event-ledger (issue #188)
+**Feature**: 20261118-125900-business-event-ledger (issue #188)
 **Supersedes**: No ADR. Replaces the design of the closed PR #381 (the first design of feature 048, never merged).
 
 ## Context
@@ -87,7 +87,7 @@ fails. A ledger that is fed from log records therefore cannot also be transactio
 
 The package name of the definition type, the table and column names, the configuration key, and
 the metric name are set in the implementing pull requests and their contracts in
-`specs/048-business-event-ledger/`.
+`specs/20261118-125900-business-event-ledger/`.
 
 ## Consequences
 

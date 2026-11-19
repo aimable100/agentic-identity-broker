@@ -75,7 +75,7 @@ The [configuration reference](../configuration.md#business-event-configuration) 
 
 ## Write timeout and accepted loss
 
-Accepted [048-business-events-as-typed-log-records](https://github.com/zalando-incubator/agentic-identity-broker/blob/main/adrs/048-business-events-as-typed-log-records.md) defines a post-commit ledger, not transactional delivery.
+Accepted [20261118-125900-business-events-as-typed-log-records](https://github.com/zalando-incubator/agentic-identity-broker/blob/main/adrs/20261118-125900-business-events-as-typed-log-records.md) defines a post-commit ledger, not transactional delivery.
 The business mutation commits before the service logs its event. The synchronous append uses the connection pool outside that transaction.
 Its deadline starts immediately before `Append`, after event construction.
 The append retains request values, but ignores request cancellation and the request deadline.
@@ -95,7 +95,7 @@ The original audit record still reaches the operational sinks. A timeout counter
 
 The PostgreSQL acceptance budget permits at most 5 ms additional p99 grant-revocation latency with the ledger enabled.
 This budget is not the write timeout or a measured deployment guarantee.
-The [SC-004 protocol](https://github.com/zalando-incubator/agentic-identity-broker/blob/main/specs/048-business-event-ledger/plan.md#sc-004-measurement-protocol) defines the measurement.
+The [SC-004 protocol](https://github.com/zalando-incubator/agentic-identity-broker/blob/main/specs/20261118-125900-business-event-ledger/plan.md#sc-004-measurement-protocol) defines the measurement.
 
 ## Change retention
 
@@ -151,7 +151,7 @@ Recovery follows the concurrent-replica limits in the previous section. It does 
 
 ## Governing contracts
 
-- [Configuration contract](https://github.com/zalando-incubator/agentic-identity-broker/blob/main/specs/048-business-event-ledger/contracts/configuration.md)
-- [Handler and retention contracts](https://github.com/zalando-incubator/agentic-identity-broker/blob/main/specs/048-business-event-ledger/contracts/ports.md)
-- [Observability contract](https://github.com/zalando-incubator/agentic-identity-broker/blob/main/specs/048-business-event-ledger/contracts/observability.md)
-- [SC-005 retention criterion](https://github.com/zalando-incubator/agentic-identity-broker/blob/main/specs/048-business-event-ledger/spec.md#measurable-outcomes)
+- [Configuration contract](https://github.com/zalando-incubator/agentic-identity-broker/blob/main/specs/20261118-125900-business-event-ledger/contracts/configuration.md)
+- [Handler and retention contracts](https://github.com/zalando-incubator/agentic-identity-broker/blob/main/specs/20261118-125900-business-event-ledger/contracts/ports.md)
+- [Observability contract](https://github.com/zalando-incubator/agentic-identity-broker/blob/main/specs/20261118-125900-business-event-ledger/contracts/observability.md)
+- [SC-005 retention criterion](https://github.com/zalando-incubator/agentic-identity-broker/blob/main/specs/20261118-125900-business-event-ledger/spec.md#measurable-outcomes)

@@ -1,6 +1,6 @@
 # Contract: Definition Type, Ports, and Handler
 
-**Feature**: `048-business-event-ledger` | FR-001 to FR-006, FR-008 to FR-011 | Research R2 to R4, R7 to R13
+**Feature**: `20261118-125900-business-event-ledger` | FR-001 to FR-006, FR-008 to FR-011 | Research R2 to R4, R7 to R13
 
 ## 1. `internal/domain/bizevent`
 
@@ -106,7 +106,7 @@ attribute document. It never reconstructs an `id.Principal` or reads a raw ident
 
 No read port, filter, cursor, or read accessor is part of this feature. Tests observe storage
 with explicit-column SQL, adapter-private state, or test-local append capture (research R11).
-Future owner-facing readers must apply the definition visibility rule in ADR 048, Decision 10.
+Future owner-facing readers must apply the definition visibility rule in ADR 20261118-125900-business-events-as-typed-log-records, Decision 10.
 
 ## 4. Retention service (`internal/domain/bizevent/retention`)
 

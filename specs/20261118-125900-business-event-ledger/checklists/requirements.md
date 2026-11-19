@@ -52,7 +52,7 @@ implementation or maintainer approval is complete.
 - Validation iteration 3 (2026-11-18): clarified FR-001 and FR-008 for analysis finding I1.
   Eligible records use `Info` or above. An enabled ledger stores them independently of the
   operational sinks' `log.level` threshold, matching the existing handler contract and
-  `048-business-events-as-typed-log-records`. Existing checklist deviations and approval gates remain unchanged.
+  `20261118-125900-business-events-as-typed-log-records`. Existing checklist deviations and approval gates remain unchanged.
 
 ## Deviation Review — 2026-11-18
 

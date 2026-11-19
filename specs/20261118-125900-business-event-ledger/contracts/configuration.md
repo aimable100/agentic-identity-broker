@@ -1,6 +1,6 @@
 # Contract: Configuration
 
-**Feature**: `048-business-event-ledger` | FR-007, FR-009 | Research R4, R10
+**Feature**: `20261118-125900-business-event-ledger` | FR-007, FR-009 | Research R4, R10
 
 ## Keys (`ports.BusinessEventsConfig`, `mapstructure:"business_events"`)
 
@@ -61,5 +61,5 @@ business_events:
   `templates/configmap.yaml`, `values.schema.json`, and the chart README. No new workload:
   retention runs in the broker Deployment.
 - `docs/operations/business-events.md`: how to enable the ledger, the accepted loss window
-  (ADR 048), the retention period and how to change it (SR-003), and the absence of an erasure
+  (ADR 20261118-125900-business-events-as-typed-log-records), the retention period and how to change it (SR-003), and the absence of an erasure
   operation. Include the healthy-operation age bound and recovery behavior of SC-005.

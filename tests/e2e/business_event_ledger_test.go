@@ -116,7 +116,7 @@ var _ = Describe("Business event ledger", Label("docker"), func() {
 	})
 
 	Context("when the ledger is enabled and Alice has created a grant", func() {
-		// Scenario US1.1 from specs/048-business-event-ledger/spec.md (User Story 1)
+		// Scenario US1.1 from specs/20261118-125900-business-event-ledger/spec.md (User Story 1)
 		It("stores exactly one consent.grant.revoked event with request and resource identities", func() {
 			traceID := revoke(http.StatusNoContent)
 			events := helpers.CommittedBusinessEvents(db)
@@ -161,7 +161,7 @@ var _ = Describe("Business event ledger", Label("docker"), func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		// Scenario US1.5 from specs/048-business-event-ledger/spec.md (User Story 1)
+		// Scenario US1.5 from specs/20261118-125900-business-event-ledger/spec.md (User Story 1)
 		It("stores the deleted grant snapshot when refresh cleanup returns an HTTP error", func() {
 			traceID := revoke(http.StatusInternalServerError)
 			events := helpers.CommittedBusinessEvents(db)
@@ -197,7 +197,7 @@ var _ = Describe("Business event ledger", Label("docker"), func() {
 			Expect(original).To(HaveLen(1))
 		})
 
-		// Scenario US1.2 from specs/048-business-event-ledger/spec.md (User Story 1)
+		// Scenario US1.2 from specs/20261118-125900-business-event-ledger/spec.md (User Story 1)
 		It("keeps exactly one event when a second revocation returns 404", func() {
 			revoke(http.StatusNotFound)
 			Expect(helpers.CommittedBusinessEvents(db)).To(Equal(original))
@@ -208,7 +208,7 @@ var _ = Describe("Business event ledger", Label("docker"), func() {
 	Context("when the ledger is disabled", func() {
 		BeforeEach(func() { cfg.BusinessEvents.Enabled = false })
 
-		// Scenario US1.3 from specs/048-business-event-ledger/spec.md (User Story 1)
+		// Scenario US1.3 from specs/20261118-125900-business-event-ledger/spec.md (User Story 1)
 		It("stores no event and still logs the revocation when the ledger is disabled", func() {
 			traceID := revoke(http.StatusNoContent)
 			Expect(helpers.CommittedBusinessEvents(db)).To(BeEmpty())
@@ -232,7 +232,7 @@ var _ = Describe("Business event ledger", Label("docker"), func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		// Scenario US1.4 from specs/048-business-event-ledger/spec.md (User Story 1)
+		// Scenario US1.4 from specs/20261118-125900-business-event-ledger/spec.md (User Story 1)
 		It("returns 204 and reports exactly one failed write without losing the audit record", func() {
 			before := helpers.BusinessEventCounterValues(reader)["business_events/business_events.write_failures"]
 			traceID := revoke(http.StatusNoContent)
@@ -289,7 +289,7 @@ var _ = Describe("Business event ledger", Label("docker"), func() {
 			cfg.BusinessEvents.Retention.Interval = time.Second
 		})
 
-		// Scenario US2.1 from specs/048-business-event-ledger/spec.md (User Story 2)
+		// Scenario US2.1 from specs/20261118-125900-business-event-ledger/spec.md (User Story 2)
 		It("deletes only the expired event without a deletion log or counter", func() {
 			revoke(http.StatusNoContent)
 			first := helpers.CommittedBusinessEvents(db)

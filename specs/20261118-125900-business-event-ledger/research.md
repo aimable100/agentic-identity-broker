@@ -1,15 +1,15 @@
 # Research: Business Event Ledger
 
-**Feature**: `048-business-event-ledger` | **Date**: 2026-11-12 | **Spec**: [spec.md](./spec.md)
+**Feature**: `20261118-125900-business-event-ledger` | **Date**: 2026-11-12 | **Spec**: [spec.md](./spec.md)
 
 Checked against `main` at commit `01da81b8`. Each entry gives the decision, the rationale, and the
-alternatives that were rejected. [ADR 048](../../adrs/048-business-events-as-typed-log-records.md)
+alternatives that were rejected. [ADR 20261118-125900-business-events-as-typed-log-records](../../adrs/20261118-125900-business-events-as-typed-log-records.md)
 holds the architectural decisions; this file holds the design choices under it.
 
 ## R1. Where a business event is recorded
 
 **Decision**: In the audit log call that LOGGING.md section 8 already requires. A typed definition
-as the `event` value marks the record as a business event (ADR 048, Decisions 1 to 3).
+as the `event` value marks the record as a business event (ADR 20261118-125900-business-events-as-typed-log-records, Decisions 1 to 3).
 
 **Rationale**: Every domain constructor requires a `*slog.Logger` (LOGGING.md section 1), and
 `forbidigo` blocks log output outside slog. One handler in `internal/app/builder.go` therefore
@@ -65,7 +65,7 @@ often cancelled when the response is written; the ledger write must not stop for
 
 **Alternatives**: An in-memory queue with a batch writer: lower request latency, but a larger loss
 window on a crash and non-deterministic tests. Deferred until high-volume events are onboarded
-(ADR 048, Revisit). Same-transaction append: rejected by ADR 048, Decision 5.
+(ADR 20261118-125900-business-events-as-typed-log-records, Revisit). Same-transaction append: rejected by ADR 20261118-125900-business-events-as-typed-log-records, Decision 5.
 
 ## R5. Table shape
 
@@ -156,10 +156,10 @@ in the package `internal/domain/bizevent/retention`. Each run deletes rows with 
 older than the retention period in batches. It runs when
 `business_events.enabled` is true and not otherwise: one flag switches the ledger and its
 retention (maintainer decision, 2026-11-12). Retention is the only operation that
-removes rows. No operation updates a row (ADR 048, Decision 9).
+removes rows. No operation updates a row (ADR 20261118-125900-business-events-as-typed-log-records, Decision 9).
 
 **Rationale**: Retention does not depend on an event type, and the ledger must not store rows
-without it (ADR 048, Decision 7; maintainer decision, 2026-11-12). An in-process ticker needs no
+without it (ADR 20261118-125900-business-events-as-typed-log-records, Decision 7; maintainer decision, 2026-11-12). An in-process ticker needs no
 CronJob and works with the memory adapter. A batched `DELETE ... WHERE id IN (SELECT ... LIMIT n)`
 keeps lock time short. Several replicas run the same idempotent delete; no leader election is
 needed.
@@ -207,11 +207,11 @@ resource-owner consumer must look up the current definition by identifier, fail 
 unknown identifier or `OwnerVisible() == false`, and intersect that permission with its own
 supported projections and authenticated ownership. Consumer allow-lists never override the
 definition. Sentences and SSF mappings belong to consumers; SSF disclosure needs its own policy
-(ADR 048, Decision 10). A duplicate or malformed identifier is a programming error and
+(ADR 20261118-125900-business-events-as-typed-log-records, Decision 10). A duplicate or malformed identifier is a programming error and
 must fail at start, as `regexp.MustCompile` does.
 
 **Alternatives**: Store the flag on each row: old rows keep an outdated flag when the declaration
-changes. A central registry file: the mirror that ADR 048 rejects.
+changes. A central registry file: the mirror that ADR 20261118-125900-business-events-as-typed-log-records rejects.
 
 ## R13. Import boundaries
 
@@ -275,5 +275,5 @@ adds schema and query complexity without a requirement. Pre-truncated test input
 
 | Point | Resolved in |
 |---|---|
-| Approval of ADR 048 as a whole | Task T004 |
+| Approval of ADR 20261118-125900-business-events-as-typed-log-records as a whole | Task T004 |
 | Measured request latency against SC-004 | Task T053 |

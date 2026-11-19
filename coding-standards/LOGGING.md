@@ -4,7 +4,7 @@ This standard applies to all Go code in `cmd/` and `internal/`. Read it before y
 
 Scope: log records only. OpenTelemetry traces and metrics follow `coding-standards/OPENTELEMETRY.md`.
 
-Related binding sources: ADR 011 and ADR 027 (OpenTelemetry), ADR 033 (request security context), ADR 048 (business events),
+Related binding sources: 011-opentelemetry-provider-pattern and 027-extproc-telemetry-shared-dependency (OpenTelemetry), 033-request-security-context-propagation (request security context), 20261118-125900-business-events-as-typed-log-records (business events),
 `docs/reference/token-exchange.md#diagnostic-attributes`, and Constitution Principle I.
 
 ## 1. Logger Plumbing
@@ -200,7 +200,7 @@ These data classes are prohibited at all levels, including `Debug`.
 
 Audit records are structured operational logs. An audit record is not a transactional ledger: the write of a record is not atomic with the mutation that it reports.
 
-The business event ledger is a projection of audit records ([048-business-events-as-typed-log-records](../adrs/048-business-events-as-typed-log-records.md)). When the ledger is enabled, a handler in the builder chain stores each record whose `event` value is a typed business event definition. The ledger is disabled by default. A failed or timed-out write is counted and logged. A confirmed insert failure leaves no row. A timed-out write has an unknown outcome: the database can still commit the insert, so the row can exist. A record whose `event` value is a string is not stored. Do not add a second API that records the same fact.
+The business event ledger is a projection of audit records ([20261118-125900-business-events-as-typed-log-records](../adrs/20261118-125900-business-events-as-typed-log-records.md)). When the ledger is enabled, a handler in the builder chain stores each record whose `event` value is a typed business event definition. The ledger is disabled by default. A failed or timed-out write is counted and logged. A confirmed insert failure leaves no row. A timed-out write has an unknown outcome: the database can still commit the insert, so the row can exist. A record whose `event` value is a string is not stored. Do not add a second API that records the same fact.
 
 - Write the record after the mutation commits. Do not write a success record for an operation that changed nothing.
 - Do not write an audit record inside a storage transaction. The record reaches stdout, OpenTelemetry, and the ledger immediately, and it is false if the transaction rolls back.

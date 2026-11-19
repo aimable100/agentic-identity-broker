@@ -1,6 +1,6 @@
 # Quickstart: Business Event Ledger
 
-**Feature**: `048-business-event-ledger` | **Spec**: [spec.md](./spec.md)
+**Feature**: `20261118-125900-business-event-ledger` | **Spec**: [spec.md](./spec.md)
 
 This guide verifies the feature by hand after Phase 3 of [tasks.md](./tasks.md). Names follow the [contracts](./contracts/). Container-backed commands
 need Docker; do not run them in a sandbox without it.

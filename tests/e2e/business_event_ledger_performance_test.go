@@ -90,7 +90,7 @@ var _ = Describe("Business event ledger SC-004 performance", Label("performance"
 		}
 	})
 
-	// Success criterion SC-004 from specs/048-business-event-ledger/spec.md; protocol in plan.md.
+	// Success criterion SC-004 from specs/20261118-125900-business-event-ledger/spec.md; protocol in plan.md.
 	It("keeps enabled p99 revocation latency within 5 ms of disabled p99 with every write verified", func() {
 		samples := [2][]time.Duration{make([]time.Duration, 0, 1000), make([]time.Duration, 0, 1000)}
 		for block := range 11 {

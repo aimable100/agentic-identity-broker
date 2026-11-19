@@ -1,6 +1,6 @@
 # Data Model: Business Event Ledger
 
-**Feature**: `048-business-event-ledger` | **Spec**: [spec.md](./spec.md) | **Research**: [research.md](./research.md)
+**Feature**: `20261118-125900-business-event-ledger` | **Spec**: [spec.md](./spec.md) | **Research**: [research.md](./research.md)
 
 ## Domain concepts
 
@@ -69,7 +69,7 @@ Invariants:
 - `Attributes` has no top-level key named `event`, `principal`, `actor`, or `trace_id`. These names can occur inside groups.
 - `Attributes` contains nothing that LOGGING.md section 6.1 prohibits. The invariant holds because
   the event is built only from a log record; the repository does not check content.
-- A stored event is immutable (ADR 048, Decision 9). No port has an update operation. An event is
+- A stored event is immutable (ADR 20261118-125900-business-events-as-typed-log-records, Decision 9). No port has an update operation. An event is
   removed only as a whole, by retention.
 
 `Validate()` checks the first invariant. `Copy()` returns a deep copy, as other models do.
@@ -152,7 +152,7 @@ longer match current policy output. The future owner-facing reader must specify 
 ### Event `consent.grant.revoked`
 
 The event states that the grant row is deleted. `user_grants` remains authoritative for current
-grant state; the ledger can lack a row (ADR 048, Consequences). Grant deletion ends refresh
+grant state; the ledger can lack a row (ADR 20261118-125900-business-events-as-typed-log-records, Consequences). Grant deletion ends refresh
 authority because local refresh verifies the active grant before issuing tokens, even if
 follow-up session cleanup fails. Existing access tokens remain valid until their expiry.
 
@@ -160,7 +160,7 @@ The event does not guarantee successful refresh-session cleanup. `refresh_cleanu
 reports that the cleanup returned an error after the committed delete; its absence means the
 emitting path completed cleanup successfully. Consumers must evaluate this attribute when
 describing cleanup status, but must not suppress a grant-revocation signal merely because cleanup
-failed. A future SSF consumer must define its own mapping and delivery guarantee (ADR 048).
+failed. A future SSF consumer must define its own mapping and delivery guarantee (ADR 20261118-125900-business-events-as-typed-log-records).
 Both committed-delete paths include `valid_until`, `updated_at`, `granted_permission_sets`, and
 `revoked_at` from the deletion audit. `occurred_at` is the canonical record time. The `revoked_at`
 attribute is not proof of the deletion's exact commit time.

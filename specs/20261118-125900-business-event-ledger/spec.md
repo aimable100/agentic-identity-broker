@@ -14,7 +14,7 @@ activity API, the activity page, and the SSF transmitter are separate features t
 
 In scope:
 
-- The business event definition type and the ledger handler in the logger chain (ADR 048).
+- The business event definition type and the ledger handler in the logger chain (ADR 20261118-125900-business-events-as-typed-log-records).
 - One ledger table with a flexible attribute document, repository ports, and both storage adapters.
 - Append and retention ports only. Read ports belong to the future features that consume them.
 - Retention: the broker deletes rows that are older than a configured period. It does not depend
@@ -28,7 +28,7 @@ Out of scope:
 - An API or UI that reads the ledger (issue #188 presentation requirements).
 - SSF streams, Security Event Tokens, and their delivery guarantee.
 - Events from ExtProc and agentgateway.
-- A transactional guarantee between a state change and its ledger row (ADR 048, Decision 5).
+- A transactional guarantee between a state change and its ledger row (ADR 20261118-125900-business-events-as-typed-log-records, Decision 5).
 
 ## Clarifications
 
@@ -89,7 +89,7 @@ ledger foundation: it works the same for every event type. It runs when the ledg
 One flag switches both.
 
 **Why this priority**: The ledger holds principals. It must not store rows without retention
-(ADR 048, Decision 7).
+(ADR 20261118-125900-business-events-as-typed-log-records, Decision 7).
 
 **Independent Test**: Store two events, make one older than the retention period, wait for one
 retention run, and read the ledger.
@@ -128,7 +128,7 @@ retention run, and read the ledger.
 - The ledger write times out: the result is unknown. The failure is counted, and the row can
   exist.
 - The process stops between the commit and the ledger write: the row is missing. This is the
-  accepted limit of ADR 048.
+  accepted limit of ADR 20261118-125900-business-events-as-typed-log-records.
 
 ## Concrete Example Journeys *(mandatory)*
 
@@ -411,7 +411,7 @@ Keys, defaults, flag names, and a YAML example are in [contracts/configuration.m
   and `operator_principal`, identical to other sinks. It MUST NOT persist raw identities through
   another path. A future owner-facing reader MUST specify safe ownership matching across policy
   changes before exposing rows.
-- **SR-003**: The ledger MUST NOT store rows without retention (ADR 048, Decision 7). FR-009
+- **SR-003**: The ledger MUST NOT store rows without retention (ADR 20261118-125900-business-events-as-typed-log-records, Decision 7). FR-009
   makes retention run whenever the ledger is enabled. The retention period MUST have an upper
   limit in the configuration validation. The operations documentation MUST state the period, how
   to change it, and that rows stay when the ledger is disabled after it stored rows.
@@ -460,7 +460,7 @@ Keys, defaults, flag names, and a YAML example are in [contracts/configuration.m
 
 - Audit records are logged after the mutation commits, as LOGGING.md section 8 requires. The
   grant revocation call site follows this today.
-- The activity page tolerates a missing row in the crash window that ADR 048 accepts, because the
+- The activity page tolerates a missing row in the crash window that ADR 20261118-125900-business-events-as-typed-log-records accepts, because the
   Delegations and Sessions pages show current state from the source tables.
 - Retention runs in the broker process on a timer, as the existing OAuth2 record cleanup does.
   It needs no separate workload.
