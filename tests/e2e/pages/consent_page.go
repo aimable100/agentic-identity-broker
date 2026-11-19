@@ -144,6 +144,16 @@ func (cp *ConsentPage) NavigateToOverview(ctx context.Context) error {
 	return nil
 }
 
+// OpenAgentFromOverview clicks the display-name heading inside the delegation card.
+func (cp *ConsentPage) OpenAgentFromOverview(ctx context.Context, displayName string) error {
+	if err := cp.page().GetByRole("heading", playwright.PageGetByRoleOptions{
+		Name: displayName, Exact: playwright.Bool(true), Level: playwright.Int(3),
+	}).Click(); err != nil {
+		return fmt.Errorf("failed to open delegation for %q: %w", displayName, err)
+	}
+	return cp.waitForAgentNameHeading(ctx)
+}
+
 // page returns the underlying Playwright page object.
 func (cp *ConsentPage) page() playwright.Page {
 	return cp.GetPlaywrightPage()

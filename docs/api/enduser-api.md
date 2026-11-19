@@ -42,6 +42,10 @@ For example, a synthetic Reports Production session can require sign-in before i
 
 Consent detail reports `connectionStatus: not_connected` for this service. Such a session cannot satisfy a mandatory service when the user submits a grant. Consent and session displays read the live client-ID file, never the secret file. If source resolution fails, these displays fall back to persisted identity evidence. A display response never authorizes token release.
 
+Grant submission checks both included services and the Agent's mandatory service requirements. A mandatory service still requires a usable connection when its permission set is unselected. This check does not add that permission set or service to the grant.
+
+The SPA requests current usability whenever it loads session lists, session details, or consent details. These responses bypass the frontend TTL cache. Returning through SPA navigation does not require a full-page reload to show sign-in. Unrelated metadata and grant caches remain unchanged.
+
 ### Browser authorization and reconnect
 
 In local and hybrid mode, the next relevant `GET /oauth2/authorize` request checks the service connections included in the existing grant. If an included connection requires reauthentication, the broker returns the existing consent redirect:

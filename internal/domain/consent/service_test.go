@@ -2205,6 +2205,118 @@ func TestService_ValidateSubmission(t *testing.T) {
 	})
 }
 
+func TestService_GrantConsent_MandatoryServiceOutsideSelection(t *testing.T) {
+	cases := []struct {
+		name          string
+		optional      bool
+		missing       bool
+		unusable      bool
+		sourceFailure bool
+		changeGrant   bool
+		wantDenied    bool
+	}{
+		{name: "unusable mandatory service denies replay", unusable: true, wantDenied: true},
+		{name: "missing mandatory service denies replay", missing: true, wantDenied: true},
+		{name: "mandatory source failure fails closed", sourceFailure: true, wantDenied: true},
+		{name: "usable mandatory service preserves replay"},
+		{name: "excluded optional unusable service is not evaluated", optional: true, unusable: true},
+		{name: "excluded optional missing service does not block", optional: true, missing: true},
+		{name: "excluded optional source failure is not evaluated", optional: true, sourceFailure: true},
+		{name: "unusable mandatory service denies grant update", unusable: true, changeGrant: true, wantDenied: true},
+		{name: "usable mandatory service permits exact grant update", changeGrant: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newConsentIdentityFixture()
+			reportsPS, calendarPS := id.NewPermissionSetID(), id.NewPermissionSetID()
+			f.agent.PermissionSets = []storage.AgentPermissionSetEntry{
+				{PermissionSetID: reportsPS, RequirementType: storage.RequirementTypeOptional},
+				{PermissionSetID: calendarPS, RequirementType: storage.RequirementTypeMandatory},
+			}
+			if tc.optional {
+				f.agent.ServiceRequirements[0].RequirementType = storage.RequirementTypeOptional
+			}
+			f.service.psService = &mockPermissionSetService{permissionSets: map[id.PermissionSetID]*storage.PermissionSet{
+				reportsPS:  {ID: reportsPS, ServiceScopes: []storage.ServiceScope{{ServiceID: f.reports.ServiceID, Scopes: []string{"reports:read"}, RequirementType: storage.RequirementTypeOptional}}},
+				calendarPS: {ID: calendarPS, ServiceScopes: []storage.ServiceScope{{ServiceID: f.calendar.ServiceID, Scopes: []string{"calendar:read"}, RequirementType: storage.RequirementTypeOptional}}},
+			}}
+			f.grant.GrantedPermissionSets = []storage.GrantedPermissionSetEntry{{PermissionSetID: calendarPS, IncludedServiceIDs: []id.ServiceID{f.calendar.ServiceID}}}
+			f.grants.grants[f.grant.ID] = f.grant.Copy()
+			beforeGrant := f.grant.Copy()
+			beforeReports, beforeCalendar := *f.reports, *f.calendar
+			beforeReports.Scope = append([]string(nil), f.reports.Scope...)
+			beforeReports.EncryptedAccessToken = append([]byte(nil), f.reports.EncryptedAccessToken...)
+			beforeReports.EncryptedRefreshToken = append([]byte(nil), f.reports.EncryptedRefreshToken...)
+			beforeCalendar.Scope = append([]string(nil), f.calendar.Scope...)
+			beforeAgent := f.agent.Copy()
+			if tc.missing {
+				delete(f.sessions.sessions, f.reports.ID)
+			}
+			req := &GrantRequest{
+				Principal: f.grant.Principal, AgentID: f.agent.ID, ValidUntil: ptr.To(*f.grant.ValidUntil),
+				GrantedPermissionSets: f.grant.Copy().GrantedPermissionSets,
+			}
+			if tc.changeGrant {
+				req.ValidUntil = ptr.To(req.ValidUntil.Add(-time.Minute))
+			}
+			seen := make(map[id.ServiceID]int)
+			sourceErr := errors.New("mandatory identity source unavailable")
+			f.service.WithSessionUsabilityEvaluator(sessionUsabilityEvaluatorFunc(func(_ context.Context, sessions []*storage.UserSession, mode ports.UsabilityMode) (map[id.ServiceID]bool, error) {
+				assert.Equal(t, ports.UsabilityGate, mode)
+				result := make(map[id.ServiceID]bool)
+				for _, session := range sessions {
+					seen[session.ServiceID]++
+					assert.Equal(t, req.Principal, session.Principal)
+					if session.ServiceID == f.reports.ServiceID {
+						assert.False(t, tc.optional, "excluded optional service must not reach Gate")
+						if tc.sourceFailure {
+							return nil, sourceErr
+						}
+						result[session.ServiceID] = tc.unusable
+					}
+				}
+				return result, nil
+			}))
+
+			grant, err := f.service.GrantConsent(context.Background(), req)
+			if tc.wantDenied {
+				if tc.sourceFailure {
+					require.ErrorIs(t, err, sourceErr)
+					assert.NotErrorIs(t, err, ErrUnconnectedServices)
+				} else {
+					require.ErrorIs(t, err, ErrUnconnectedServices)
+					assert.Contains(t, err.Error(), f.reports.ServiceID.String())
+				}
+				assert.Nil(t, grant)
+				assert.Zero(t, f.grants.findCalls, "deny before reading or mutating the grant")
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, grant)
+				assert.Equal(t, req.GrantedPermissionSets, grant.GrantedPermissionSets)
+				assert.Equal(t, req.ValidUntil, grant.ValidUntil)
+				assert.Equal(t, beforeGrant.ID, grant.ID)
+				assert.Equal(t, beforeGrant.CreatedAt, grant.CreatedAt)
+			}
+			if !tc.optional && !tc.missing {
+				assert.Equal(t, 1, seen[f.reports.ServiceID])
+			} else {
+				assert.Zero(t, seen[f.reports.ServiceID])
+			}
+			assert.Zero(t, f.grants.createCalls)
+			assert.Zero(t, f.grants.deleteCalls)
+			if tc.changeGrant && !tc.wantDenied {
+				assert.Equal(t, 1, f.grants.updateCalls)
+			} else {
+				assert.Zero(t, f.grants.updateCalls)
+				assert.Equal(t, beforeGrant, f.grants.grants[f.grant.ID])
+			}
+			assert.Equal(t, &beforeReports, f.reports)
+			assert.Equal(t, &beforeCalendar, f.calendar)
+			assert.Equal(t, beforeAgent, f.agent)
+		})
+	}
+}
+
 func TestService_VerifyAgentAccessReturnsDefensiveFoundGrant(t *testing.T) {
 	t.Parallel()
 	principal := id.Principal("user@example.com")

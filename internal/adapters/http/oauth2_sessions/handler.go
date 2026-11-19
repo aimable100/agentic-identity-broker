@@ -184,10 +184,12 @@ func (h *Handler) InitiateFlow(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		h.logger.ErrorContext(ctx, "failed to initiate OAuth2 flow",
-			"principal", principalValue,
-			"service_id", serviceIDStr,
-			"error", err)
+		if !errors.Is(err, model.ErrCredentialSourceUnavailable) {
+			h.logger.ErrorContext(ctx, "failed to initiate oauth2 flow",
+				"principal", principalValue,
+				"service_id", serviceIDStr,
+				"error", err)
+		}
 		writeJSONError(w, http.StatusInternalServerError, "internal_error", "failed to initiate OAuth2 flow")
 		return
 	}
@@ -333,11 +335,12 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Generic callback error - log and redirect
-		h.logger.ErrorContext(ctx, "failed to handle OAuth2 callback",
-			"principal", principalValue,
-			"service_id", serviceIDStr,
-			"error", err)
+		if !errors.Is(err, model.ErrCredentialSourceUnavailable) {
+			h.logger.ErrorContext(ctx, "failed to handle oauth2 callback",
+				"principal", principalValue,
+				"service_id", serviceIDStr,
+				"error", err)
+		}
 
 		redirectURL := "/sessions?error=callback_failed&error_description=" +
 			url.QueryEscape("Authorization failed - please try again")

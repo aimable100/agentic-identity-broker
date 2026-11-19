@@ -8,7 +8,7 @@
 
 **Organization**: Setup → mandatory design preconditions → foundation → US1 (P1) → US2 (P1) → US3 (P2) → mandatory compliance. Paths are relative to the repository root.
 
-**Task summary**: All 75 tasks are checked, including convergence T071–T075. Focused convergence package, component, and browser validation passes. T069 validation execution is complete, but its recorded security gate still fails on dependency advisories. PostgreSQL and prior-release container execution remains container-CI validation, not a locally passed check. Structural quality-delta remains non-clean.
+**Task summary**: All 78 tasks are checked, including convergence T071–T078. Phase 7 package, API, backend-journey, and browser validation passes. T069 validation execution is complete, but its recorded security gate still fails on dependency advisories. PostgreSQL and prior-release container execution remains container-CI validation, not a locally passed check. Structural quality-delta remains non-clean.
 
 ## 🔒 Feature Scope [MANDATORY]
 
@@ -232,6 +232,8 @@ T001 approval record
   → US2 T042–T049
   → US3 T050–T054
   → Phase N T055–T069
+  → Phase 6 T071–T075
+  → Phase 7 T076 → T077 → T078
 ```
 
 Acceptance recovery, foundation, and observability design are complete. T022 never depended on T033/T037. Historical completion does not imply that the original test-first order was followed.
@@ -701,3 +703,33 @@ No full security or container gate was rerun; the earlier security findings and 
 Review follow-up: the consent-originated provider-failure case checks every token request since initiation, requiring an `authorization_code` grant and current Reports v2 credentials for each request. It allows authentication-style negotiation without fixing the request count, while rejecting stale-client or refresh-token attempts. Existing no-token-release, session/grant preservation, stable error recovery, and successful retry assertions remain.
 
 Follow-up validation: the focused consent-originated provider-failure browser journey passed, and `just check` passed with zero lint issues. Scoped quality-delta remains non-clean (two gating findings in the browser test file); no suppression or acknowledgment was added.
+
+## Phase 7: Convergence
+
+- [X] T076 CRITICAL — Eliminate duplicate credential-source failure logging for authorization initiation and callback across `internal/domain/oauth2session/service.go` (`initiateOAuth2Flow`, `HandleCallback`) and `internal/adapters/http/oauth2_sessions/handler.go` (`InitiateFlow`, `HandleCallback`). The domain audit defers currently emit the canonical failure event, followed by a second generic HTTP-layer Error record; identity denials must not be escalated from Warn to Error. Establish one owning layer while preserving existing HTTP responses, redirects, closed metadata, and typed principals. Extend constructor-injected JSON-buffer regression coverage through the real service-to-handler paths for unreadable initiation identity and stale/missing callback identity or revision, asserting exactly one failure record with the required level/event and no credential or path values. Preserve T071's manual-refresh ownership fix. Resolve F1 per Constitution XV, SR-004, `contracts/observability.md` failure ownership, and T040/T064 (contradicts).
+- [X] T077 HIGH — Validate the union of submitted included services and the Agent's mandatory service requirements through the existing Gate evaluator in `internal/domain/consent/service.go`, including mandatory services covered only by an optional, unselected permission set. Submission currently filters sessions and checks connectivity only for included IDs, allowing a Calendar-only grant to be committed while mandatory Reports is identity-invalid. Reject missing/unusable mandatory connections and fail closed on identity-source errors before grant mutation; do not silently select permission sets, include optional services, broaden scopes, or extend grant validity. Write regression coverage in `internal/domain/consent/service_test.go` and a complete HTTP acceptance variant for a valid Agent whose mandatory Reports requirement is covered by an unselected optional permission set; retain usable mandatory-service and excluded optional-service controls and prove rejected submissions preserve the existing grant. Resolve F2 per SR-002, spec Edge Cases (mandatory service requirements), plan mandatory grant-validation decision, and T042/T045 (partial).
+- [X] T078 HIGH — Prevent stale client-identity usability from being reused on the next SPA connection-state load in `web/src/services/api/sessions.ts`, `web/src/services/api/consent.ts`, and their consuming hooks/pages. Session list/detail currently return two-minute cached summaries and ordinary consent detail returns five-minute cached connection state; mount/refetch does not bypass those entries, so returning through SPA navigation can still show Reports as connected without sign-in after an identity change. Use the existing fetching/cache mechanisms to obtain current usability on these loads, without polling, notifications, unsolicited navigation, or unrelated cache changes; preserve the already-uncached session-token authorization detail flow. Add API/hook regressions with changed backend state inside the old TTL and extend `tests/e2e/frontend/client_identity_reconnect_test.go` to visit connected sessions and ordinary consent detail, navigate away through SPA controls, change Reports identity, and return within the same JavaScript context. Assert service-specific Reports sign-in/no Refresh, unchanged Calendar usability and grants, and no unsolicited navigation; a full-document `Goto` must not substitute for the SPA regression. Resolve F3 per FR-008, FR-014, AS-2.5, and T016/T044/T047 (partial).
+
+### Phase 7 validation
+
+T076–T078 are complete. Initiation and callback credential-source denials retain one canonical domain audit record. Constructor-injected handler tests cover unavailable initiation identity and mismatched, superseded, or missing callback evidence. HTTP responses and redirects remain unchanged.
+
+Consent submission evaluates included and mandatory services together without adding selections. Domain cases cover missing/unusable mandatory sessions, source errors, exact updates, replay, excluded optional services, and unchanged grants. The supplemental AS-2.2 HTTP journey reconnects mandatory Reports while its optional permission set remains unselected, then completes the original authorization with the same Calendar-only selection.
+
+Live session list/detail and consent agent-detail reads bypass the frontend TTL cache. Unrelated metadata and grant caches remain. API regressions use the real cache. The AS-2.5 browser journey retains one JavaScript context, populates connected views, publishes the new identity, and returns through actual SPA controls. Reports offers sign-in while Calendar remains usable. Sessions and grants remain unchanged, with no unsolicited navigation or provider calls.
+
+Validation performed:
+
+- `just check`: passed, zero lint issues.
+- `go test -race ./internal/adapters/http/oauth2_sessions -count=1`: passed.
+- `go test -race ./internal/domain/consent -count=1`: passed.
+- Focused backend feature acceptance run: 23 passed, zero failed; container cases excluded.
+- Scoped Vitest API/hook run: 30 passed across usability freshness, consent API, and session hooks.
+- ESLint on the changed API services and new regression file: passed.
+- `just web-build`: passed.
+- Built, serial browser recovery capture run: eight passed, zero failed. The six existing screenshot states were captured through the existing opt-in flow. No visual style changed.
+- Scoped `ripwire --quality-delta --legend=compact`: non-clean, with ten gating findings. These comprise generic map/page-helper/HTTP-wrapper duplication matches and browser-test self-churn. New tests also carry size/complexity warnings. No suppression, acknowledgment, or unrelated refactoring was added.
+
+The first browser run exposed an incorrect setup assertion: connected services appear in permission sets, not in disconnected-service headings. The corrected setup checks the selected Calendar service and enabled Save action. The final run exercises the full same-document journey. The first Vitest invocation used the repository root instead of the frontend root; the corrected package-root run passed.
+
+No full security or container gate was rerun. The previously recorded dependency advisories and PostgreSQL/prior-release validation limits remain unchanged. No commit or push was made.

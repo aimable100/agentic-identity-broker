@@ -730,6 +730,101 @@ var _ = Describe("Client identity change", Label("client-identity-change"), func
 				return body
 			}
 
+			// Supplemental AS-2.2 from specs/056-invalidate-client-sessions/spec.md; SR-002.
+			It("requires mandatory Reports reconnection without selecting its optional permission set", func() {
+				calendarSet := fixtures.ClientIdentityPermissionSet(calendarID, "Calendar Access")
+				reportsSet := fixtures.ClientIdentityPermissionSet(serviceID, "Optional Reports Access")
+				Expect(journey.Storage.PermissionSets().Create(ctx, calendarSet)).To(Succeed())
+				Expect(journey.Storage.PermissionSets().Create(ctx, reportsSet)).To(Succeed())
+				agent.PermissionSets = []domainstorage.AgentPermissionSetEntry{
+					{PermissionSetID: calendarSet.ID, RequirementType: domainstorage.RequirementTypeMandatory},
+					{PermissionSetID: reportsSet.ID, RequirementType: domainstorage.RequirementTypeOptional},
+				}
+				agent.ServiceRequirements = []domainstorage.ServiceRequirement{
+					{ServiceID: serviceID, RequiredScopes: []string{"profile"}, RequirementType: domainstorage.RequirementTypeMandatory},
+					{ServiceID: calendarID, RequiredScopes: []string{"profile"}, RequirementType: domainstorage.RequirementTypeOptional},
+				}
+				Expect(journey.Storage.Agents().Update(ctx, agent)).To(Succeed())
+				validUntil := time.Now().UTC().Add(time.Hour).Truncate(time.Second)
+				selection, err := json.Marshal(map[string]any{
+					"valid_until":             validUntil,
+					"granted_permission_sets": map[string][]string{calendarSet.ID.String(): {calendarID.String()}},
+				})
+				Expect(err).NotTo(HaveOccurred())
+				grantPath := "/api/consent/agents/" + agent.ID.String() + "/grants"
+				response, err := journey.EndUser.AuthenticatedPOST(grantPath, alice, "application/json", bytes.NewReader(selection))
+				Expect(err).NotTo(HaveOccurred())
+				body, err := helpers.CredentialResponseObject(response)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(response.StatusCode).To(Equal(http.StatusCreated), "%v", body)
+				before := grant()
+				publicBefore := grantResponse()
+				Expect(before.ValidUntil).To(Equal(&validUntil))
+				Expect(before.GrantedPermissionSets).To(Equal([]domainstorage.GrantedPermissionSetEntry{
+					{PermissionSetID: calendarSet.ID, IncludedServiceIDs: []id.ServiceID{calendarID}},
+				}))
+
+				By("rejecting the same Calendar-only selection while mandatory Reports is identity-invalid")
+				publish(fixtures.ReportsClientV2, fixtures.ReportsSecretV2)
+				location := authorizeAgent()
+				Expect(location.Path).To(Equal("/agents/" + agent.ID.String()))
+				sessionToken := location.Query().Get("session_token")
+				Expect(sessionToken).NotTo(BeEmpty())
+				Expect(consentConnection()).To(Equal("not_connected"))
+				calendarBefore, err := journey.Storage.UserSessions().FindByPrincipalAndService(ctx, id.Principal(alice), calendarID)
+				Expect(err).NotTo(HaveOccurred())
+				providerCalls := len(journey.Upstream.GetTokenRequests())
+				submitPath := grantPath + "?session_token=" + url.QueryEscape(sessionToken)
+				response, err = journey.EndUser.AuthenticatedPOST(submitPath, alice, "application/json", bytes.NewReader(selection))
+				Expect(err).NotTo(HaveOccurred())
+				body, err = helpers.CredentialResponseObject(response)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(response.StatusCode).To(Equal(http.StatusBadRequest), "%v", body)
+				Expect(body).To(HaveKeyWithValue("error", "unconnected services"))
+				Expect(grant()).To(Equal(before))
+				Expect(grantResponse()).To(Equal(publicBefore))
+				Expect(journey.Upstream.GetTokenRequests()).To(HaveLen(providerCalls))
+
+				By("reconnecting Reports and completing the original authorization with identical selections")
+				connect(alice)
+				Expect(consentConnection()).To(Equal("connected"))
+				Expect(grant()).To(Equal(before))
+				response, err = journey.EndUser.AuthenticatedPOST(submitPath, alice, "application/json", bytes.NewReader(selection))
+				Expect(err).NotTo(HaveOccurred())
+				body, err = helpers.CredentialResponseObject(response)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(response.StatusCode).To(Equal(http.StatusCreated), "%v", body)
+				Expect(grant().GrantedPermissionSets).To(Equal(before.GrantedPermissionSets))
+				Expect(grant().ValidUntil).To(Equal(before.ValidUntil))
+				Expect(grantResponse()["data"]).To(HaveKeyWithValue("granted_permission_sets", map[string]any{
+					calendarSet.ID.String(): []any{calendarID.String()},
+				}))
+				calendarAfter, err := journey.Storage.UserSessions().FindByPrincipalAndService(ctx, id.Principal(alice), calendarID)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(calendarAfter).To(Equal(calendarBefore))
+				resume, ok := body["redirect_url"].(string)
+				Expect(ok).To(BeTrue())
+				resumeURL, err := url.Parse(resume)
+				Expect(err).NotTo(HaveOccurred())
+				response, err = journey.EndUser.AuthenticatedGET(resumeURL.RequestURI(), alice)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(response.StatusCode).To(Equal(http.StatusFound))
+				completed, err := url.Parse(response.Header.Get("Location"))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(response.Body.Close()).To(Succeed())
+				Expect(completed.String()).To(HavePrefix(agent.RedirectURIs[0]))
+				Expect(completed.Query().Get("code")).NotTo(BeEmpty())
+				Expect(completed.Query().Get("state")).To(Equal("reports-agent-state"))
+				tokenResponse := exchangeAuthorizationCode(journey.EndUser, agent.ID.String(), completed.Query().Get("code"), agent.RedirectURIs[0], verifier)
+				tokens, err := helpers.CredentialResponseObject(tokenResponse)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(tokenResponse.StatusCode).To(Equal(http.StatusOK), "%v", tokens)
+				Expect(tokens["access_token"]).NotTo(BeEmpty())
+				Expect(calendarExchange(http.StatusOK)).To(HaveKey("access_token"))
+				Expect(grant().GrantedPermissionSets).To(Equal(before.GrantedPermissionSets))
+				Expect(grant().ValidUntil).To(Equal(before.ValidUntil))
+			})
+
 			// AS-3.1 from specs/056-invalidate-client-sessions/spec.md (User Story 3)
 			It("leaves Calendar, broker login, grants, rejection, and refreshability unchanged", func() {
 				delegation := grant()

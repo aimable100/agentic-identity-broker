@@ -341,21 +341,16 @@ func (s *Service) GrantConsent(ctx context.Context, req *GrantRequest) (*storage
 		return nil, err
 	}
 
-	// FR-020: Validate every included service has an active OAuth2 session.
-	if len(req.GrantedPermissionSets) > 0 {
+	// Validate included services and mandatory connections without changing selections.
+	requiredServices := submissionServiceIDs(agent, req.GrantedPermissionSets)
+	if len(requiredServices) > 0 {
 		sessions, sessErr := s.sessionRepo.ListActiveByPrincipal(ctx, req.Principal)
 		if sessErr != nil {
 			return nil, fmt.Errorf("failed to list sessions for submission validation: %w", sessErr)
 		}
-		included := make(map[id.ServiceID]bool)
-		for _, entry := range req.GrantedPermissionSets {
-			for _, serviceID := range entry.IncludedServiceIDs {
-				included[serviceID] = true
-			}
-		}
-		relevant := make([]*storage.UserSession, 0, len(included))
+		relevant := make([]*storage.UserSession, 0, len(requiredServices))
 		for _, session := range sessions {
-			if included[session.ServiceID] {
+			if requiredServices[session.ServiceID] {
 				relevant = append(relevant, session)
 			}
 		}
@@ -363,7 +358,7 @@ func (s *Service) GrantConsent(ctx context.Context, req *GrantRequest) (*storage
 		if usabilityErr != nil {
 			return nil, fmt.Errorf("failed to evaluate sessions for submission validation: %w", usabilityErr)
 		}
-		if err := s.ValidateSubmission(ctx, agent, req.GrantedPermissionSets, activeIDs); err != nil {
+		if err := validateSubmissionServices(requiredServices, activeIDs); err != nil {
 			return nil, err
 		}
 	}
@@ -455,30 +450,21 @@ func grantAuditValidUntil(validUntil *time.Time) any {
 	return validUntil.UTC().Format(time.RFC3339Nano)
 }
 
-// ValidateSubmission validates that every service in the grant's included_service_ids
-// has an active session (FR-020). Returns a descriptive error listing unconnected services if not.
+// ValidateSubmission validates that every included service and mandatory Agent service
+// has a usable session. It does not add services to the submitted selection.
 func (s *Service) ValidateSubmission(ctx context.Context, agent *storage.Agent, grantedPS []storage.GrantedPermissionSetEntry, activeSessionServiceIDs []id.ServiceID) error {
-	if len(grantedPS) == 0 {
-		return nil
-	}
+	return validateSubmissionServices(submissionServiceIDs(agent, grantedPS), activeSessionServiceIDs)
+}
 
+func validateSubmissionServices(requiredServices map[id.ServiceID]bool, activeSessionServiceIDs []id.ServiceID) error {
 	// Build set of active session service IDs for O(1) lookup
 	activeSet := make(map[id.ServiceID]bool, len(activeSessionServiceIDs))
 	for _, svcID := range activeSessionServiceIDs {
 		activeSet[svcID] = true
 	}
 
-	// Collect all unique included service IDs from the grant
-	includedServices := make(map[id.ServiceID]bool)
-	for _, entry := range grantedPS {
-		for _, svcID := range entry.IncludedServiceIDs {
-			includedServices[svcID] = true
-		}
-	}
-
-	// Check each included service has an active session
 	var unconnected []string
-	for svcID := range includedServices {
+	for svcID := range requiredServices {
 		if !activeSet[svcID] {
 			unconnected = append(unconnected, svcID.String())
 		}
@@ -489,6 +475,21 @@ func (s *Service) ValidateSubmission(ctx context.Context, agent *storage.Agent, 
 	}
 
 	return nil
+}
+
+func submissionServiceIDs(agent *storage.Agent, grantedPS []storage.GrantedPermissionSetEntry) map[id.ServiceID]bool {
+	services := make(map[id.ServiceID]bool)
+	for _, requirement := range agent.ServiceRequirements {
+		if requirement.RequirementType == storage.RequirementTypeMandatory {
+			services[requirement.ServiceID] = true
+		}
+	}
+	for _, entry := range grantedPS {
+		for _, serviceID := range entry.IncludedServiceIDs {
+			services[serviceID] = true
+		}
+	}
+	return services
 }
 
 func (s *Service) connectedSessionServiceIDs(ctx context.Context, sessions []*storage.UserSession, mode ports.UsabilityMode) ([]id.ServiceID, error) {

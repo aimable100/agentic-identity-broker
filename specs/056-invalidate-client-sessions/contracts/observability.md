@@ -72,6 +72,8 @@ The synchronous response boundary, background worker, or sweep candidate handler
 Wrappers and callers must not add a second generic failure record for the same handled failure.
 Independent consumers of a shared refresh can each record their own denied use, but not another record for each intermediate layer.
 
+Authorization initiation, callback, and manual refresh retain domain ownership of credential-source failures. Their HTTP handlers preserve the response or redirect without adding a generic failure record for the same denial. Constructor-injected handler tests cover this boundary, including Warn-level identity denials and Error-level unavailable sources.
+
 Suppress `session.oauth2.refresh_failed` for every credential-source failure, including all identity reasons, across on-demand, manual, background, and sweep paths.
 Keep the existing failed-candidate counts and failure counters. A dry run still writes no identity/session state and changes no refresh counter.
 Aggregate sweep audit totals remain distinct from per-use failure records. A committed change event and a subsequent denied-use event describe different facts.
