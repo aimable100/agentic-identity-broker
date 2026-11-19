@@ -2,7 +2,7 @@
   "version": 1,
   "cursors": {
     "labelling_after": null,
-    "investigation_after": 347
+    "investigation_after": 501
   },
   "issues": [
     {
@@ -45,7 +45,7 @@
       "number": 206,
       "state": "awaiting_clarification",
       "updated_at": "2026-11-06",
-      "note": "Maintainer Oct 12 comment prefers assessment before broker as OPA input; no new human reply to Nov 6 questions. Do not re-ask placement without new activity; remaining argument egress/retention and assessor contract need agreement."
+      "note": "Nov19 human body revision confirms PDP placement and likely agentgateway Decisions API; remaining adapter/input, egress/retention and evaluation contracts are explicit design work. Do not re-ask placement or duplicate the existing comment."
     },
     {
       "number": 222,
@@ -255,7 +255,7 @@
       "number": 497,
       "state": "awaiting_clarification",
       "updated_at": "2026-11-18",
-      "note": "Labelled enhancement. Existing ServiceCard/Avatar and end-user logoUrl lack persisted provider/Admin/session plumbing. Asked same-origin asset vs broker import; Constitution XI bars third-party image loads. Flagged retained Avatar imageError on src changes; no browser/security reproduction."
+      "note": "Existing static source-policy/plumbing comment remains unacknowledged. Live #510 now implements service icons; do not duplicate or assume closure while that PR is open."
     },
     {
       "number": 347,
@@ -268,6 +268,18 @@
       "state": "commented",
       "updated_at": "2026-11-19",
       "note": "Posted shared frontend hostname + explicit PDP plan; internal token endpoint can stay. Preserve Vite exact host allowlist, same-origin proxy/preauth, callback origins and matching principal. Existing explicit-PDP subtest passes with race; Compose/DNS/browser not run."
+    },
+    {
+      "number": 500,
+      "state": "awaiting_clarification",
+      "updated_at": "2026-11-19",
+      "note": "Static release/v0.2 review: no finite producer cardinality/string budget; full grant contributions and encoded escaping matter. Asked existing-data policy before new admission/response ceiling. Keep bounded ExtProc read; no oversized payload or security reproduction."
+    },
+    {
+      "number": 501,
+      "state": "awaiting_clarification",
+      "updated_at": "2026-11-19",
+      "note": "Static shared GrantResolver/GetByIDs cache review. Asked new broker reads vs already-issued permit freshness and referenced-update policy. LISTEN/NOTIFY alone cannot guarantee immediate invalidation. Fresh domain/port read candidate; no stale-authorization reproduction."
     }
   ],
   "fixes": [
@@ -374,39 +386,39 @@
       "follow_up": null
     },
     {
-      "area": "repo_assist_prs",
-      "checked_at": "2026-11-19",
-      "result": "Read all nine live details/comments/reviews/threads and both check types; #490 page2 included. Seven pipelines pass; #403/#490 start and #403/#420/#448 classification blockers persist. #432 merge rejected downstream by changed-content size limit; no new push.",
-      "follow_up": "#403/#432 integrations require an approved maintainer publication path; do not retry oversized payloads or rewrite history."
-    },
-    {
-      "area": "hygiene",
-      "checked_at": "2026-11-19",
-      "result": "All 71 open issues and 28 open PRs already labelled; Task 1 falls back to Task 2. Monthly checklist has no new check-offs; tracked issue timestamps show no new human activity. No repeat blocker comments or labels.",
-      "follow_up": null
-    },
-    {
-      "area": "code",
-      "checked_at": "2026-11-19",
-      "result": "Oldest-first after #346: inspected untouched #347 and merged #399. Release/v0.2 has URL/error classification helpers, CIMD agent-only diagnostics and redirect helper; main does not. Posted release-delivery boundary. No disclosure reproduced or logging tests run.",
-      "follow_up": null
-    },
-    {
       "area": "qa",
       "checked_at": "2026-11-19",
       "result": "#496: explicit grant_context.policy_decision_point avoids changing internal token endpoint. Proposed shared frontend origin, exact Vite host allowlist, callbacks and matching subject. No config edits, DNS changes, Docker or browser run; maintenance-only candidate.",
       "follow_up": null
     },
     {
+      "area": "repo_assist_prs",
+      "checked_at": "2026-11-19",
+      "result": "Read nine live PR details/comments/reviews/threads and both check types. Seven pipelines pass; #403/#490 pipeline-start and #403/#420/#448 classification blockers persist. #403/#432 heads unchanged and dirty; existing publication-size blocker remains. No repeated push/comment.",
+      "follow_up": "Approved maintainer publication path needed for integrations; no oversized retries or history rewrite."
+    },
+    {
+      "area": "hygiene",
+      "checked_at": "2026-11-19",
+      "result": "Reviewed 73 open issues and 26 open PRs; only #508 unlabelled, submitted documentation label. Submitted bug for #500 and bug/security for #501. Monthly has no new check-offs; merged #464 removed from pending actions.",
+      "follow_up": null
+    },
+    {
+      "area": "code",
+      "checked_at": "2026-11-19",
+      "result": "Static release/v0.2 review of #500/#501 producer, consumer, storage validation, grant resolver and cache. Posted encoded-response-budget and authoritative-read/freshness plans with precise compatibility questions. No security reproduction or runtime change.",
+      "follow_up": "Clarify existing oversized grants and immediate broker-read versus cached-permit consistency requirements."
+    },
+    {
       "area": "tests",
       "checked_at": "2026-11-19",
-      "result": "Release/v0.2 existing TestValidateGrantContext/keeps_an_explicit_path-prefixed_PDP passes uncached with race via just test package override. Only this subtest ran; no Compose, browser, full-suite, build, lint or full-gate pass claimed. Source tree unchanged.",
-      "follow_up": null
+      "result": "This run was static investigation only. Inspected producer schema/validation, exact ExtProc body bound and existing evaluation test inventory. No tests, benchmarks, builds, lint or full gate were run; no source changes.",
+      "follow_up": "Future #500 encoded boundary/maximal-grant coverage; #501 two-instance shared-repository consistency coverage after contract agreement."
     },
     {
       "area": "release",
       "checked_at": "2026-11-19",
-      "result": "Latest release remains v0.1.147 (Nov17). #399 logging fix and #495 AuthZEN are release/v0.2-only. No release PR warranted by this triage/maintenance run; no source changes or new PRs allowed.",
+      "result": "Latest release remains v0.1.147 (Nov17); release/v0.2 integration work is active. Triage-only maintenance run with no new release PR permitted or justified by changes in this run.",
       "follow_up": null
     }
   ],
@@ -428,8 +440,8 @@
     },
     {
       "task": 2,
-      "item": "Resume oldest-first investigation after #347",
-      "note": "#347 delivery-boundary evidence and out-of-order #496 Compose implementation plan posted. No new PR in maintenance-only mode. Review still-untouched follow-ups #500/#501 statically; preserve security controls and do not reproduce disclosures."
+      "item": "Resume oldest-first investigation after #501",
+      "note": "#500/#501 static findings and compatibility questions posted. #508 labelled documentation. Review new human input and active #510 before revisiting icon work; no duplicate implementation in maintenance-only mode."
     },
     {
       "task": 3,
