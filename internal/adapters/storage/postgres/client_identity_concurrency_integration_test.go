@@ -210,7 +210,9 @@ func TestPostgresClientIdentityObservationRechecksConcurrentConfiguration(t *tes
 					_, applied, changed, err := repo.RecordObservedClientIdentity(ctx, provider.ID, value, clientIdentityObservation(before))
 					observed <- observationResult{applied, changed, err}
 				}()
-				waitRefreshBlock(t, adapter, ctx, writerPID)
+				if mutation != "source round trip" {
+					waitRefreshBlock(t, adapter, ctx, writerPID)
+				}
 				require.NoError(t, gate.Commit())
 				update := <-updated
 				require.NoError(t, update.err)
@@ -251,13 +253,15 @@ func TestPostgresClientIdentityConcurrentUpdatePreconditions(t *testing.T) {
 				require.NoError(t, repo.Create(ctx, provider))
 			}
 			first, second := provider.Copy(), provider.Copy()
-			first.ClientID = id.ClientID(provider.ClientID.String() + "-newer")
-			second.ClientID = id.ClientID(provider.ClientID.String() + "-older")
+			first.ClientID = id.ClientID("https://newer.example.test/.well-known/oauth-client/" + provider.ID.String())
+			second.ClientID = id.ClientID("https://older.example.test/.well-known/oauth-client/" + provider.ID.String())
 			expectedVersion := &provider.Version
 			if precondition == "discovery attempt" {
 				expectedVersion = nil
 				first.DiscoveryStatus.LastAttemptAt = new(provider.DiscoveryStatus.LastAttemptAt.Add(2 * time.Second))
 				second.DiscoveryStatus.LastAttemptAt = new(provider.DiscoveryStatus.LastAttemptAt.Add(time.Second))
+				first.DiscoveryStatus.LastSuccessAt = first.DiscoveryStatus.LastAttemptAt
+				second.DiscoveryStatus.LastSuccessAt = second.DiscoveryStatus.LastAttemptAt
 			}
 			gate, gatePID := blockClientIdentityWriteCommit(t, adapter, ctx)
 			type result struct {
@@ -291,7 +295,11 @@ func TestPostgresClientIdentityConcurrentUpdatePreconditions(t *testing.T) {
 			assert.Equal(t, first.ClientIdentity, found.ClientIdentity)
 			assert.Equal(t, int64(1), found.ClientIdentityRevision)
 			assert.Equal(t, first.Version, found.Version)
-			assert.Equal(t, first.DiscoveryStatus.LastAttemptAt, found.DiscoveryStatus.LastAttemptAt)
+			if first.DiscoveryStatus.LastAttemptAt != nil {
+				assertDiscoveryInstant(t, *first.DiscoveryStatus.LastAttemptAt, found.DiscoveryStatus.LastAttemptAt)
+			} else {
+				assert.Nil(t, found.DiscoveryStatus.LastAttemptAt)
+			}
 		})
 	}
 }

@@ -31,7 +31,7 @@ func TestPostgresSessionClientRevisionEstablishment(t *testing.T) {
 	require.NoError(t, NewPostgresThirdpartyOAuth2ProviderRepository(adapter).Create(ctx, provider))
 	repo := NewUserSessionRepository(adapter)
 	for _, reconnect := range []bool{false, true} {
-		session := &storage.UserSession{ID: id.NewSessionID(), Principal: id.Principal(id.NewSessionID().String()), ServiceID: provider.ID, CallbackID: "first", UpstreamClientID: new(id.ClientID("reports")), UpstreamClientRevision: 7, EncryptedAccessToken: []byte("ciphertext"), TokenType: "Bearer", InitiatedAt: time.Now(), CreatedAt: time.Now(), UpdatedAt: time.Now()}
+		session := &storage.UserSession{ID: id.NewSessionID(), Principal: id.Principal(id.NewSessionID().String()), ServiceID: provider.ID, CallbackID: "first", UpstreamClientID: new(id.ClientID("reports")), UpstreamClientRevision: 7, EncryptedAccessToken: []byte("ciphertext"), TokenType: "Bearer", Scope: []string{"read"}, InitiatedAt: time.Now(), CreatedAt: time.Now(), UpdatedAt: time.Now()}
 		_, err := repo.CreateIfAbsent(ctx, session)
 		require.NoError(t, err)
 		updated, err := repo.WithLockedSession(ctx, session.Principal, session.ServiceID, func(_ context.Context, current *storage.UserSession) (bool, error) {
@@ -94,5 +94,7 @@ func createClientIdentitySession(t *testing.T, repo *PostgresUserSessionReposito
 	}
 	_, err := repo.CreateIfAbsent(context.Background(), session)
 	require.NoError(t, err)
-	return session
+	persisted, err := repo.Get(context.Background(), session.ID)
+	require.NoError(t, err)
+	return persisted
 }

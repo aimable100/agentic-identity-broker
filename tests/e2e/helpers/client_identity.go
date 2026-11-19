@@ -184,6 +184,10 @@ func StartClientIdentityPriorRelease(ctx context.Context, directory string, docu
 		instance := servers[name].(map[string]any)
 		instance["bind"], instance["port"] = "0.0.0.0", port
 	}
+	adminPublicURL, err := url.Parse(servers["admin"].(map[string]any)["public_url"].(string))
+	if err != nil {
+		return nil, err
+	}
 	encoded, err = json.Marshal(config)
 	if err != nil {
 		return nil, err
@@ -251,7 +255,7 @@ func StartClientIdentityPriorRelease(ctx context.Context, directory string, docu
 		_ = container.Terminate(context.Background())
 		return nil, err
 	}
-	return &ClientIdentityPriorRelease{CredentialServer: bootstrap.RemoteCredentialServer(admin, endUser, fixtures.DefaultPrincipal().String()), Container: container, Image: image}, nil
+	return &ClientIdentityPriorRelease{CredentialServer: bootstrap.RemoteCredentialServer(admin, endUser, adminPublicURL.Host, servers["enduser"].(map[string]any)["public_url"].(string), fixtures.DefaultPrincipal().String()), Container: container, Image: image}, nil
 }
 
 func ClientIdentityHostPort(endpoint string) (int, error) {

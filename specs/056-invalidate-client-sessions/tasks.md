@@ -8,7 +8,7 @@
 
 **Organization**: Setup → mandatory design preconditions → foundation → US1 (P1) → US2 (P1) → US3 (P2) → mandatory compliance. Paths are relative to the repository root.
 
-**Task summary**: All 78 tasks are checked, including convergence T071–T078. Phase 7 package, API, backend-journey, and browser validation passes. T069 validation execution is complete, but its recorded security gate still fails on dependency advisories. PostgreSQL and prior-release container execution remains container-CI validation, not a locally passed check. Structural quality-delta remains non-clean.
+**Task summary**: All 78 tasks are checked, including convergence T071–T078. Phase 7 package, API, backend-journey, and browser validation passes. T069 validation execution is complete, but its recorded security gate still fails on dependency advisories. Full fast Go, PostgreSQL/integration, backend E2E, and Docker E2E gates pass, as recorded in the final CI repair validation. Structural quality-delta remains non-clean.
 
 ## 🔒 Feature Scope [MANDATORY]
 
@@ -733,3 +733,34 @@ Validation performed:
 The first browser run exposed an incorrect setup assertion: connected services appear in permission sets, not in disconnected-service headings. The corrected setup checks the selected Calendar service and enabled Save action. The final run exercises the full same-document journey. The first Vitest invocation used the repository root instead of the frontend root; the corrected package-root run passed.
 
 No full security or container gate was rerun. The previously recorded dependency advisories and PostgreSQL/prior-release validation limits remain unchanged. No commit or push was made.
+
+### CI repair validation — 2026-11-19
+
+CI run `44542750710` exposed documentation links, PostgreSQL regressions, and historical-schema fixture failures.
+Repository-only ADR and chart links use GitHub URLs so the documentation build can resolve them.
+Provider identity reads reuse the locked session's transaction instead of waiting for another pooled connection.
+Discovery fixtures preserve the existing error contract: valid stale attempts conflict, while missing timestamps fail validation. The production update ordering is unchanged.
+The PostgreSQL fixtures use valid discovery timestamps, CIMD identifiers, and session scopes, and compare persisted timestamps by instant.
+Source-round-trip coverage no longer waits for a row lock when the committed stored source already rejects the observation.
+
+Historical-schema setup uses the actual preceding release until migration succeeds.
+Remote requests preserve the configured Admin Host and each replica's public end-user origin.
+The rollout Agent declares both services that its traffic matrix requests.
+The container runtime must share the credential directory. Local Colima runs used `TMPDIR` under its shared home directory.
+The first full integration run exposed a 32 ms Colima clock lag and failed immediate CIMD key selection.
+After VM clock synchronization, the complete integration command passed without a key-activation code change.
+
+Validation performed:
+
+- `npm run build --prefix assets/docusaurus`: passed with broken-link validation enabled.
+- `just test`: passed with race detection across 71 packages.
+- `go test -count=1 -tags=integration -p 2 ./internal/adapters/storage/postgres/... ./tests/integration/...`: all seven packages passed, including migrations, bootstrap, and infrastructure suites.
+- The normal-mode run skipped only `TestShortModeBypassesContainerStartup`, whose prerequisite is short mode. No requested package was omitted.
+- Focused non-Docker credential, client-identity, and external-ID backend journeys: 175 passed with two workers.
+- `go test -race ./cmd/agentic-identity-broker ./internal/config -run Credential`: both packages passed.
+- `just test-e2e-backend`: 983 passed, zero failed, with performance and Docker cases excluded by the recipe.
+- `just test-e2e-docker`: all 18 Docker scenarios passed, including historical-schema upgrade, mixed-version serving, drain, restart, rollback, and reconnect journeys.
+- Final `just check`: passed with zero lint issues after all production, fixture, and test-helper changes.
+- Structural quality-delta remains non-clean. It reports normalized-constructor/bootstrap duplication and growth in the concurrency test. No suppression or acknowledgment was added.
+
+All requested Go, PostgreSQL/integration, backend E2E, and Docker E2E gates pass. No requested package was omitted. The security, frontend E2E, and ExtProc E2E gates were not rerun. No commit or push was made.

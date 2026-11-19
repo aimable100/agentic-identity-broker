@@ -111,14 +111,16 @@ func TestPostgresClientIdentityDiscoveryPrecondition(t *testing.T) {
 			before, err := repo.Get(ctx, provider.ID)
 			require.NoError(t, err)
 			candidate := before.Copy()
-			candidate.ClientID = id.ClientID(candidate.ClientID.String() + "-replacement")
+			candidate.ClientID = id.ClientID("https://replacement.example.test/.well-known/oauth-client/" + candidate.ID.String())
 			switch attempt {
 			case "older":
 				candidate.DiscoveryStatus.LastAttemptAt = new(now.Add(-time.Second))
+				candidate.DiscoveryStatus.LastSuccessAt = candidate.DiscoveryStatus.LastAttemptAt
 			case "missing":
 				candidate.DiscoveryStatus.LastAttemptAt = nil
 			case "newer":
 				candidate.DiscoveryStatus.LastAttemptAt = new(now.Add(time.Second))
+				candidate.DiscoveryStatus.LastSuccessAt = candidate.DiscoveryStatus.LastAttemptAt
 			}
 			changed, err := repo.Update(ctx, candidate, nil)
 			if attempt == "newer" {
@@ -130,7 +132,11 @@ func TestPostgresClientIdentityDiscoveryPrecondition(t *testing.T) {
 				assert.False(t, changed)
 				var storageErr *storage.StorageError
 				require.ErrorAs(t, err, &storageErr)
-				assert.Equal(t, storage.ErrorKindConflict, storageErr.Kind)
+				kind := storage.ErrorKindConflict
+				if attempt == "missing" {
+					kind = storage.ErrorKindValidation
+				}
+				assert.Equal(t, kind, storageErr.Kind)
 			}
 			after, getErr := repo.Get(ctx, provider.ID)
 			require.NoError(t, getErr)

@@ -333,7 +333,7 @@ func (r *PostgresUserSessionRepository) WithLockedSession(ctx context.Context, p
 	}
 	session := recordToSession(&rec)
 	upstreamClientID := session.UpstreamClientID
-	updated, err := refresh(ctx, session)
+	updated, err := refresh(context.WithValue(ctx, storageTransactionKey{}, tx), session)
 	if err != nil {
 		return nil, err
 	}

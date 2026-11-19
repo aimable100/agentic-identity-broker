@@ -31,19 +31,21 @@ type CredentialServerOptions struct {
 }
 
 type CredentialServer struct {
-	AdminURL        string
-	EndUserURL      string
-	ConfigPath      string
-	Principal       string
-	Logs            *BufferedLogCapture
-	admin           *TestServer
-	endUser         *TestServer
-	storage         *storageadapter.Adapter
-	application     *app.App
-	logger          *slog.Logger
-	client          *http.Client
-	adminListener   net.Listener
-	endUserListener net.Listener
+	AdminURL         string
+	EndUserURL       string
+	EndUserPublicURL string
+	ConfigPath       string
+	Principal        string
+	Logs             *BufferedLogCapture
+	admin            *TestServer
+	endUser          *TestServer
+	storage          *storageadapter.Adapter
+	application      *app.App
+	logger           *slog.Logger
+	client           *http.Client
+	adminHost        string
+	adminListener    net.Listener
+	endUserListener  net.Listener
 }
 
 func StartCredentialServer(options CredentialServerOptions) (*CredentialServer, error) {
@@ -88,6 +90,7 @@ func prepareCredentialServer(options CredentialServerOptions) (_ *CredentialServ
 	adminPort := server.adminListener.Addr().(*net.TCPAddr).Port
 	server.AdminURL = "http://127.0.0.1:" + strconv.Itoa(adminPort)
 	server.EndUserURL = "http://127.0.0.1:" + strconv.Itoa(endUserPort)
+	server.EndUserPublicURL = server.EndUserURL
 	instances, ok := options.Document["server"].(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("credential fixture requires server configuration")
@@ -181,9 +184,9 @@ func LoadCredentialConfiguration(path string, environment map[string]string, com
 	return loader.GetConfig(ctx)
 }
 
-// RemoteCredentialServer shares the credential journey's HTTP contract with a released container.
-func RemoteCredentialServer(adminURL, endUserURL, principal string) *CredentialServer {
-	return &CredentialServer{AdminURL: adminURL, EndUserURL: endUserURL, Principal: principal, client: newTestHTTPClient()}
+// RemoteCredentialServer connects to a released container using its configured admin Host.
+func RemoteCredentialServer(adminURL, endUserURL, adminHost, endUserPublicURL, principal string) *CredentialServer {
+	return &CredentialServer{AdminURL: adminURL, EndUserURL: endUserURL, EndUserPublicURL: endUserPublicURL, Principal: principal, adminHost: adminHost, client: newTestHTTPClient()}
 }
 
 func (s *CredentialServer) EndUserRequestAs(principal, method, path string, body io.Reader) (*http.Response, error) {
@@ -214,6 +217,9 @@ func (s *CredentialServer) request(baseURL, method, path, contentType string, bo
 	request, err := http.NewRequest(method, baseURL+path, body)
 	if err != nil {
 		return nil, err
+	}
+	if baseURL == s.AdminURL {
+		request.Host = s.adminHost
 	}
 	request.Header.Set("X-Remote-User", s.Principal)
 	if body != nil {

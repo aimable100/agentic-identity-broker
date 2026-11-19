@@ -176,7 +176,7 @@ Administrative responses expose source metadata, not paths, file values, or tran
 
 ### Changing a service client ID
 
-Existing `third_party_oauth2.credential_files` and `server.enduser.public_url` suffice. There is no enforcement opt-out, new configuration key, or changed default. The public URL determines the same-origin, service-specific recovery URL; see [ADR 044-service-specific-session-recovery-url](../adrs/044-service-specific-session-recovery-url.md).
+Existing `third_party_oauth2.credential_files` and `server.enduser.public_url` suffice. There is no enforcement opt-out, new configuration key, or changed default. The public URL determines the same-origin, service-specific recovery URL; see [ADR 044-service-specific-session-recovery-url](https://github.com/zalando-incubator/agentic-identity-broker/blob/main/adrs/044-service-specific-session-recovery-url.md).
 
 Before an identity change, complete the [client-identity upgrade checklist](#client-identity-upgrade-checklist).
 For stored credentials, an accepted full-replacement Admin PUT records a different effective `client_id` atomically with the update.
@@ -192,8 +192,8 @@ Same-ID secret rotation needs no reconnection or identity change procedure. It m
 
 ### Client-identity upgrade checklist
 
-The [accepted ADR 048-client-identity-revisions](../adrs/048-client-identity-revisions.md#guarded-rollout-and-rollback-proposed-dec-005) defines this continuous rolling upgrade.
-The [chart migration procedure](../charts/agentic-identity-broker/README.md#client-identity-migrations-049-and-050) gives database lock and failure-recovery details.
+The [accepted ADR 048-client-identity-revisions](https://github.com/zalando-incubator/agentic-identity-broker/blob/main/adrs/048-client-identity-revisions.md#guarded-rollout-and-rollback-proposed-dec-005) defines this continuous rolling upgrade.
+The [chart migration procedure](https://github.com/zalando-incubator/agentic-identity-broker/blob/main/charts/agentic-identity-broker/README.md#client-identity-migrations-049-and-050) gives database lock and failure-recovery details.
 Activation is the operator-verified boundary that permits identity changes, not a runtime switch. New replicas enforce revisions from startup.
 This procedure adds no configuration keys, defaults, Helm values, templates, hooks, or workflows.
 

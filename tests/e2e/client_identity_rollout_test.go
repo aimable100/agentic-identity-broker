@@ -69,7 +69,7 @@ var _ = Describe("Client identity continuous rolling upgrade", Label("docker", "
 
 	callback := func(broker *bootstrap.CredentialServer, principal string, target id.ServiceID) *url.URL {
 		GinkgoHelper()
-		result := rolloutHTTP(broker, principal, http.MethodGet, "/api/third-party/"+target.String()+"/oauth2/authorize?redirect_uri="+url.QueryEscape(document["server"].(map[string]any)["enduser"].(map[string]any)["public_url"].(string)+"/sessions"), nil)
+		result := rolloutHTTP(broker, principal, http.MethodGet, "/api/third-party/"+target.String()+"/oauth2/authorize?redirect_uri="+url.QueryEscape(broker.EndUserPublicURL+"/sessions"), nil)
 		Expect(result.err).NotTo(HaveOccurred())
 		Expect(result.status).To(Equal(http.StatusFound))
 		provider, err := url.Parse(result.header.Get("Location"))
@@ -174,6 +174,7 @@ var _ = Describe("Client identity continuous rolling upgrade", Label("docker", "
 		permissions.ServiceScopes = append(permissions.ServiceScopes, domainstorage.ServiceScope{ServiceID: filesystemID, Scopes: []string{"profile"}, RequirementType: domainstorage.RequirementTypeOptional})
 		Expect(store.PermissionSets().Create(ctx, permissions)).To(Succeed())
 		agent = fixtures.ClientIdentityRolloutAgent(serviceID, permissions.ID)
+		agent.ServiceRequirements = append(agent.ServiceRequirements, domainstorage.ServiceRequirement{ServiceID: filesystemID, RequiredScopes: []string{"profile"}, RequirementType: domainstorage.RequirementTypeOptional})
 		Expect(store.Agents().Create(ctx, agent)).To(Succeed())
 		for _, principal := range []string{alice, bob} {
 			grant := fixtures.ActiveGrant(principal, agent.ID.String(), serviceID.String(), []string{"profile"})

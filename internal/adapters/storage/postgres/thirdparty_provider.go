@@ -94,7 +94,7 @@ func (r *PostgresThirdpartyOAuth2ProviderRepository) Get(ctx context.Context, se
 	}
 	queryCtx, cancel := context.WithTimeout(ctx, r.adapter.timeouts.Read)
 	defer cancel()
-	record, err := scanProvider(r.adapter.db.QueryRowContext(queryCtx, `SELECT `+providerColumns+` FROM thirdparty_oauth2_services s WHERE s.id = $1`, serviceID))
+	record, err := scanProvider(r.adapter.storageExecutor(queryCtx).QueryRowxContext(queryCtx, `SELECT `+providerColumns+` FROM thirdparty_oauth2_services s WHERE s.id = $1`, serviceID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, storage.NewStorageError("GetThirdpartyOAuth2Provider", storage.ErrorKindNotFound, ports.ErrNotFound, "provider not found")
 	}

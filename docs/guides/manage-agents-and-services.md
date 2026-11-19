@@ -224,7 +224,7 @@ A transition that preserves the effective client ID does not invalidate matching
 ## Changing a service client ID
 
 First complete the [client-identity upgrade checklist](/docs/configuration#client-identity-upgrade-checklist).
-The [accepted ADR 048-client-identity-revisions](../../adrs/048-client-identity-revisions.md) defines the rollout and rollback boundary.
+The [accepted ADR 048-client-identity-revisions](https://github.com/zalando-incubator/agentic-identity-broker/blob/main/adrs/048-client-identity-revisions.md) defines the rollout and rollback boundary.
 
 There are two change channels:
 
