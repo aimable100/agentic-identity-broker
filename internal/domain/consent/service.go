@@ -149,9 +149,29 @@ func (s *Service) GetAgentConsentDetail(ctx context.Context, agentID id.AgentID,
 		return nil, err
 	}
 
-	sessions, err := s.sessionRepo.ListActiveByPrincipal(ctx, principal)
+	summaries, err := s.sessionRepo.ListSummariesByPrincipal(ctx, principal)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list sessions for principal: %w", err)
+	}
+	relevant := make(map[id.ServiceID]bool, len(agent.ServiceRequirements))
+	for _, requirement := range agent.ServiceRequirements {
+		relevant[requirement.ServiceID] = true
+	}
+	for _, entry := range resolvedPermissionSets {
+		for _, serviceScopes := range entry.PermissionSet.ServiceScopes {
+			relevant[serviceScopes.ServiceID] = true
+		}
+	}
+	sessions := make([]*storage.UserSession, 0, len(relevant))
+	for _, summary := range summaries {
+		if !relevant[summary.ServiceID] || summary.RequiresReauthentication {
+			continue
+		}
+		// Summary usability already accounts for expiry and refresh rejection.
+		sessions = append(sessions, &storage.UserSession{
+			ID: summary.ID, Principal: principal, ServiceID: summary.ServiceID,
+			UpstreamClientID: summary.UpstreamClientID, UpstreamClientRevision: summary.UpstreamClientRevision,
+		})
 	}
 	activeSessionServiceIDs, err := s.connectedSessionServiceIDs(ctx, sessions, ports.UsabilityDisplay)
 	if err != nil {

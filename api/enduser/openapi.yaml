@@ -3170,9 +3170,9 @@ components:
                 type: string
                 format: uuid
               description:
-                "Phase 4 US2: Array of service IDs for which the authenticated user has active sessions.
+                "Array of service IDs referenced by this agent's service requirements or resolved permission sets for which the authenticated user has usable sessions.
 
-                Empty array if no active sessions.
+                Empty array if no relevant usable sessions exist.
 
                 "
             available_services:

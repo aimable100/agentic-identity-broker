@@ -270,6 +270,28 @@ func TestService_GetAgentConsentDetail_ClientIdentityDisplay(t *testing.T) {
 	}
 }
 
+func TestService_GetAgentConsentDetail_EvaluatesOnlyRelevantMetadata(t *testing.T) {
+	f := newConsentIdentityFixture()
+	f.agent.ServiceRequirements = f.agent.ServiceRequirements[:1]
+	unrelated := &storage.UserSession{ID: id.NewSessionID(), Principal: f.grant.Principal, ServiceID: id.NewServiceID()}
+	f.sessions.sessions[unrelated.ID] = unrelated
+	var evaluated []id.ServiceID
+	f.service.WithSessionUsabilityEvaluator(sessionUsabilityEvaluatorFunc(func(_ context.Context, sessions []*storage.UserSession, mode ports.UsabilityMode) (map[id.ServiceID]bool, error) {
+		assert.Equal(t, ports.UsabilityDisplay, mode)
+		for _, session := range sessions {
+			evaluated = append(evaluated, session.ServiceID)
+			assert.Empty(t, session.EncryptedAccessToken)
+			assert.Empty(t, session.EncryptedRefreshToken)
+		}
+		return map[id.ServiceID]bool{}, nil
+	}))
+	detail, err := f.service.GetAgentConsentDetail(context.Background(), f.agent.ID, f.grant.Principal)
+	require.NoError(t, err)
+	want := []id.ServiceID{f.reports.ServiceID, f.calendar.ServiceID}
+	assert.ElementsMatch(t, want, evaluated, "permission-set-only services remain relevant, unrelated connections do not")
+	assert.ElementsMatch(t, want, detail.ActiveSessionServiceIDs)
+}
+
 func TestService_ClientIdentityReconnect_PreservesGrantSelectionsAndExpiry(t *testing.T) {
 	for _, expiredGrant := range []bool{false, true} {
 		name := "active delegation"

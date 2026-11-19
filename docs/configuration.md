@@ -158,6 +158,7 @@ Public, CIMD confidential, and Google services cannot select filesystem mode.
 Initiation reads only the current client-ID file. Each exchange attempt and actual refresh reads a fresh, coherent pair.
 Each file must be regular, readable by the broker UID, non-empty after whitespace removal, and at most 65,536 bytes before trimming.
 The broker removes surrounding whitespace and preserves internal characters. It caches no descriptor or credential value. Administrative service metadata reads and writes never read files. Session and consent usability displays read only the client-ID file, never the secret file; source failure falls back to persisted identity evidence for display only. Token acquisition and authorization gates have no availability fallback.
+Consent detail evaluates only connections referenced by the agent's service requirements or resolved permission sets. It reads session metadata without encrypted tokens and does not evaluate unrelated providers or their credential files.
 Configuration has no hot reload. Binding changes require a restart, but file publication takes effect on the next applicable operation.
 
 For rotation, publish fresh immutable targets and switch the complete pair atomically. Do not modify a published target or reuse a retired target during acquisition.

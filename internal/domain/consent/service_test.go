@@ -733,7 +733,14 @@ func (m *mockSessionRepo) ListByPrincipal(_ context.Context, _ id.Principal) ([]
 	return nil, nil
 }
 func (m *mockSessionRepo) ListSummariesByPrincipal(_ context.Context, _ id.Principal) ([]*storage.UserSessionSummary, error) {
-	return nil, nil
+	if m.listErr != nil {
+		return nil, m.listErr
+	}
+	summaries := make([]*storage.UserSessionSummary, 0, len(m.activeIDs))
+	for _, serviceID := range m.activeIDs {
+		summaries = append(summaries, &storage.UserSessionSummary{ServiceID: serviceID})
+	}
+	return summaries, nil
 }
 func (m *mockSessionRepo) Delete(_ context.Context, _ id.SessionID) error { return nil }
 func (m *mockSessionRepo) DeleteByPrincipalAndService(_ context.Context, _ id.Principal, _ id.ServiceID) error {
@@ -1923,7 +1930,10 @@ func TestService_GetAgentConsentDetail_WithPermissionSets(t *testing.T) {
 	now := time.Now()
 	permissionSetID := id.NewPermissionSetID()
 	permissionSetService := &mockPermissionSetService{permissionSets: map[id.PermissionSetID]*storage.PermissionSet{
-		permissionSetID: {ID: permissionSetID, Name: "Test Permission Set", Description: "Used by detail tests"},
+		permissionSetID: {
+			ID: permissionSetID, Name: "Test Permission Set", Description: "Used by detail tests",
+			ServiceScopes: []storage.ServiceScope{{ServiceID: serviceID1, RequirementType: storage.RequirementTypeOptional}},
+		},
 	}}
 
 	session1 := &storage.UserSession{
