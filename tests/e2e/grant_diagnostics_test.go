@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -378,12 +379,16 @@ func (f *grantDiagnosticsFixture) LifecycleRecords() []map[string]any {
 		for _, message := range messages {
 			lifecycle = lifecycle || record["msg"] == message
 		}
-		lifecycle = lifecycle || record["msg"] == "permission set created" || record["msg"] == "permission set updated" || record["msg"] == "permission set deleted"
+		message, _ := record["msg"].(string)
+		lifecycle = lifecycle || slices.Contains([]string{"grant revoked", "permission set created", "permission set updated", "permission set deleted"}, message)
 		if !lifecycle {
 			continue
 		}
 		_, implemented := fields[discriminator]
 		Expect(implemented).To(BeTrue(), "every lifecycle success must have a fixed domain-owned discriminator; handler-only successes are duplicates")
+		if discriminator == "consent.grant.revoked" {
+			Expect(record["event"]).To(Equal("consent.grant.revoked"), "grant revocation must use the typed event discriminator")
+		}
 		if expectedMessage, checkMessage := messages[discriminator]; checkMessage {
 			Expect(record["msg"]).To(Equal(expectedMessage))
 		}

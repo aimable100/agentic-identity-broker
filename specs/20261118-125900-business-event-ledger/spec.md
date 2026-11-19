@@ -336,6 +336,97 @@ unexpected database error as `unknown`.
 **Observable result**: The revocation succeeded and the grant is gone. The ledger has no row for
 it.
 
+### Journey 5 — Grant deletion commits but refresh cleanup fails
+
+**Scenario**: [User Story 1, Scenario 5](#user-story-1---a-logged-business-event-is-stored-priority-p1).
+
+**Cast and initial state**: Alice and the agent, permission set, and GitHub service from Journey 1.
+This independent example starts with an empty ledger and grant `990e8400-e29b-41d4-a716-446655440022`.
+The grant has `valid_until=2027-02-12T10:24:00Z` and `updated_at=2026-11-12T10:24:00Z`.
+A local refresh session refers to Alice, that agent, and that grant.
+Refresh cleanup fails before it deletes the session row. Ledger writes succeed.
+All times are 2026-11-12 UTC, and all IDs are synthetic.
+
+**Step 1 — Broker configuration (excerpt)**
+
+```yaml
+business_events:
+  enabled: true
+oauth2_authorization_server:
+  mode: local
+```
+
+**Step 2 — 10:25:00: Alice revokes the grant**
+
+```http
+DELETE /api/consent/agents/550e8400-e29b-41d4-a716-446655440000/grants HTTP/1.1
+Host: broker.example.com
+X-Remote-User: alice@example.com
+traceparent: 00-7ad1672827de54ee9559fc322d9142ad-c8be7c827a314442-01
+
+HTTP/1.1 500 Internal Server Error
+Content-Type: application/json
+
+{"error": "internal server error", "message": "an unexpected error occurred"}
+```
+
+Before this response, the grant deletion commits and refresh cleanup returns an error.
+The service emits one `consent.grant.revoked` audit record with `refresh_cleanup=failed` and then returns the cleanup error.
+The `500` does not roll back the deletion.
+
+**Step 3 — 10:25:00: the ledger stores the committed deletion**
+
+Database inspection shows exactly one row. There is no ledger-reading API.
+The row contains the request identities and the full deletion audit snapshot:
+
+```json
+{
+  "id": "01a1cf4a-10dc-7c1e-9d2a-3f4b5c6d7e90",
+  "event": "consent.grant.revoked",
+  "occurred_at": "2026-11-12T10:25:00.124Z",
+  "recorded_at": "2026-11-12T10:25:00.125Z",
+  "principal": "alice@example.com",
+  "actor": "alice@example.com",
+  "trace_id": "7ad1672827de54ee9559fc322d9142ad",
+  "attributes": {
+    "agent_id": "550e8400-e29b-41d4-a716-446655440000",
+    "grant_id": "990e8400-e29b-41d4-a716-446655440022",
+    "valid_until": "2027-02-12T10:24:00Z",
+    "updated_at": "2026-11-12T10:24:00Z",
+    "granted_permission_sets": [
+      {
+        "permission_set_id": "770e8400-e29b-41d4-a716-446655440001",
+        "included_service_ids": ["880e8400-e29b-41d4-a716-446655440002"]
+      }
+    ],
+    "revoked_at": "2026-11-12T10:25:00.123456789Z",
+    "refresh_cleanup": "failed"
+  }
+}
+```
+
+The audit timestamps use UTC RFC3339Nano. `revoked_at` is an audit observation, not the exact commit time.
+The grant is absent, but the refresh session row remains.
+That row grants no refresh authority: local refresh requires an active grant before token issuance.
+Existing access tokens remain valid until expiry. Alice's connected GitHub OAuth2 session is not terminated by grant revocation.
+
+**Step 4 — 10:26:00: Alice repeats the DELETE**
+
+```http
+DELETE /api/consent/agents/550e8400-e29b-41d4-a716-446655440000/grants HTTP/1.1
+Host: broker.example.com
+X-Remote-User: alice@example.com
+traceparent: 00-8be2783938ef65ffa66a0d433ea253be-d9cf8d938b425553-01
+
+HTTP/1.1 404 Not Found
+Content-Type: application/json
+
+{"error": "not found", "message": "no active grant exists for this agent"}
+```
+
+**Observable result**: The grant stays absent. The retry performs no refresh cleanup and emits no revocation audit record.
+The uncleaned refresh session row remains, and the ledger still contains exactly the one row from Step 3.
+
 ## Requirements *(mandatory)*
 
 ### Functional Requirements

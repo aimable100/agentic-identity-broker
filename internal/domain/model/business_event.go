@@ -74,6 +74,12 @@ func copyBusinessEventValue(value reflect.Value) reflect.Value {
 			copy.Index(i).Set(copyBusinessEventValue(value.Index(i)))
 		}
 		return copy
+	case reflect.Array:
+		copy := reflect.New(value.Type()).Elem()
+		for i := range value.Len() {
+			copy.Index(i).Set(copyBusinessEventValue(value.Index(i)))
+		}
+		return copy
 	default:
 		return value
 	}

@@ -1,36 +1,36 @@
-package consent_test
+package consent
 
 import (
 	"bytes"
-	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"testing"
 	"time"
 
-	"github.com/agentic-identity-broker/agentic-identity-broker/internal/adapters/storage/memory"
-	"github.com/agentic-identity-broker/agentic-identity-broker/internal/adapters/telemetry"
-	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/consent"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/id"
-	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/model"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/storage"
-	"github.com/agentic-identity-broker/agentic-identity-broker/internal/ports"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-type consentEventAppender func(context.Context, *model.BusinessEvent) error
-
-func (f consentEventAppender) Append(ctx context.Context, event *model.BusinessEvent) error {
-	return f(ctx, event)
-}
-
 func TestConsentRevocationBusinessEvent(t *testing.T) {
-	for _, outcome := range []string{"success", "cleanup failure", "delete failure", "not found"} {
-		t.Run(outcome, func(t *testing.T) {
+	failure := errors.New("storage unavailable")
+	for _, tc := range []struct {
+		name        string
+		grantExists bool
+		deleteErr   error
+		cleanupErr  error
+		wantErr     error
+		wantEvent   bool
+	}{
+		{name: "success", grantExists: true, wantEvent: true},
+		{name: "cleanup failure", grantExists: true, cleanupErr: failure, wantErr: failure, wantEvent: true},
+		{name: "delete failure", grantExists: true, deleteErr: failure, wantErr: failure},
+		{name: "not found", wantErr: ErrGrantNotFound},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			ctx := t.Context()
-			grants := memory.NewUserGrantRepository()
+			grants := &grantAuditRepository{mockGrantRepo: &mockGrantRepo{grants: map[id.GrantID]*storage.UserGrant{}}}
 			validUntil := time.Now().Add(time.Hour).UTC()
 			grant := &storage.UserGrant{
 				ID: id.NewGrantID(), Principal: id.NewPrincipal("resource-owner"), AgentID: id.NewAgentID(),
@@ -39,55 +39,45 @@ func TestConsentRevocationBusinessEvent(t *testing.T) {
 					PermissionSetID: id.NewPermissionSetID(), IncludedServiceIDs: []id.ServiceID{id.NewServiceID()},
 				}},
 			}
-			if outcome != "not found" {
-				require.NoError(t, grants.Create(ctx, grant))
+			if tc.grantExists {
+				grants.grants[grant.ID] = grant
 			}
-			var grantRepo ports.UserGrantRepository = grants
-			var refreshRepo ports.RefreshTokenSessionRepository = memory.NewRefreshTokenSessionStore()
-			failure := errors.New("storage unavailable")
-			if outcome == "cleanup failure" {
-				refreshRepo = failingConsentRefreshRepo{refreshRepo, failure}
-			}
-			if outcome == "delete failure" {
-				grantRepo = failingConsentDeleteRepo{grants, failure}
-			}
-			var events []*model.BusinessEvent
-			appender := consentEventAppender(func(ctx context.Context, event *model.BusinessEvent) error {
-				_, err := grants.FindByPrincipalAndAgent(ctx, grant.Principal, grant.AgentID)
-				require.ErrorIs(t, err, ports.ErrNotFound, "audit emission must follow committed deletion")
-				events = append(events, event.Copy())
-				return nil
-			})
-			var operational bytes.Buffer
-			base := slog.NewJSONHandler(&operational, nil)
-			fallback := telemetry.NewContextHandler(telemetry.NewPrincipalPolicyHandler(base))
-			ledger := telemetry.NewLedgerHandler(appender, fallback, time.Second)
-			logger := slog.New(telemetry.NewContextHandler(telemetry.NewPrincipalPolicyHandler(telemetry.NewMultiHandler(base, ledger))))
-			service := consent.NewService(nil, nil, grantRepo, nil, refreshRepo, nil, logger)
+			grants.err = tc.deleteErr
+			refreshRepo := &mockConsentRefreshRepo{err: tc.cleanupErr}
+			capture := &grantAuditLogHandler{Handler: slog.NewJSONHandler(&bytes.Buffer{}, nil)}
+			service := NewService(nil, nil, grants, nil, refreshRepo, nil, slog.New(capture))
 			err := service.RevokeConsentForPrincipal(ctx, grant.Principal, grant.AgentID)
-			switch outcome {
-			case "not found":
-				require.ErrorIs(t, err, consent.ErrGrantNotFound)
-				assert.Empty(t, events)
+			require.ErrorIs(t, err, tc.wantErr)
+			if !tc.wantEvent {
+				assert.Empty(t, capture.records)
 				return
-			case "delete failure":
-				require.ErrorIs(t, err, failure)
-				assert.Empty(t, events)
-				return
-			case "cleanup failure":
-				require.ErrorIs(t, err, failure)
-			default:
-				require.NoError(t, err)
+			}
+			require.NotNil(t, grants.deleted)
+			assert.NotContains(t, grants.grants, grant.ID)
+			grants.deleted.ID = id.NewGrantID()
+			grants.deleted.Principal = id.NewPrincipal("different-owner")
+			grants.deleted.AgentID = id.NewAgentID()
+			*grants.deleted.ValidUntil = validUntil.Add(time.Hour)
+			grants.deleted.UpdatedAt = time.Now()
+			grants.deleted.GrantedPermissionSets[0].PermissionSetID = id.NewPermissionSetID()
+			grants.deleted.GrantedPermissionSets[0].IncludedServiceIDs[0] = id.NewServiceID()
+			var events []map[string]any
+			for i, record := range capture.JSONRecords(t) {
+				if record["event"] != "consent.grant.revoked" {
+					continue
+				}
+				capture.records[i].Attrs(func(attr slog.Attr) bool {
+					if attr.Key == "event" {
+						assert.Equal(t, GrantRevoked, attr.Value.Any(), "the event must retain its typed definition")
+					}
+					return true
+				})
+				assert.Same(t, ctx, capture.contexts[i])
+				events = append(events, record)
 			}
 			require.Len(t, events, 1)
-			event := events[0]
-			assert.Equal(t, "consent.grant.revoked", event.Event)
-			require.NotNil(t, event.Principal)
-			assert.Equal(t, grant.Principal.String(), *event.Principal)
-			encoded, err := json.Marshal(event.Attributes)
-			require.NoError(t, err)
-			var attributes map[string]any
-			require.NoError(t, json.Unmarshal(encoded, &attributes))
+			attributes := events[0]
+			assert.Equal(t, grant.Principal.String(), attributes["principal"])
 			assert.Equal(t, grant.ID.String(), attributes["grant_id"])
 			assert.Equal(t, grant.AgentID.String(), attributes["agent_id"])
 			assert.Equal(t, validUntil.Format(time.RFC3339Nano), attributes["valid_until"])
@@ -100,13 +90,14 @@ func TestConsentRevocationBusinessEvent(t *testing.T) {
 			revokedAt, err := time.Parse(time.RFC3339Nano, attributes["revoked_at"].(string))
 			require.NoError(t, err)
 			assert.Equal(t, revokedAt.UTC().Format(time.RFC3339Nano), attributes["revoked_at"])
-			if outcome == "cleanup failure" {
+			if tc.cleanupErr != nil {
 				assert.Equal(t, "failed", attributes["refresh_cleanup"])
 			} else {
 				assert.NotContains(t, attributes, "refresh_cleanup")
 			}
-			require.ErrorIs(t, service.RevokeConsentForPrincipal(ctx, grant.Principal, grant.AgentID), consent.ErrGrantNotFound)
-			assert.Len(t, events, 1, "an unchanged retry must emit no event")
+			recordCount := len(capture.records)
+			require.ErrorIs(t, service.RevokeConsentForPrincipal(ctx, grant.Principal, grant.AgentID), ErrGrantNotFound)
+			assert.Len(t, capture.records, recordCount, "an unchanged retry must emit no event")
 		})
 	}
 }
