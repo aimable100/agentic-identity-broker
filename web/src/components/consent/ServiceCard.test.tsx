@@ -8,8 +8,8 @@
  * - Grant status badges
  */
 
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { ServiceCard } from './ServiceCard';
 import type { ThirdpartyService, DelegatedToken } from '../../types/consent';
 
@@ -42,15 +42,11 @@ describe('ServiceCard', () => {
     },
   ];
 
-  it('renders service name and logo', () => {
-    render(<ServiceCard service={mockService} />);
-
+  it('retains the visible name and initials without requesting legacy logoUrl', () => {
+    const { container } = render(<ServiceCard service={mockService} />);
     expect(screen.getByText('GitHub')).toBeInTheDocument();
-    expect(screen.getByAltText('GitHub logo')).toBeInTheDocument();
-    expect(screen.getByAltText('GitHub logo')).toHaveAttribute(
-      'src',
-      'https://example.com/github-logo.png',
-    );
+    expect(screen.getByText('G')).toBeVisible();
+    expect(container.querySelector('img')).toBeNull();
   });
 
   it('renders fallback logo when logoUrl is not provided', () => {
@@ -170,5 +166,37 @@ describe('ServiceCard', () => {
 
     // Component should still render even in loading state
     expect(container).toBeInTheDocument();
+  });
+  it.each(['mandatory', 'optional'] as const)('recovers the live %s requirement image without replacing Login', (requirementType) => {
+    const onDelegate = vi.fn();
+    const source = '<svg xmlns="http://www.w3.org/2000/svg"><circle r="4"/></svg>';
+    const replacement = '<svg xmlns="http://www.w3.org/2000/svg"><path d="M1 1h4v4z"/></svg>';
+    const requirement = {
+      kind: 'requirement' as const, serviceId: 'atlas', serviceName: 'Atlas Files',
+      requirementType, requiredScopes: [{ name: 'files.read' }],
+      connectionStatus: 'not_connected' as const,
+      logoUrl: 'https://example.com/not-an-icon.svg',
+    };
+    const view = (iconSvg?: string | null) => <ServiceCard service={{ ...requirement, iconSvg }} onDelegate={onDelegate} />;
+    const { container, rerender } = render(view(source));
+    const login = screen.getByRole('button', { name: 'Login' });
+    const icon = container.querySelector('img')!;
+    expect(icon).toHaveAttribute('alt', '');
+    expect(icon).toHaveAttribute('src', `data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}`);
+    expect(screen.getByText('A')).toBeVisible();
+    fireEvent.error(icon);
+    expect(container.querySelector('img')).toBeNull();
+    expect(screen.getByText('Atlas Files')).toBeVisible();
+    rerender(view(replacement));
+    const next = container.querySelector('img')!;
+    fireEvent.load(next);
+    expect(next).toBeVisible();
+    expect(screen.queryByText('A')).toBeNull();
+    rerender(view(undefined));
+    expect(container.querySelector('img')).toBeNull();
+    expect(screen.getByText('A')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Login' })).toBe(login);
+    fireEvent.click(login);
+    expect(onDelegate).toHaveBeenCalledWith('atlas');
   });
 });

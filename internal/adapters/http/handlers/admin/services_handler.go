@@ -48,6 +48,7 @@ func NewServicesHandler(providerService *thirdparty.ThirdpartyOAuth2ProviderServ
 type ServiceRequest struct {
 	CanonicalID                *string                  `json:"canonical_id,omitempty"`
 	DisplayName                string                   `json:"display_name"`
+	IconSVG                    *string                  `json:"icon_svg,omitempty"`
 	CredentialSource           model.CredentialSource   `json:"credential_source,omitempty"`
 	ClientRegistration         model.ClientRegistration `json:"client_registration,omitempty"`
 	ClientID                   string                   `json:"client_id"`
@@ -66,6 +67,7 @@ type ServiceRequest struct {
 	ClientSecretProvided       bool                     `json:"-"`
 	clearCanonicalID           bool
 	protectedResourcesProvided bool
+	iconSVGProvided            bool
 }
 
 // UnmarshalJSON retains field presence so explicit null values are not omissions.
@@ -81,6 +83,7 @@ func (req *ServiceRequest) UnmarshalJSON(data []byte) error {
 		ClientID                     json.RawMessage `json:"client_id"`
 		ClientSecret                 json.RawMessage `json:"client_secret"`
 		CanonicalID                  json.RawMessage `json:"canonical_id"`
+		IconSVG                      json.RawMessage `json:"icon_svg"`
 		ProtectedResources           json.RawMessage `json:"protected_resources"`
 		ClientIDFile                 json.RawMessage `json:"client_id_file"`
 		ClientSecretFile             json.RawMessage `json:"client_secret_file"`
@@ -100,6 +103,7 @@ func (req *ServiceRequest) UnmarshalJSON(data []byte) error {
 	req.ClientSecretProvided = fields.ClientSecret != nil
 	req.clearCanonicalID = isJSONNull(fields.CanonicalID)
 	req.protectedResourcesProvided = fields.ProtectedResources != nil && !isJSONNull(fields.ProtectedResources)
+	req.iconSVGProvided = fields.IconSVG != nil
 	return nil
 }
 
@@ -129,6 +133,7 @@ type ServiceResponse struct {
 	ID                      string                   `json:"id"`
 	CanonicalID             *string                  `json:"canonical_id"`
 	DisplayName             string                   `json:"display_name"`
+	IconSVG                 *string                  `json:"icon_svg,omitempty"`
 	CredentialSource        model.CredentialSource   `json:"credential_source"`
 	ClientRegistration      model.ClientRegistration `json:"client_registration"`
 	ClientID                string                   `json:"client_id,omitempty"`
@@ -267,6 +272,8 @@ func (h *ServicesHandler) CreateService(w http.ResponseWriter, r *http.Request) 
 		ID:                         serviceID,
 		CanonicalID:                req.CanonicalID,
 		DisplayName:                req.DisplayName,
+		IconSVG:                    req.IconSVG,
+		IconSVGProvided:            req.iconSVGProvided,
 		ClientID:                   id.ClientID(req.ClientID),
 		Secret:                     secret,
 		CredentialSource:           req.CredentialSource,
@@ -492,6 +499,8 @@ func (h *ServicesHandler) UpdateService(w http.ResponseWriter, r *http.Request) 
 		ID:                         parsedSvcID,
 		CanonicalID:                req.CanonicalID,
 		DisplayName:                req.DisplayName,
+		IconSVG:                    req.IconSVG,
+		IconSVGProvided:            req.iconSVGProvided,
 		ClearCanonicalID:           req.clearCanonicalID,
 		ClientID:                   id.ClientID(req.ClientID),
 		Secret:                     secret,
@@ -719,6 +728,7 @@ func (h *ServicesHandler) toResponse(entity *model.ThirdpartyOAuth2ProviderEntit
 		ID:                 entity.ID.String(),
 		CanonicalID:        entity.CanonicalID,
 		DisplayName:        entity.DisplayName,
+		IconSVG:            entity.IconSVG,
 		CredentialSource:   credentialSource,
 		ClientRegistration: entity.ClientRegistration,
 		OAuth2Flavor:       flavor.String(),

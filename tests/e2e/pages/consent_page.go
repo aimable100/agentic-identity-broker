@@ -249,6 +249,10 @@ func (cp *ConsentPage) SubmitConsent(ctx context.Context) error {
 	return nil
 }
 
+func (cp *ConsentPage) SaveConsent(ctx context.Context) error {
+	return cp.getConsentActionButton("Save").Click()
+}
+
 func (cp *ConsentPage) endDateInput() (playwright.Locator, error) {
 	input := cp.page().GetByLabel("End date", playwright.PageGetByLabelOptions{
 		Exact: playwright.Bool(true),
@@ -1519,7 +1523,7 @@ func (cp *ConsentPage) WaitForGrantSuccess(ctx context.Context) error {
 
 	successToast := cp.page().GetByRole("status").Filter(playwright.LocatorFilterOptions{
 		HasText: "Grant updated successfully",
-	})
+	}).Last()
 
 	err := successToast.WaitFor(playwright.LocatorWaitForOptions{
 		State:   playwright.WaitForSelectorStateVisible,

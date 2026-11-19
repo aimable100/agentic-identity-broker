@@ -419,7 +419,7 @@ export function AgentGrantDetailPage() {
   }
 
   // Loading state
-  if (loading) {
+  if (loading && !agent) {
     return (
       <AppLayout>
         <div className="space-y-6">
@@ -683,6 +683,7 @@ export function AgentGrantDetailPage() {
                   s.kind === 'requirement'
                     ? s.serviceName
                     : (s.displayName ?? s.serviceId),
+                iconSvg: s.iconSvg,
               }))}
               serviceRequirements={agent.service_requirements}
               initialGrantedPermissionSets={

@@ -844,6 +844,18 @@ PostgreSQL reads check stored client registration and authentication without rep
 
 **See Also**: [ADR 037: CIMD Client-Authentication Key Domain](adrs/037-cimd-client-authentication-key-domain.md) and [ADR 044: Client Registration Independent of Authentication](adrs/044-client-registration-independent-of-authentication.md).
 
+#### Service Icon Metadata
+
+The existing third-party service owns an optional Service Icon: the exact accepted SVG source, not an independently addressable asset. Both storage adapters retain it with service metadata. Migration `049_service_icon_svg` adds nullable text with a 1–65,536-byte shape check, without changing existing rows or timestamps. Session records never snapshot the icon.
+
+Admin JSON uses `icon_svg` with omission/preserve, null/clear, and value/replace semantics. Current source appears only on existing authenticated consent service entries (`iconSvg`) and session summaries/details (`service_icon_svg`). Permission-set rows reuse consent service metadata. Existing authorization, service filtering, row versions, and cache lifetimes remain authoritative. There is no image endpoint, service catalog, new configuration, or icon repository.
+
+Upload validation consumes strict UTF-8 XML and rejects named active constructs without resolving DTDs or resources. It is not a CSS, geometry, reference-graph, or animation sanitizer. The SPA URI-encodes exact source only into decorative `<img>` data images. Browser image mode supplies script, interaction, and external-resource isolation. Accepted source is not certified safe for inline SVG or active-document reuse, including source an authenticated caller copies.
+
+The SPA retains existing security headers and uses `frame-ancestors 'none'; object-src 'none'`, without restricting existing remote avatars through `img-src` or `default-src`. Only image state is keyed by source. Visible names, original fallbacks, and action controls remain stable. Repeated source increases JSON payload and browser memory. Rendering-resource quotas and stress tests are explicitly out of scope.
+
+See [20261119-211813-service-icons-image-mode](adrs/20261119-211813-service-icons-image-mode.md) and the [approved contract](specs/20261118-224349-configure-service-icons/contracts/service-icons.md).
+
 #### 3.1.z.1. Protected-Resource Discovery and Dynamic Client Registration (Feature 050)
 
 **Boundary and ownership**: `ThirdpartyOAuth2ProviderService` owns discovery for the existing service aggregate. It validates source and metadata identities, selects an issuer and client method, sets the effective resource, encrypts DCR secrets, and changes status. The Admin handler parses requests and returns safe results. The domain uses the narrow `OAuthDiscoveryClient` port for the resource probe, bounded metadata reads, and one registration request. `internal/adapters/outboundhttp/` performs remote I/O. Builder wires the port and HTTP clients. No End-user API or consent UI changes.
@@ -1348,6 +1360,7 @@ Partial supersessions and amendments apply only to the subjects named in those d
 | [045-agent-subject-impersonation.md](adrs/045-agent-subject-impersonation.md) | Accepted | Self-agent issuance without human delegation. Partly supersedes ADR 032 |
 | [046-observed-refresh-token-rejection.md](adrs/046-observed-refresh-token-rejection.md) | Accepted | Observed rejection replaces predicted refresh expiry. Partly supersedes ADR 038 |
 | [047-unique-agent-external-id-reconcile.md](adrs/047-unique-agent-external-id-reconcile.md) | Accepted | Unique Agent external IDs, domain reconciliation, atomic migration `047`, and Admin API `3.0.0` |
+| [20261119-211813-service-icons-image-mode.md](adrs/20261119-211813-service-icons-image-mode.md) | Accepted | Exact service-owned SVG metadata, authenticated JSON, named upload checks, and browser image-mode isolation |
 
 ## 11. Project Identification
 
@@ -1452,6 +1465,8 @@ The terms that follow describe domain models and their relationships.
 **Optional Service**: A third-party OAuth2 service marked with requirement_type="optional" in an agent's service requirements. Displayed in consent UI with visual distinction (neutral badge vs trust-deep for mandatory). Does not block authorization while the user has not included it in their grant. Once the user includes it, it is required for that user: a missing or unusable session redirects authorization to the consent screen, where the user reconnects or deselects it ([Feature 019](specs/019-permission-sets/spec.md) FR-022). Allows agents to degrade gracefully when optional integrations are unavailable.
 
 **ThirdpartyOAuth2Provider**: An operator-managed third-party OAuth2 service with scopes, a display name, and one client identity. Static confidential providers in stored mode retain a client ID and an encrypted `Secret` value object. Eligible filesystem mode stores neither credential and acquires the current pair for each exchange or refresh attempt. A discovery-backed service also owns its configured resource URL, issuer, effective resource, client bootstrap method, and discovery status. A confidential DCR secret uses the existing `Secret` value object. Public and hosted CIMD services have no shared secret. The Go entity is `model.ThirdpartyOAuth2ProviderEntity` in `internal/domain/model/`. `ThirdpartyOAuth2ProviderService` in `internal/domain/thirdparty/` exclusively owns client-secret encryption and decryption.
+
+**Service Icon**: Optional visual value owned by a `ThirdpartyOAuth2Provider`: absent or the exact permitted SVG source, never an empty string. It has no independent identity or lifecycle. Consent service entries and session summaries use the current service value. Browser image state is separate from stored source, connection status, grants, and session state. Rendering is supported only through URI-encoded `<img>` data images, not inline SVG or active documents.
 
 **Provider Authorization Parameters**: Administrator-managed OAuth2 request parameters on a `ThirdpartyOAuth2Provider`, not end-user input. Other parameters keep their existing authorization-URL behavior. For a discovery-backed service, `authorization_params.resource` is the single effective RFC 8707 token audience on authorization, code exchange, and refresh. It does not claim ownership of a protected resource. The source of this value appears only in the response field `discovery.authorization_param_resource_strategy`.
 

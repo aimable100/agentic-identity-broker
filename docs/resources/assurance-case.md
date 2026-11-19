@@ -93,6 +93,8 @@ These details apply to the trust boundaries in the diagram:
 
 Three of these connections rely on network position instead of an authentication check: proxy to port 8000, proxy to port 14000, and agentgateway to ExtProc. On each, a caller that reaches the port is trusted. Section 5 states the operator conditions that follow. The broker verifies the peer cryptographically on the remaining connections: TLS to PostgreSQL, KMS, and identity providers, and signed tokens on the token endpoint.
 
+Operator-provided Service Icons cross a separate browser-content boundary. The broker validates bounded XML without resource resolution and delivers exact source through existing authenticated JSON. The SPA uses only decorative `<img>` data images. Browser image mode blocks scripts, interaction, and external references. Accepted bytes are not safe for arbitrary inline or active-document reuse. The approved CSP preserves remote-avatar compatibility. Rendering-resource budgets remain outside this feature. See [20261119-211813-service-icons-image-mode](https://github.com/zalando-incubator/agentic-identity-broker/blob/main/adrs/20261119-211813-service-icons-image-mode.md) for the decision and its limitations. Runtime evidence belongs to the feature's validator, authentication, and Chromium acceptance checks.
+
 ## 3. Secure design argument
 
 We apply the Saltzer and Schroeder principles named by the OpenSSF criteria. We also validate untrusted destinations.
