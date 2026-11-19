@@ -218,11 +218,7 @@ func (s *OAuth2SessionService) checkDryRunIdentity(ctx context.Context, session 
 
 func (s *OAuth2SessionService) RequiresReauthentication(ctx context.Context, sessions []*storage.UserSession, mode ports.UsabilityMode) (map[id.ServiceID]bool, error) {
 	result := make(map[id.ServiceID]bool, len(sessions))
-	type evaluatedIdentity struct {
-		service *model.ThirdpartyOAuth2ProviderEntity
-		state   ports.ClientIdentityState
-	}
-	identities := make(map[id.ServiceID]evaluatedIdentity, len(sessions))
+	identities := make(map[id.ServiceID]summaryIdentityEvaluation, len(sessions))
 	for _, session := range sessions {
 		if session == nil {
 			continue
@@ -234,30 +230,23 @@ func (s *OAuth2SessionService) RequiresReauthentication(ctx context.Context, ses
 		}
 		if !ok {
 			service, err := s.providerService.GetForIdentityEvaluation(ctx, session.ServiceID)
-			if err != nil {
-				failure := identityReadError(err)
-				if mode != ports.UsabilityDisplay {
-					return nil, &ports.SessionUsabilityError{ServiceID: session.ServiceID, Err: failure}
+			if mode == ports.UsabilityDisplay {
+				evaluated = s.evaluateSummaryIdentity(ctx, session.ServiceID, service, err)
+			} else {
+				if err != nil {
+					return nil, &ports.SessionUsabilityError{ServiceID: session.ServiceID, Err: identityReadError(err)}
 				}
-				s.auditCredentialSourceFailure(ctx, session.ServiceID, credentialOperationDisplay, failure)
-				result[session.ServiceID] = true
-				identities[session.ServiceID] = evaluatedIdentity{}
-				continue
-			}
-			state, err := s.resolveClientIdentity(ctx, service)
-			if err != nil {
-				if mode != ports.UsabilityDisplay {
+				state, err := s.resolveClientIdentity(ctx, service)
+				if err != nil {
 					return nil, &ports.SessionUsabilityError{ServiceID: session.ServiceID, Err: err}
 				}
-				s.auditCredentialSourceFailure(ctx, session.ServiceID, credentialOperationDisplay, err)
-				state = ports.ClientIdentityState{Identity: service.ClientIdentity, Revision: service.ClientIdentityRevision}
-				if service.CredentialSource != model.CredentialSourceFilesystem {
-					clientID := service.ClientID
-					state.Identity = &clientID
-				}
+				evaluated = summaryIdentityEvaluation{service: service, state: state}
 			}
-			evaluated = evaluatedIdentity{service: service, state: state}
 			identities[session.ServiceID] = evaluated
+			if evaluated.service == nil {
+				result[session.ServiceID] = true
+				continue
+			}
 		}
 		result[session.ServiceID] = result[session.ServiceID] || session.RequiresReauthentication() || sessionIdentityStatus(session, evaluated.service, evaluated.state) != nil
 	}
