@@ -14,6 +14,8 @@ Missing or broken icons retain the existing fallback and never prevent consent o
 
 **Scope correction — 2026-11-19**: Operator-supplied image URLs, including same-origin image paths, are out of scope. SVG documents are the only supported icon input. Validated SVG MUST be rendered through `<img>`, never inserted into the page DOM. Planning will choose the delivery mechanism; this specification does not require broker-generated image URLs or a separate icon endpoint.
 
+**Approved planning decisions — 2026-11-19**: Allow visual SVG features without a drawing allowlist. Reject explicitly prohibited active constructs at upload; browser image mode is the primary boundary for scripts, interaction and external loads. Complete static detection of unsafe CSS, indirect references and animation is not promised. The stakeholder approved this image-mode contract during planning and explicitly descoped rendering-resource budgets because SVG is operator-provided. Keep the 64 KiB input limit and basic XML validation. No third-party asset is required.
+
 ## User Scenarios & Testing *(mandatory)*
 
 Each numbered acceptance scenario requires one corresponding E2E scenario under `tests/e2e/`.
@@ -21,7 +23,7 @@ Browser scenarios also require Playwright coverage and screenshots of meaningful
 
 ### User Story 1 - Configure a Service Icon from an SVG Document (Priority: P1)
 
-An operator supplies a static SVG document for a service. Users recognize that service in consent and session views.
+An operator supplies an SVG document for a service. Users recognize that service in consent and session views.
 The operator can replace or clear the icon without changing the service identity or its permissions.
 
 **Why this priority**: This provides the requested operator control and visible service identity without a separate asset deployment process.
@@ -37,17 +39,17 @@ The operator can replace or clear the icon without changing the service identity
 
 ### User Story 2 - Supply a Safe SVG Icon (Priority: P1)
 
-An operator supplies SVG content without deploying a separate image file. Users see a static icon, not executable page content.
+An operator supplies SVG content without deploying a separate image file. Users see the artwork, not executable page content.
 
 **Why this priority**: Operator-supplied SVG documents must preserve the browser trust boundary.
 
-**Independent Test**: Create a service with a static SVG document. Open its service views and verify image-mode rendering without page-DOM insertion, executable content, or external requests. Verify that unauthenticated callers cannot obtain icon content through the feature's delivery mechanism.
+**Independent Test**: Create a service with an original, self-contained SVG that uses visual effects. Open its service views and verify image-mode rendering without page-DOM insertion, executable content, or external requests. Verify that unauthenticated callers cannot obtain icon content through the feature's delivery mechanism.
 
 **Acceptance Scenarios**:
 
-1. **US2.1 — Create and render SVG**: **Given** an authorized operator and a permitted SVG document, **When** the operator creates the service with that document, **Then** the broker retains it across restart. Admin reads report the SVG source, and authenticated users see it in consent and session views through `<img>`, without inserting its SVG elements into the page DOM, executing content, or requesting external resources.
+1. **US2.1 — Create and render visual SVG features**: **Given** an authorized operator and self-contained SVG examples covering visual features under FR-016, **When** the operator creates a service with each document, **Then** the broker retains the exact source across restart. Admin reads report that source, and authenticated users see the artwork in consent and session views through `<img>`. No manual simplification, SVG insertion into the page DOM, executable content or external requests occur. Examples use original test artwork, not a required third-party logo.
 2. **US2.2 — Replace SVG**: **Given** a configured service, **When** the operator replaces its SVG document, **Then** the accepted update replaces the previous document. Fresh service data makes views display the current icon rather than a cached predecessor, regardless of the delivery mechanism.
-3. **US2.3 — Reject unsafe SVG**: **Given** a service with a valid icon, **When** an operator submits malformed, oversized, or prohibited SVG content, including scripts, event handlers, or external-resource references, **Then** the request fails validation even though the UI uses image-mode rendering. The previous icon and other service properties remain unchanged. Rejected content never becomes available as a service image, executes, or causes a referenced resource to be fetched.
+3. **US2.3 — Reject explicit active constructs**: **Given** a service with a valid icon, **When** an operator submits malformed or oversized SVG, or an explicitly prohibited construct under SR-005, **Then** the write fails without changing any service properties. Separately, an otherwise accepted image containing external references cannot load those resources or execute content in browser image mode. This scenario does not require exhaustive static detection of every CSS, reference or animation behavior.
 4. **US2.4 — Protect icon access**: **Given** a configured SVG icon and no authenticated principal, **When** a caller attempts to obtain its content through consent, session, or other icon-delivery access selected during planning, **Then** existing end-user authentication rejects the request. The response contains no SVG content.
 
 ### User Story 3 - Keep Service Views Usable Without an Image (Priority: P1)
@@ -78,6 +80,11 @@ After an operator replaces a broken icon, the same open view can display the new
 - A malformed or prohibited icon accompanies other service changes. The entire write fails without partial changes.
 - A view retains an earlier SVG in memory or cache after replacement or removal. Fresh service data must display the current document or the no-icon fallback, independent of how the document is delivered.
 - Several services use identical SVG documents. Replacing or clearing one service's icon must not alter another service.
+- Visual features such as gradients, masks, filters, patterns, markers, clipping, text, styling, local reuse and declarative visual animation are not rejection reasons by themselves.
+- Definitions appear inside `defs` or directly beneath the root, references precede their definitions, and exports use harmless namespace aliases, comments or metadata. These forms must work without preprocessing.
+- External references can remain in accepted source, including styles and animated values, but image-mode rendering must not load them. The broker must never fetch them during validation.
+- Missing references, duplicate IDs, unusual geometry and browser-ignored values are rendering concerns, not automatic upload errors.
+- SVG is operator-provided. Browser rendering budgets, filter-cost limits, animation lifetime limits and rendering stress tests are out of scope. The source byte limit is an input contract, not a rendering quota.
 
 ## Concrete Example Journeys *(mandatory)*
 
@@ -227,7 +234,7 @@ After Alice receives fresh service data, her view renders the replacement SVG th
 
 ### Journey 2 — Validate and Render SVG Content Safely (US2.1–US2.4)
 
-**Step 1 — 10:15:00: Olivia supplies a static SVG**
+**Step 1 — 10:15:00: Olivia supplies an SVG**
 
 ```http
 PUT /api/services/880e8400-e29b-41d4-a716-446655440010 HTTP/1.1
@@ -310,6 +317,22 @@ At 10:21, a caller without an authenticated principal attempts to obtain the ico
 
 **Observable result**: The safe SVG remains available after restart. The rejected document never replaces it or executes in Alice's browser.
 
+**Compatibility example — visual features without a third-party fixture (US2.1, US2.3)**:
+
+At 10:22, Olivia repeats Journey 2's complete update for Atlas Files with `icon_svg` set to this original illustration:
+
+```xml
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="paint"><stop stop-color="#1670c5"/><stop offset="1" stop-color="#36b878"/></linearGradient><mask id="cutout"><rect width="64" height="64" fill="white"/><circle cx="32" cy="24" r="8" fill="black"/></mask><filter id="soft"><feGaussianBlur stdDeviation="0.4"/></filter></defs><style>.tile { fill: url(#paint); }</style><rect class="tile" x="4" y="4" width="56" height="40" mask="url(#cutout)" filter="url(#soft)"><animate attributeName="opacity" values="0.8;1;0.8" dur="2s" repeatCount="indefinite"/></rect><text x="4" y="60" font-family="sans-serif" font-size="10">Atlas</text></svg>
+```
+
+The update returns `200 OK`; Admin reads return the unchanged source. After restart and fresh data, Alice sees the gradient, cutout, blur, styled shape, text and opacity animation beside Atlas Files in consent and sessions. Visual checks compare the image with the same document in the browser's SVG image mode; successful decoding alone is insufficient. Animation comparisons use the same point in its timeline.
+
+Additional original examples cover other visual features rather than treating this document as an exhaustive vocabulary. No commercial logo, local download or fixed file hash is required for acceptance or for the repository.
+
+At 10:23, Olivia adds an `onload` event attribute. The request returns `400` without changing the stored illustration. She then supplies an otherwise valid document with an external paint reference. It can remain in accepted source, but browser image mode prevents the external load; the browser applies its normal missing-resource behavior. Network observation proves no request occurs. The server never resolves the reference.
+
+**Observable result**: Visual artwork needs no prescribed drawing vocabulary. Explicit active constructs fail atomically; browser image mode blocks unsafe rendering capabilities even when their references remain in source.
+
 ### Journey 3 — Recover from a Broken Image and Remove It (US1.3–US1.4, US3.2–US3.3)
 
 **Step 1 — 10:25:00: Alice's browser fails to load the current SVG icon**
@@ -352,6 +375,7 @@ An attempted replacement with `"icon_svg": "https://images.example.net/atlas.svg
 - **FR-013**: Invalid icon input MUST reject the entire service write. It MUST NOT change existing metadata, credentials, grants, or sessions.
 - **FR-014**: Icons MUST remain non-interactive decoration. The service name MUST remain visible and accessible independently of the image.
 - **FR-015**: Icon-only edits MUST preserve the service ID and unrelated configuration. Existing authorization and concurrency requirements MUST remain in effect.
+- **FR-016**: All SVG visual features supported by the target browser's image mode MUST be allowed when they satisfy the security requirements. This includes gradients, masks, filters, patterns, markers, clipping, text/font styling, embedded styles, local reuse, self-contained inert media and declarative visual animation; the examples are not an allowlist. Operators MUST NOT need to flatten artwork or remove harmless visual properties, namespaces, comments or metadata. Support MUST NOT depend on a specific logo, filename, hash or committed third-party asset. Standalone raster uploads remain outside this SVG-input feature.
 
 **Source semantics**: `icon_svg` is an optional, nullable string in writes. A supplied non-null value must be a nonempty, permitted SVG document. There is no operator-supplied URL field.
 
@@ -403,11 +427,13 @@ The isolation comes from the image rendering context, not from using a separate 
 - **SR-002**: Icon input MUST reject URLs and image paths, including same-origin paths. Only permitted SVG documents can become service icons.
 - **SR-003**: Icon display MUST cause zero requests to third-party origins. The chosen delivery mechanism MUST preserve existing frontend security controls, and planning MUST define any additional browser policy needed to enforce this restriction.
 - **SR-004**: SVG content MUST be a well-formed UTF-8 SVG document of at most 65,536 decoded bytes. Empty documents and non-SVG roots are invalid.
-- **SR-005**: SVG content MUST contain only static vector content. Scripts, event handlers, hyperlinks, foreign content, animation, document types, and entity declarations are prohibited.
-- **SR-006**: SVG content MUST NOT load external fonts, styles, images, or documents. These restrictions also apply to embedded styling and URL references.
-- **SR-007**: Accepted SVG MUST be rendered through `<img>`. Its markup MUST NOT be inserted into the page DOM or loaded through `<object>`, `<embed>`, or `<iframe>`. This requirement applies regardless of whether the chosen delivery mechanism carries SVG content in existing responses or retrieves it separately. Image-mode isolation MUST NOT replace validation under SR-004–SR-006.
+- **SR-005**: Upload validation MUST reject script elements, event-handler attributes, hyperlink elements, `foreignObject`, explicitly script-capable attribute URLs, document types, entity declarations and processing instructions other than an initial XML declaration. Checks MUST use parsed XML names and decoded attribute values, not XML regular expressions. Visual styles, filters, text, local reuse, media and declarative animation remain allowed. This is a named-construct rejection policy, not a complete SVG/CSS static capability analysis.
+- **SR-006**: The broker MUST NOT fetch SVG dependencies. Accepted content MUST be rendered only in browser SVG image mode, which disables scripts, interaction and external resource loads while permitting declarative animation. External references in CSS, attributes, media or animated values need not all fail upload; the rendering context must prevent their loads. Same-document and data references follow browser image-mode semantics. Source is not certified safe for inline SVG or active document embedding.
+- **SR-007**: Render accepted SVG exclusively through `<img>`. Never insert its markup into the page DOM or load it through `<object>`, `<embed>` or `<iframe>`. Deliver the source as authenticated JSON, not a navigable SVG resource. Image mode is the primary rendering security boundary, supplemented by the named upload rejections and existing frontend security controls.
 - **SR-008**: Rejected sources MUST remain unavailable to users. Rejection MUST NOT attempt to fetch referenced resources or silently accept a modified unsafe document.
 - **SR-009**: SVG content and image delivery MUST NOT introduce credentials or personal data into logs, traces, or metrics.
+- **SR-010**: XML validation MUST account for namespace identity and decoded attribute values for the named active-construct checks. It MUST NOT become a CSS, geometry, reference-graph or animation conformance checker. Unknown visual features, aliases, forward references and ignored visual values do not fail solely because they are not enumerated. No claim of complete static detection is made.
+- **SR-011**: Rendering-resource budgets and rendering stress tests are out of scope for operator-provided SVG. Retain the 65,536-byte input limit and basic XML validation. Do not claim these controls bound browser CPU/GPU work, memory, filter cost or animation lifetime.
 
 ### Frontend/Design System Requirements *(if applicable - document before implementation)*
 
@@ -433,6 +459,7 @@ The isolation comes from the image rendering context, not from using a separate 
 - **SC-004**: Every broken-to-valid replacement fixture recovers on the first delivery of fresh service data, without a full page reload.
 - **SC-005**: All prohibited-source fixtures fail without changing stored service data. Icon display causes zero third-party network requests or executable content.
 - **SC-006**: Keyboard and screen-reader review finds zero new focus stops or duplicate service announcements attributable to icons.
+- **SC-007**: Every original visual-feature example covering FR-016 passes its compatibility journey without manual preprocessing. After restart, consent and session views preserve the artwork against browser image-mode references with zero external requests. Test examples and verification do not require a third-party logo or a workstation-local file.
 
 ## Assumptions
 
@@ -444,6 +471,7 @@ The isolation comes from the image rendering context, not from using a separate 
 - Existing end-user authentication, Admin authorization, and service concurrency controls remain authoritative.
 - Existing data refresh and cache lifetimes remain in effect. This feature requires correct fresh data and source-change recovery, not live push updates.
 - Planning must finalize the documented external contracts before implementation. This specification does not itself approve or modify the OpenAPI documents.
+- Visual compatibility follows browser SVG image-mode support, not a finite drawing vocabulary. Original synthetic artwork supplies tests; no third-party brand asset is required. The approved image-mode boundary replaces comprehensive static capability detection. Rendering-resource budgets are explicitly out of scope for operator-provided artwork.
 
 **Acceptance traceability**:
 
@@ -451,7 +479,7 @@ The isolation comes from the image rendering context, not from using a separate 
 | --- | --- |
 | FR-001–FR-003, FR-007–FR-009 | US1.1, US2.1 |
 | FR-004 | US1.3, US1.4, US2.2 |
-| FR-005–FR-006, SR-001–SR-009 | US1.4, US2.1, US2.3, US2.4 |
+| FR-005–FR-006, FR-016, SR-001–SR-011, SC-007 | US1.4, US2.1, US2.3, US2.4 |
 | FR-010 | US3.1, US3.2 |
 | FR-011–FR-012 | US2.2, US3.3 |
 | FR-013, FR-015 | US1.2, US1.4, US2.3 |

@@ -15,7 +15,9 @@ The existing third-party service owns an optional **Service Icon**: an absent va
 | Session summary/detail projection | Optional `service_icon_svg` | Current referenced service source, not a session snapshot |
 | Available-service catalog | Optional `icon_svg` per distinct service | Agent-referenced requirements and permission-set services, redacted and deduplicated |
 
-`contracts/service-icons.md` defines the permitted XML vocabulary and external JSON semantics. Database checks protect null/nonempty/size shape; application validation enforces the full vocabulary. SQL `octet_length` measures bytes, not characters.
+`contracts/service-icons.md` defines named XML rejection checks and external JSON semantics. Database checks protect null/nonempty/size shape; application validation enforces the input contract. SQL `octet_length` measures bytes, not characters.
+
+Validation uses the named XML checks in `contracts/service-icons.md`, not a complete SVG/CSS sanitizer. The service owns the exact accepted source, including inert references. Browser image mode is its only supported rendering context. No parser-derived sanitized copy, rendering certification, reference-graph state or renderer-budget fields are stored. Invalid input fails before any service mutation.
 
 ## Write transitions
 
