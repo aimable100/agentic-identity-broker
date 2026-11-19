@@ -1818,11 +1818,6 @@ func (s *OAuth2SessionService) refreshLockedSession(ctx context.Context, princip
 			}
 			return false, refreshUnavailableError(ctx, current, nil)
 		}
-		var identityErr error
-		provider, identityErr = s.checkSessionIdentity(ctx, current, OperationRefresh)
-		if identityErr != nil {
-			return false, identityErr
-		}
 		var threshold *time.Time
 		if dueBy != nil {
 			due := dueBy()
@@ -1830,6 +1825,11 @@ func (s *OAuth2SessionService) refreshLockedSession(ctx context.Context, princip
 				return false, nil
 			}
 			threshold = &due
+		}
+		var identityErr error
+		provider, identityErr = s.checkSessionIdentity(ctx, current, OperationRefresh)
+		if identityErr != nil {
+			return false, identityErr
 		}
 		if !current.CanRefresh() {
 			return false, refreshUnavailableError(ctx, current, threshold)

@@ -842,8 +842,12 @@ func TestSessionSweepRepositoryFailuresAbortInsteadOfMiscounting(t *testing.T) {
 }
 
 func TestSessionSweepCredentialFileFailureDoesNotAbort(t *testing.T) {
-	for _, dryRun := range []bool{true, false} {
-		t.Run(fmt.Sprintf("dry_run=%t", dryRun), func(t *testing.T) {
+	for _, tc := range []struct {
+		dryRun  bool
+		renewed bool
+	}{{dryRun: true}, {}, {renewed: true}} {
+		t.Run(fmt.Sprintf("dry_run=%t/renewed=%t", tc.dryRun, tc.renewed), func(t *testing.T) {
+			dryRun := tc.dryRun
 			f := newSweepFixture(t)
 			records := memory.NewInMemoryThirdpartyOAuth2ProviderRepository()
 			f.providers = thirdparty.NewThirdpartyOAuth2ProviderService(records, f.seedEncryption, newNoopBranchKeyManager(), nil, false, slog.Default())
@@ -863,6 +867,21 @@ func TestSessionSweepCredentialFileFailureDoesNotAbort(t *testing.T) {
 			require.NoError(t, f.providers.Create(context.Background(), provider))
 			soon := time.Now().Add(time.Minute)
 			failed := f.seed(1, &soon, nil, true)
+			if tc.renewed {
+				f.expiry.afterList = func(page int, _ []*storage.UserSession) {
+					if page != 1 {
+						return
+					}
+					later := time.Now().Add(time.Hour)
+					_, err := f.repo.WithLockedSession(context.Background(), failed.Principal, failed.ServiceID, func(_ context.Context, current *storage.UserSession) (bool, error) {
+						current.AccessTokenExpiresAt = &later
+						return true, nil
+					})
+					require.NoError(t, err)
+					failed, err = f.repo.Get(context.Background(), failed.ID)
+					require.NoError(t, err)
+				}
+			}
 			f.serviceID = id.NewServiceID()
 			var providerCalls atomic.Int32
 			f.provider(func(w http.ResponseWriter, _ *http.Request) {
@@ -873,9 +892,13 @@ func TestSessionSweepCredentialFileFailureDoesNotAbort(t *testing.T) {
 
 			result, err := f.sweeper().Sweep(context.Background(), oauth2session.SweepRequest{DryRun: dryRun, PageSize: 1})
 			require.NoError(t, err, "a credential file failure must not be mistaken for a repository outage")
-			assertSweepCounts(t, result, 1, 0, 1, dryRun)
+			wantFailed, wantSkipped, wantReads := 1, 0, 1
+			if tc.renewed {
+				wantFailed, wantSkipped, wantReads = 0, 1, 0
+			}
+			assertSweepCounts(t, result, 1, wantSkipped, wantFailed, dryRun)
 			ids, pairs := reader.counts()
-			assert.Equal(t, 1, ids, "the failed file must actually be read")
+			assert.Equal(t, wantReads, ids, "only candidates still due need identity resolution")
 			assert.Zero(t, pairs, "a missing identity must stop before reading the secret")
 			persisted, err := f.repo.Get(context.Background(), failed.ID)
 			require.NoError(t, err)
@@ -889,7 +912,11 @@ func TestSessionSweepCredentialFileFailureDoesNotAbort(t *testing.T) {
 			} else {
 				assert.EqualValues(t, 1, providerCalls.Load(), "later candidates must still refresh")
 			}
-			assert.Contains(t, f.logs.String(), `"reason":"not_found"`)
+			if tc.renewed {
+				assert.NotContains(t, f.logs.String(), "session.oauth2.credential_source_failed")
+			} else {
+				assert.Contains(t, f.logs.String(), `"reason":"not_found"`)
+			}
 			assert.NotContains(t, f.logs.String(), "session.oauth2.sweep_aborted")
 			assert.NotContains(t, f.logs.String(), binding.ClientIDFile)
 			assert.NotContains(t, f.logs.String(), binding.ClientSecretFile)
