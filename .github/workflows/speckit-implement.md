@@ -19,11 +19,13 @@ on:
         default: 0
   # A repair run is started by the Container tests run that the App dispatched, so the App's bot is its actor.
   # speckit-assisted.yml routes a repair only for a base implementation that a maintainer started.
-  bots: ["zalando-incubator-agent-workflows[bot]"]
+  bots: ["${{ vars.AGENTIC_WORKFLOWS_APP_SLUG }}[bot]"]
 imports:
   - shared/speckit-common.md
   - shared/speckit-phase-instructions.md
 timeout-minutes: 180
+# Sub-agents share this model-call budget; the gateway's default of 500 covers only part of a feature.
+max-turns: 2000
 network:
   allowed:
     - local
@@ -51,8 +53,8 @@ safe-outputs:
   github-app:
     client-id: ${{ vars.AGENTIC_WORKFLOWS_APP_CLIENT_ID }}
     private-key: ${{ secrets.AGENTIC_WORKFLOWS_APP_PRIVATE_KEY }}
-    owner: zalando-incubator
-    repositories: [agentic-identity-broker]
+    owner: ${{ github.repository_owner }}
+    repositories: ["${{ github.repository }}"]
   report-failure-as-issue:
     - "!report_incomplete"
   threat-detection:
@@ -62,7 +64,7 @@ safe-outputs:
     # Reading branch protection needs Administration, which the App does not hold; Spec Kit branches are unprotected.
     check-branch-protection: false
     target: ${{ inputs.pr }}
-    required-title-prefix: "[Spec Kit] "
+    required-title-prefix: "[spec-driven] "
     base-branch: ${{ github.event.repository.default_branch }}
     allowed-files:
       - "internal/**"
