@@ -8,7 +8,7 @@
 
 **Organization**: Setup → mandatory design preconditions → foundation → US1 (P1) → US2 (P1) → US3 (P2) → mandatory compliance. Paths are relative to the repository root.
 
-**Task summary**: All 78 tasks are checked, including convergence T071–T078. Phase 7 package, API, backend-journey, and browser validation passes. T069 validation execution is complete, but its recorded security gate still fails on dependency advisories. Full fast Go, PostgreSQL/integration, backend E2E, and Docker E2E gates pass, as recorded in the final CI repair validation. Structural quality-delta remains non-clean.
+**Task summary**: All 80 tasks are checked. T079 records explicit user acceptance of F1 without code changes; T080 resolves F2's unknown-service failure logging. Phase 7 package, API, backend-journey, and browser validation passes. T069 validation execution is complete, but its recorded security gate still fails on dependency advisories. Full fast Go, PostgreSQL/integration, backend E2E, and Docker E2E gates pass, as recorded in the final CI repair validation. Structural quality-delta remains non-clean; Phase 8's scoped check has no gating findings.
 
 ## 🔒 Feature Scope [MANDATORY]
 
@@ -234,6 +234,7 @@ T001 approval record
   → Phase N T055–T069
   → Phase 6 T071–T075
   → Phase 7 T076 → T077 → T078
+  → Phase 8 T079 (accepted without change) → T080
 ```
 
 Acceptance recovery, foundation, and observability design are complete. T022 never depended on T033/T037. Historical completion does not imply that the original test-first order was followed.
@@ -772,3 +773,22 @@ All requested Go, PostgreSQL/integration, backend E2E, and Docker E2E gates pass
 The spec requires existing button variants without feature-specific colors. Session and service-requirement Login buttons use the standard secondary variant without green overrides. Existing success indicators remain unchanged.
 
 Validation: 54 component tests, ESLint, the production frontend build, and all eight client-identity browser recovery journeys passed. All six screenshot states were captured and inspected. The three affected session sign-in, reconnection-failure, and reconnection-decline screenshots were refreshed; the other tracked captures remain unchanged.
+
+## Phase 8: Convergence
+
+- [X] T079 Record F1 as accepted without code changes per the user's explicit direction on 2026-11-19. Keep the current session Login variant and colors; no contrast, shared-token, screenshot, or related UI change is requested.
+- [X] T080 CRITICAL — Give unknown-service authorization initiation one correctly leveled failure record across `internal/domain/oauth2session/service.go`, `client_identity.go`, `credentials.go`, and `internal/adapters/http/oauth2_sessions/handler.go`. A nonexistent service currently becomes a credential-source error, triggering the domain's Error-level `session.oauth2.credential_source_failed` record before the handler emits a second Warn and returns 404. Distinguish this caller-input outcome from unavailable identity infrastructure at the owning audit boundary; preserve existing error matching and the `404 service_not_found` response body, retain exactly one Warn record for the handled missing-service request, and keep genuine source failures at Error and identity denials at Warn. Extend the constructor-injected JSON-buffer real service-to-handler coverage in `internal/adapters/http/oauth2_sessions/handler_test.go` with a valid unknown service UUID, asserting status/body, one failure record, no Error-level infrastructure record, and safe bounded metadata; preserve existing initiation/callback/manual-refresh ownership coverage. Resolve F2 per Constitution XV, `coding-standards/LOGGING.md` section 3, SR-004, `contracts/observability.md` failure ownership, and T040/T064/T076 (contradicts).
+
+### Phase 8 disposition and validation
+
+F1 is accepted without code changes by explicit user direction. The current Login variant, colors, and screenshots remain unchanged; T079 records that disposition, not a contrast correction.
+
+F2 is resolved. Authorization initiation leaves the missing-service warning to the existing HTTP handler instead of also emitting a domain credential-source failure. The 404 status/body and both existing error matches remain unchanged. The real service-to-handler ownership regression now covers an unknown service UUID, asserting one Warn record, no credential-source failure event, and no sensitive values. Existing unavailable-source and callback identity/revision cases retain their level, metadata, and response assertions. The observability contract documents the ownership distinction.
+
+Validation performed:
+
+- `just check`: passed, zero lint issues.
+- `go test -race ./internal/adapters/http/oauth2_sessions ./internal/domain/oauth2session -count=1`: both packages passed, including the ownership regression and existing error-matching tests.
+- Scoped `ripwire --quality-delta --legend=compact`: zero gating findings; five minor complexity, verbosity, and self-churn findings remain. No suppression or acknowledgment was added.
+
+No full security, browser, or container gate was rerun. No commit or push was made.

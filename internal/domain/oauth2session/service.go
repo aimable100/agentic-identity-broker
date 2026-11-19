@@ -720,7 +720,11 @@ func (s *OAuth2SessionService) initiateOAuth2Flow(
 	redirectURI string,
 	consentStateID string,
 ) (result *InitiateFlowResult, resultErr error) {
-	defer func() { s.auditCredentialSourceFailure(ctx, serviceID, credentialOperationInitiation, resultErr) }()
+	defer func() {
+		if !errors.Is(resultErr, ErrServiceNotFound) {
+			s.auditCredentialSourceFailure(ctx, serviceID, credentialOperationInitiation, resultErr)
+		}
+	}()
 	if len(redirectURI) >= maxProviderStateBytes {
 		return nil, ErrStateTokenTooLarge
 	}
