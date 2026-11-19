@@ -31,7 +31,7 @@ The domain remains the existing service aggregate, no new entity or typed ID. Ex
 
 | Principles | Decision and remaining gate |
 |---|---|
-| I, III | Standard XML parser plus named rejections; browser secure animated image mode. Stakeholder approved the narrower upload claim. Security review and an Accepted timestamp-named ADR must precede implementation. No security toggle. |
+| I, III | Standard XML parser plus named rejections; browser secure animated image mode. Stakeholder approved the narrower upload claim. T004 blocks implementation until security review resolves all blocking findings and the timestamp-named ADR is Accepted. The review covers upload/rendering boundaries, authenticated JSON, copied-source limitations, supported-browser isolation and SPA-wide CSP effects. Record the reviewer and outcome. No security toggle. |
 | II, V | Add Service Icon glossary/trust-boundary text to ARCHITECTURE.md and record the approved source-versus-rendering distinction in the ADR. Accepted `004-storage-layer-architecture` and `035-root-mounted-spa` remain binding. |
 | IV, X | Proposed fields remain in contracts/. API approval is not inferred from the security decision. Obtain explicit confirmation, publish both canonical OpenAPI contracts and rendered docs before behavior. Preserve released logoUrl semantics. |
 | VI, XII | Domain service enforces source invariants; existing ports/adapters persist/project. No handler-to-repository shortcut or routing construction. No new dependency requiring builder changes. |
@@ -41,7 +41,7 @@ The domain remains the existing service aggregate, no new entity or typed ID. Ex
 | XI, XIV | Existing semantic tokens, decorative image semantics, visible names, existing wireframes and original inline illustration. No required third-party artwork. |
 | XV | No new telemetry; review existing error paths so source/credentials never enter signals. Read binding standards before changing telemetry. |
 
-**Gate outcome:** Design is specified with no unresolved technical selection. Implementation remains blocked by API confirmation/publication, glossary/ADR acceptance and test-first prerequisites. These are not waived. Rendering quotas are explicitly out of scope, not an unimplemented security promise. Regenerate tasks before coding; existing tasks are not the new execution authority.
+**Gate outcome:** Design is specified with no unresolved technical selection. Implementation remains blocked by security review, resolution of blocking findings, API confirmation/publication, glossary/ADR acceptance and test-first prerequisites. These gates are not waived. Rendering quotas are explicitly out of scope, not an unimplemented security promise. The regenerated `tasks.md` records these prerequisites and their execution order.
 
 ## Project Structure
 

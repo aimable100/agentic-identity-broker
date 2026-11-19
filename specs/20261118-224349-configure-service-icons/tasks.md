@@ -20,7 +20,7 @@ All subphases must finish before production behavior changes. Test-owned harness
 ### Phase 2a: Domain Model & Glossary
 
 - [ ] T003 Add Service Icon and its service-aggregate relationship to `ARCHITECTURE.md` and its glossary, reconciled with `specs/20261118-224349-configure-service-icons/data-model.md`; retain existing service IDs, no icon repository and no session snapshot (FR-003/007/009; Constitution II/V/VI).
-- [ ] T004 Create and obtain actual acceptance of a UTC timestamp-named ADR under `adrs/` for named upload rejections, browser image-mode isolation, exact-source JSON delivery, source-reuse limitations, payload cost and the stakeholder's explicit rendering-resource descope; record its full file stem in `ARCHITECTURE.md` and `specs/20261118-224349-configure-service-icons/plan.md`. Do not equate task generation with acceptance (SR-005–SR-011; Constitution II).
+- [ ] T004 Create a UTC timestamp-named ADR under `adrs/` for named upload rejections, browser image-mode isolation, exact-source JSON delivery, source-reuse limitations, payload cost and the explicit rendering-resource descope. Complete security review of the upload/rendering boundary before implementation. Include authenticated JSON delivery, copied-source limitations, supported-browser isolation and SPA-wide CSP effects. Record the reviewer, review outcome and resolution of blocking findings in `specs/20261118-224349-configure-service-icons/plan.md`. Obtain actual ADR acceptance and record its full file stem in `ARCHITECTURE.md` and `plan.md`. Security review and ADR acceptance are separate blocking conditions. Task generation satisfies neither condition (SR-001–SR-011; Constitution I/II/III).
 
 ### Phase 2b: Configuration Design
 
@@ -51,7 +51,7 @@ All subphases must finish before production behavior changes. Test-owned harness
 
 - [ ] T015 Read `coding-standards/LOGGING.md` and `OPENTELEMETRY.md`; record in `specs/20261118-224349-configure-service-icons/plan.md` that no new telemetry is planned and identify existing write/error paths requiring source/credential non-disclosure protection. If changing telemetry becomes necessary, design its required tests/contracts/registry entries before touching it; do not add speculative instruments (SR-009; Constitution XV).
 
-**Checkpoint:** Actual ADR/API approvals, canonical publication, model/migration design, UI review, examples and all twelve meaningful compiling acceptance cases are complete. No production implementation before this checkpoint.
+**Checkpoint:** Security review has no unresolved blocking findings. Actual ADR/API approvals, canonical publication, model/migration design, UI review, examples and all twelve meaningful compiling acceptance cases are complete. No production implementation before this checkpoint.
 
 ## Phase 2.5: Shared Foundations
 
@@ -99,7 +99,7 @@ Security, isolation and baseline fallback are present before any icon is accepte
 **Goal:** Prove broad visual support, precise named rejection and actual image-mode isolation without claiming original-source certification.
 **Independent test:** US2.1–US2.4 use original visuals, real PostgreSQL restart, built-SPA browser observation, fresh replacement and unauthenticated denial. Already-approved external references may remain in accepted source.
 
-- [ ] T037 [US2] Complete positive/negative regression coverage in `internal/domain/model/service_icon_test.go` for namespace/case/character-reference variants of every named rule in `contracts/service-icons.md`, paired with valid styles, local reuse, Unicode, metadata, external references and animation. Add failing regressions before correcting shared validation defects in `internal/domain/model/service_icon.go`; do not add CSS/reference-graph analysis or rendering limits (FR-016; SR-004/005/010/011).
+- [ ] T037 [US2] Address validator defects discovered during US2 browser/integration checks. Before each correction in `internal/domain/model/service_icon.go`, add a failing regression in `internal/domain/model/service_icon_test.go`. T016 owns the complete named-rule matrix. Do not duplicate that matrix or add CSS/reference-graph analysis or rendering limits. If no additional validator defects arise, record that outcome in `specs/20261118-224349-configure-service-icons/quickstart.md` (FR-016; SR-004/005/010/011).
 - [ ] T038 [US2] Drive US2.1/US2.3 in `tests/e2e/frontend/service_icons_test.go` through built SPA and supported Chromium/Firefox/WebKit: original effects/text/style/media/local-reuse/animation retain visual fidelity after PostgreSQL restart; explicit constructs reject atomically; accepted external references in attributes/CSS/animated values never fetch or execute. Use actual network/execution observation and no inserted SVG DOM, not only mocked image events (FR-006/016; SR-003/005–SR-007).
 - [ ] T039 [US2] Exercise US2.2 in `tests/e2e/frontend/service_icons_test.go` across scoped/catalog/requirement/session identity surfaces: replace one of two identical-source services, observe genuinely fresh responses, match browser image-mode rendering at equal animation times and leave the other service unchanged. Fix only feature mapping/image defects, with regressions preceding fixes in their existing test files (FR-011/012/015/016).
 - [ ] T040 [US2] Complete US2.4 and write-atomicity checks in `tests/e2e/service_icons_test.go`, `internal/adapters/http/handlers/admin/service_icons_test.go` and `tests/integration/storage/service_icons_test.go`: all actual delivery paths enforce existing principal/ownership boundaries; invalid writes alongside credentials/metadata change nothing. Add no public/navigable SVG route (SR-001/007–SR-009; FR-013/015).
@@ -146,12 +146,12 @@ flowchart TD
   US3 --> Compliance[Compliance T046-T052]
 ```
 
-- T001 precedes scoped work. T002 fixes actual migration filenames before T008/T029. All of Phase 2 blocks behavior. T004 and T006 require real approval, not inferred consent; T007 follows T006, T010 follows approved contracts, T011–T013 follow T010, T014 follows their authoring and T015 closes applicability before implementation.
+- T001 precedes scoped work. T002 fixes actual migration filenames before T008/T029. All of Phase 2 blocks behavior. T004 requires completed security review, resolution of blocking findings and actual ADR acceptance. T006 requires explicit API approval. T007 follows T006, T010 follows approved contracts, T011–T013 follow T010, T014 follows their authoring and T015 closes applicability before implementation.
 - T011 and T012 own different suite files and may be authored concurrently once contracts settle. T013 follows T012 because both edit the same browser file. Minimal type/signature setup for compilation is not permission to implement behavior before the test-first gate.
 - Foundations have three chains: T016→T017, T018→T019 and T020→T021. Test-authoring streams can overlap after design gates; implementations follow their own tests. These foundations cannot be omitted from the US1 increment.
 - US1: T022/T023/T024 are disjoint test slices. T028 follows T022/T023; T029 follows T008/T024; T030 follows T028/T029; T031 follows T030. T025 precedes T032/T033. T026/T027 precede T034/T035, even though T033 is a backend task. T034 follows T032/T033, T035 follows T019/T034; T036 follows all US1 work. Serialize changes to shared model/read-model files.
 - All stories are P1 and overlap on one end-to-end path. US1 supplies the usable lifecycle; US2 proves image-mode capabilities and US3 proves fallback/accessibility without deferring those baseline controls. Each has standalone scenario checks on the shared implementation, not an independently deployable substitute.
-- T037 precedes fixes it exposes. T038/T039 and T042–T044 share the canonical browser file and must be integrated sequentially. Focused unit checks can run independently of isolated browser suites; no shared fixture/database state.
+- US2 browser/integration checks can expose additional validator defects. T037 adds a failing regression before each resulting validator correction. T038/T039 and T042–T044 share the canonical browser file and must be integrated sequentially. Focused unit checks can run independently of isolated browser suites; no shared fixture/database state.
 - Phase 6 requires all three stories. Run the broad release gate once after integration, not between every mechanical edit. Any newly revealed defect gets a regression before a root-cause fix; do not hide failures by narrowing coverage.
 
 ## Parallel Execution Examples
@@ -162,7 +162,7 @@ After design/foundations, T022 Admin tests, T023 domain tests and T024 persisten
 
 ### User Story 2
 
-After US1, T037 validator regression work and T040 backend authentication/atomicity coverage can be independent owned slices with isolated test state. T038/T039 browser cases share a file and remain serial. T041 can run already-authored focused unit and browser suites concurrently only with isolated state; no renderer stress work is added.
+After US1, T038 browser isolation checks and T040 backend authentication/atomicity checks can run concurrently with isolated test state. T037 handles validator defects these checks discover, with regressions before corrections. T038/T039 browser cases share a file and remain serial. T041 verifies the integrated result with isolated suites. No renderer stress work is added.
 
 ### User Story 3
 
