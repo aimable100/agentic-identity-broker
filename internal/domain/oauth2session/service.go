@@ -899,6 +899,9 @@ func (s *OAuth2SessionService) createSession(
 		return true, nil
 	})
 	if err != nil {
+		if errors.Is(err, model.ErrCredentialSourceUnavailable) {
+			return nil, sessionOperationError(ctx, OperationCodeExchange, DetailCredentialSourceUnavailable, err)
+		}
 		failure := sessionOperationError(ctx, OperationCodeExchange, DetailPersistenceFailed, err)
 		s.logger.ErrorContext(ctx, "failed to update existing session", "service_id", serviceID, "oauth2_session", failure.Metadata())
 		return nil, failure
@@ -934,6 +937,9 @@ func (s *OAuth2SessionService) createSession(
 	// The unique key chooses the winner even when both callbacks observed no session.
 	session, err = s.sessionRepo.CreateIfAbsent(ctx, session)
 	if err != nil {
+		if errors.Is(err, model.ErrCredentialSourceUnavailable) {
+			return nil, sessionOperationError(ctx, OperationCodeExchange, DetailCredentialSourceUnavailable, err)
+		}
 		failure := sessionOperationError(ctx, OperationCodeExchange, DetailPersistenceFailed, err)
 		s.logger.ErrorContext(ctx, "failed to create session", "service_id", serviceID, "oauth2_session", failure.Metadata())
 		return nil, failure
@@ -1042,6 +1048,9 @@ func (s *OAuth2SessionService) HandleCallback(
 	// Create and store session
 	session, err := s.createSession(ctx, principal, req.ServiceID, token, scopes, claims)
 	if err != nil {
+		if errors.Is(err, model.ErrCredentialSourceUnavailable) {
+			return nil, err
+		}
 		s.logger.ErrorContext(ctx, "failed to create session from token", "service_id", req.ServiceID, "oauth2_session", sessionFailureMetadata(err))
 		return nil, fmt.Errorf("failed to create session: %w", err)
 	}

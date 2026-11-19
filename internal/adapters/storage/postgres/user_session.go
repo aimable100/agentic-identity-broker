@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/id"
+	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/model"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/storage"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/ports"
 	"github.com/lib/pq"
@@ -165,6 +166,7 @@ func (r *PostgresUserSessionRepository) create(ctx context.Context, session *sto
 		SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $18
 		FROM thirdparty_oauth2_services AS service
 		WHERE service.id = $3
+			AND ($19::boolean OR service.client_identity_revision = $18)
 			AND ((service.resource_url IS NULL AND $16::text = '' AND $17::text = '')
 				OR (service.resource_url IS NOT NULL AND $16::text <> '' AND $17::text <> ''
 					AND service.issuer_uri = $16::text AND service.authorization_params ->> 'resource' = $17::text))
@@ -196,7 +198,7 @@ func (r *PostgresUserSessionRepository) create(ctx context.Context, session *sto
 		session.TokenType, session.AccessTokenExpiresAt, session.RefreshRejectedAt,
 		pq.Array(session.Scope), session.EncryptionContext,
 		session.InitiatedAt, session.CreatedAt, session.UpdatedAt,
-		session.CallbackID, upstreamClientID, session.ExpectedIssuerURI, session.ExpectedResource, session.UpstreamClientRevision,
+		session.CallbackID, upstreamClientID, session.ExpectedIssuerURI, session.ExpectedResource, session.UpstreamClientRevision, replace,
 	)
 	if err != nil {
 		return nil, r.wrapError(err, "Create")
@@ -213,8 +215,9 @@ func (r *PostgresUserSessionRepository) create(ctx context.Context, session *sto
 		// INSERT ... SELECT inserts nothing for a missing service, a stale provider
 		// expectation, or (without replace) an existing session.
 		var probe struct {
-			ServiceExists   bool `db:"service_exists"`
-			ProviderMatches bool `db:"provider_matches"`
+			ServiceExists         bool `db:"service_exists"`
+			ProviderMatches       bool `db:"provider_matches"`
+			ClientRevisionMatches bool `db:"client_revision_matches"`
 		}
 		readCtx, cancel := context.WithTimeout(ctx, r.adapter.timeouts.Read)
 		err = r.adapter.db.GetContext(readCtx, &probe, `SELECT
@@ -224,13 +227,17 @@ func (r *PostgresUserSessionRepository) create(ctx context.Context, session *sto
 				WHERE id = $1 AND ((resource_url IS NULL AND $2::text = '' AND $3::text = '')
 					OR (resource_url IS NOT NULL AND $2::text <> '' AND $3::text <> ''
 						AND issuer_uri = $2::text AND authorization_params ->> 'resource' = $3::text))
-			) AS provider_matches`, session.ServiceID, session.ExpectedIssuerURI, session.ExpectedResource)
+			) AS provider_matches,
+			EXISTS (SELECT 1 FROM thirdparty_oauth2_services WHERE id = $1 AND client_identity_revision = $4) AS client_revision_matches`, session.ServiceID, session.ExpectedIssuerURI, session.ExpectedResource, session.UpstreamClientRevision)
 		cancel()
 		if err != nil {
 			return nil, r.wrapError(err, operation)
 		}
 		if !probe.ServiceExists {
 			return nil, storage.NewStorageError(operation, storage.ErrorKindNotFound, nil, "service not found")
+		}
+		if !replace && !probe.ClientRevisionMatches {
+			return nil, storage.NewStorageError(operation, storage.ErrorKindConflict, model.NewCredentialSourceError(model.CredentialSourceReasonIdentitySuperseded), "client identity revision changed")
 		}
 		if replace || !probe.ProviderMatches {
 			return nil, storage.NewStorageError(operation, storage.ErrorKindConflict, nil, "service issuer, audience, or source changed")
@@ -347,6 +354,18 @@ func (r *PostgresUserSessionRepository) WithLockedSession(ctx context.Context, p
 	if updated {
 		if err := session.Validate(); err != nil {
 			return nil, storage.NewStorageError("WithLockedSession", storage.ErrorKindValidation, err, "invalid session")
+		}
+		if session.CallbackID != rec.CallbackID {
+			var revision int64
+			readCtx, cancel := context.WithTimeout(ctx, r.adapter.timeouts.Read)
+			err = tx.GetContext(readCtx, &revision, `SELECT client_identity_revision FROM thirdparty_oauth2_services WHERE id = $1 FOR SHARE`, serviceID)
+			cancel()
+			if err != nil {
+				return nil, r.wrapError(err, "WithLockedSession")
+			}
+			if revision != session.UpstreamClientRevision {
+				return nil, storage.NewStorageError("WithLockedSession", storage.ErrorKindConflict, model.NewCredentialSourceError(model.CredentialSourceReasonIdentitySuperseded), "client identity revision changed")
+			}
 		}
 		writeCtx, cancel := context.WithTimeout(ctx, r.adapter.timeouts.Write)
 		_, err = tx.ExecContext(writeCtx, `UPDATE user_sessions SET encrypted_access_token = $1, encrypted_refresh_token = $2,

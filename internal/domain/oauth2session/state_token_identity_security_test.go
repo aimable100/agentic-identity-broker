@@ -220,7 +220,8 @@ func TestClientIdentityStateRevisionRoundtripRetainsExplicitZero(t *testing.T) {
 
 type identityCreationRepository struct {
 	ports.UserSessionRepository
-	created *storage.UserSession
+	created   *storage.UserSession
+	createErr error
 }
 
 func (r *identityCreationRepository) FindByPrincipalAndService(context.Context, id.Principal, id.ServiceID) (*storage.UserSession, error) {
@@ -228,6 +229,9 @@ func (r *identityCreationRepository) FindByPrincipalAndService(context.Context, 
 }
 
 func (r *identityCreationRepository) CreateIfAbsent(_ context.Context, session *storage.UserSession) (*storage.UserSession, error) {
+	if r.createErr != nil {
+		return nil, r.createErr
+	}
 	if r.created == nil {
 		r.created = session
 	}
@@ -296,42 +300,81 @@ func TestClientIdentityFailedCurrentCallbackPreservesPreviousSessionEvidence(t *
 }
 
 func TestClientIdentityChangeDuringCodeExchangeCannotEstablishCurrentConnection(t *testing.T) {
-	service, provider, session, store, _ := newIdentityCallbackFixture(t, "public")
-	revision := provider.ClientIdentityRevision
-	state := identityCallbackState(t, service, provider, session, session.UpstreamClientID, &revision)
-	service.httpClient.Transport = operationTransport(func(*http.Request) (*http.Response, error) {
-		provider.ClientID = "identity-new-during-exchange-sentinel"
-		provider.ClientIdentity = identityPointer(provider.ClientID.String())
-		provider.ClientIdentityRevision = revision + 1
-		return operationTokenResponse(200, `{"access_token":"old-exchange-result","refresh_token":"old-exchange-refresh","expires_in":3600}`), nil
-	})
-	result, callbackErr := service.HandleCallback(context.Background(), session.Principal, &HandleCallbackRequest{ServiceID: provider.ID, Code: "old-code", State: state})
-	if callbackErr == nil {
-		require.NotNil(t, result)
-		assert.Equal(t, revision, result.Session.UpstreamClientRevision)
-		assert.Equal(t, session.UpstreamClientID, result.Session.UpstreamClientID)
-	} else {
-		assert.ErrorIs(t, callbackErr, model.ErrCredentialSourceUnavailable)
+	for _, rollback := range []bool{false, true} {
+		t.Run(fmt.Sprintf("rollback=%t", rollback), func(t *testing.T) {
+			service, provider, session, store, logs := newIdentityCallbackFixture(t, "public")
+			revision := provider.ClientIdentityRevision
+			state := identityCallbackState(t, service, provider, session, session.UpstreamClientID, &revision)
+			before, err := store.find(context.Background(), session.Principal, provider.ID)
+			require.NoError(t, err)
+			service.httpClient.Transport = operationTransport(func(*http.Request) (*http.Response, error) {
+				provider.ClientID = "identity-new-during-exchange-sentinel"
+				provider.ClientIdentityRevision++
+				if rollback {
+					provider.ClientID = *session.UpstreamClientID
+					provider.ClientIdentityRevision++
+				}
+				provider.ClientIdentity = identityPointer(provider.ClientID.String())
+				return operationTokenResponse(200, `{"access_token":"old-exchange-result","refresh_token":"old-exchange-refresh","expires_in":3600}`), nil
+			})
+			result, callbackErr := service.HandleCallback(context.Background(), session.Principal, &HandleCallbackRequest{ServiceID: provider.ID, Code: "old-code", State: state})
+			assert.Nil(t, result)
+			assert.ErrorIs(t, callbackErr, model.ErrCredentialSourceUnavailable)
+			var source *model.CredentialSourceError
+			require.ErrorAs(t, callbackErr, &source)
+			want := model.CredentialSourceReasonIdentityMismatch
+			if rollback {
+				want = model.CredentialSourceReasonIdentitySuperseded
+			}
+			assert.Equal(t, want, source.Reason)
+			beforeReconnect, err := store.find(context.Background(), session.Principal, provider.ID)
+			require.NoError(t, err)
+			assert.Equal(t, before, beforeReconnect)
+			assertIdentityFailureEvent(t, logs, provider.ID, "code_exchange", want)
+			got, token, err := service.GetValidAccessToken(context.Background(), session.Principal, provider.ID)
+			assert.Nil(t, got)
+			assert.Empty(t, token)
+			assert.ErrorIs(t, err, model.ErrCredentialSourceUnavailable)
+			currentRevision := provider.ClientIdentityRevision
+			currentIdentity := identityPointer(provider.ClientID.String())
+			fresh := identityCallbackState(t, service, provider, beforeReconnect, currentIdentity, &currentRevision)
+			service.httpClient.Transport = operationTransport(func(*http.Request) (*http.Response, error) {
+				return operationTokenResponse(200, `{"access_token":"fresh-current-access","refresh_token":"fresh-current-refresh","expires_in":3600}`), nil
+			})
+			result, err = service.HandleCallback(context.Background(), session.Principal, &HandleCallbackRequest{ServiceID: provider.ID, Code: "fresh-code", State: fresh})
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			assert.Equal(t, currentRevision, result.Session.UpstreamClientRevision)
+			assert.Equal(t, currentIdentity, result.Session.UpstreamClientID)
+			_, token, err = service.GetValidAccessToken(context.Background(), session.Principal, provider.ID)
+			require.NoError(t, err)
+			assert.Equal(t, "fresh-current-access", token)
+		})
 	}
-	got, token, err := service.GetValidAccessToken(context.Background(), session.Principal, provider.ID)
-	assert.Nil(t, got)
-	assert.Empty(t, token)
-	assert.ErrorIs(t, err, model.ErrCredentialSourceUnavailable)
-	beforeReconnect, err := store.find(context.Background(), session.Principal, provider.ID)
-	require.NoError(t, err)
-	assert.Equal(t, revision, beforeReconnect.UpstreamClientRevision, "an old result cannot adopt the new revision")
-	currentRevision := provider.ClientIdentityRevision
-	currentIdentity := identityPointer(provider.ClientID.String())
-	fresh := identityCallbackState(t, service, provider, beforeReconnect, currentIdentity, &currentRevision)
-	service.httpClient.Transport = operationTransport(func(*http.Request) (*http.Response, error) {
-		return operationTokenResponse(200, `{"access_token":"fresh-current-access","refresh_token":"fresh-current-refresh","expires_in":3600}`), nil
-	})
-	result, err = service.HandleCallback(context.Background(), session.Principal, &HandleCallbackRequest{ServiceID: provider.ID, Code: "fresh-code", State: fresh})
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	assert.Equal(t, currentRevision, result.Session.UpstreamClientRevision)
-	assert.Equal(t, currentIdentity, result.Session.UpstreamClientID)
-	_, token, err = service.GetValidAccessToken(context.Background(), session.Principal, provider.ID)
-	require.NoError(t, err)
-	assert.Equal(t, "fresh-current-access", token)
+}
+
+func TestClientIdentityPersistenceDenialHasOneSafeFailure(t *testing.T) {
+	for _, initial := range []bool{false, true} {
+		t.Run(fmt.Sprintf("initial=%t", initial), func(t *testing.T) {
+			service, provider, session, _, logs := newIdentityCallbackFixture(t, "public")
+			conflict := storage.NewStorageError("callback", storage.ErrorKindConflict, model.NewCredentialSourceError(model.CredentialSourceReasonIdentitySuperseded), "client identity revision changed")
+			service.refreshRepo = operationRefreshRepository(func(context.Context, id.Principal, id.ServiceID, func(context.Context, *storage.UserSession) (bool, error)) (*storage.UserSession, error) {
+				if initial {
+					return nil, nil
+				}
+				return nil, conflict
+			})
+			baseline := *session
+			if initial {
+				baseline.ID = id.SessionID{}
+				service.sessionRepo = &identityCreationRepository{createErr: conflict}
+			}
+			state := identityCallbackState(t, service, provider, &baseline, session.UpstreamClientID, &provider.ClientIdentityRevision)
+			result, err := service.HandleCallback(context.Background(), session.Principal, &HandleCallbackRequest{ServiceID: provider.ID, Code: "identity-code-sentinel", State: state})
+			assert.Nil(t, result)
+			assert.ErrorIs(t, err, model.ErrCredentialSourceUnavailable)
+			assert.Equal(t, DetailCredentialSourceUnavailable, sessionFailureMetadata(err).Detail())
+			assertIdentityFailureEvent(t, logs, provider.ID, "code_exchange", model.CredentialSourceReasonIdentitySuperseded)
+		})
+	}
 }

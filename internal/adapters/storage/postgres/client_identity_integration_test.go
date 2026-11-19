@@ -29,11 +29,17 @@ func TestPostgresSessionClientRevisionEstablishment(t *testing.T) {
 	ctx := context.Background()
 	provider := newTestEntity()
 	require.NoError(t, NewPostgresThirdpartyOAuth2ProviderRepository(adapter).Create(ctx, provider))
+	_, err := adapter.db.ExecContext(ctx, `UPDATE thirdparty_oauth2_services SET client_identity_revision = 7 WHERE id = $1`, provider.ID)
+	require.NoError(t, err)
 	repo := NewUserSessionRepository(adapter)
 	for _, reconnect := range []bool{false, true} {
 		session := &storage.UserSession{ID: id.NewSessionID(), Principal: id.Principal(id.NewSessionID().String()), ServiceID: provider.ID, CallbackID: "first", UpstreamClientID: new(id.ClientID("reports")), UpstreamClientRevision: 7, EncryptedAccessToken: []byte("ciphertext"), TokenType: "Bearer", Scope: []string{"read"}, InitiatedAt: time.Now(), CreatedAt: time.Now(), UpdatedAt: time.Now()}
 		_, err := repo.CreateIfAbsent(ctx, session)
 		require.NoError(t, err)
+		if reconnect {
+			_, err := adapter.db.ExecContext(ctx, `UPDATE thirdparty_oauth2_services SET client_identity_revision = 8 WHERE id = $1`, provider.ID)
+			require.NoError(t, err)
+		}
 		updated, err := repo.WithLockedSession(ctx, session.Principal, session.ServiceID, func(_ context.Context, current *storage.UserSession) (bool, error) {
 			assert.Equal(t, int64(7), current.UpstreamClientRevision)
 			current.UpstreamClientRevision = 8

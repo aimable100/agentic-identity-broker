@@ -261,7 +261,9 @@ type UserSessionRepository interface {
 
 	// CreateIfAbsent inserts a first connection without replacing a competing callback's session.
 	// Returns the inserted session or the existing winner.
-	// It returns the same NotFound and Conflict errors as Create.
+	// Insertion is atomic with a check of the service's current client identity revision.
+	// A superseded revision returns Conflict wrapping a CredentialSourceError.
+	// It otherwise returns the same NotFound and Conflict errors as Create.
 	CreateIfAbsent(ctx context.Context, session *storage.UserSession) (*storage.UserSession, error)
 
 	// Get retrieves a session by ID.
@@ -305,6 +307,8 @@ type UserSessionRepository interface {
 // only when it has changed the session and the adapter must atomically persist the encrypted
 // tokens, access expiry, refresh rejection, token type, scope, encryption context and callback generation.
 // Only a new callback generation may replace the established upstream client identity.
+// Such a write atomically checks the service's current client identity revision;
+// a superseded revision returns Conflict wrapping a CredentialSourceError without changing the session.
 // A nil session means the principal has no session for that service.
 type UserSessionRefreshRepository interface {
 	WithLockedSession(ctx context.Context, principal id.Principal, serviceID id.ServiceID, refresh func(context.Context, *storage.UserSession) (bool, error)) (*storage.UserSession, error)
