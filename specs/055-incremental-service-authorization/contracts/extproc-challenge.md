@@ -77,6 +77,6 @@ Without the metadata field, the header is identical except that `resource_metada
 
 ## 4. Logging
 
-ExtProc never logs credentials. It logs the scope only as `challenge.scope_present=true|false` and
-`challenge.resource_metadata_present=true|false`. The broker-provided URLs are already public
+ExtProc never logs credentials. It logs the scope only as `token_exchange.challenge_scope_present=true|false` and
+`token_exchange.challenge_resource_metadata_present=true|false`. The broker-provided URLs are already public
 action links, but the logging footprint stays unchanged apart from these booleans.

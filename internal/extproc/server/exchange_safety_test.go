@@ -290,10 +290,10 @@ func TestInvalidChallengeMetadataNeverReachesTelemetry(t *testing.T) {
 					assert.Equal(t, "WARN", record["level"])
 					assert.NotContains(t, record, "event", "advisory diagnostics are exempt")
 				}
-				if present, ok := record["challenge.scope_present"]; ok {
+				if present, ok := record["token_exchange.challenge_scope_present"]; ok {
 					challenge++
 					assert.Equal(t, true, present)
-					assert.Equal(t, false, record["challenge.resource_metadata_present"])
+					assert.Equal(t, false, record["token_exchange.challenge_resource_metadata_present"])
 				}
 			}
 			assert.Equal(t, 1, invalid)

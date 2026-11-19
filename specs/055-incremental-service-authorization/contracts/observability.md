@@ -44,7 +44,7 @@ building that denial's redirect fails. Telemetry never changes the existing HTTP
 
 The invalid optional metadata diagnostic (`challenge_metadata_invalid` in the design) uses a constant message phrase such as `challenge metadata invalid`, Warn level, and only the fixed field name `resource_metadata_url` plus existing bounded token-exchange diagnostics. It never includes the rejected value. This advisory diagnostic can omit `event` under LOGGING §2.2.
 
-The existing challenge record adds only `challenge.scope_present` and `challenge.resource_metadata_present`, each with value set `{true, false}`. These are log attributes, not span or metric attributes. Omit invalid optional values from the challenge without changing its status, body, exchange result or authorization decision.
+The existing challenge record adds only `token_exchange.challenge_scope_present` and `token_exchange.challenge_resource_metadata_present`, each with value set `{true, false}`. These are log attributes, not span or metric attributes. Omit invalid optional values from the challenge without changing its status, body, exchange result or authorization decision.
 
 ## Traces and metrics
 

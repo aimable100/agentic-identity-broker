@@ -1015,8 +1015,8 @@ func (s *Server) exchangeErrorResponse(ctx context.Context, err error, resourceM
 				slog.String("field", resourceMetadataURLFieldKey))
 		}
 		logOperationError(ctx, logger, slog.LevelInfo, "token exchange requires re-authentication — returning 403 insufficient_scope challenge", metadata, diagnostic,
-			slog.Bool("challenge.scope_present", validChallengeScope(brokerErr.Scope)),
-			slog.Bool("challenge.resource_metadata_present", metadataURL != ""))
+			slog.Bool("token_exchange.challenge_scope_present", validChallengeScope(brokerErr.Scope)),
+			slog.Bool("token_exchange.challenge_resource_metadata_present", metadataURL != ""))
 		return reauthChallengeResponse(brokerErr.ErrorURI, brokerErr.Description, brokerErr.Scope, metadataURL), diagnostic
 	}
 
