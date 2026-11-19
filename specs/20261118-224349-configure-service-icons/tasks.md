@@ -1,7 +1,7 @@
 # Tasks: Configurable Third-Party Service Icons
 
 **Input**: `specs/20261118-224349-configure-service-icons/` — spec.md, plan.md, research.md, data-model.md, contracts/ and quickstart.md.
-**Status**: API drafts explicitly approved by the stakeholder in this conversation; T006 is complete. Production implementation has not started. Security review, ADR acceptance and canonical API publication remain separate gates.
+**Status**: All stakeholder approvals for the current design are complete, including API drafts, security design and CSP. T006 is complete. Production implementation has not started. Security analysis, ADR authoring, canonical API publication and test-first cases remain work, not further sign-off requirements.
 **Tests**: Required by the spec and Constitution VIII/XIII. Write meaningful tests before behavior; tests must compile and fail semantically, not through missing imports or undefined symbols. Use only minimal production signatures/types where needed to make test-first work compile; no final stubs, test-only production APIs or skipped/pending cases. Container-backed local red runs may first occur in CI under the constitution; archived red-run evidence is not required.
 
 ## Feature Scope
@@ -20,7 +20,7 @@ All subphases must finish before production behavior changes. Test-owned harness
 ### Phase 2a: Domain Model & Glossary
 
 - [ ] T003 Add Service Icon and its service-aggregate relationship to `ARCHITECTURE.md` and its glossary, reconciled with `specs/20261118-224349-configure-service-icons/data-model.md`; retain existing service IDs, no icon repository and no session snapshot (FR-003/007/009; Constitution II/V/VI).
-- [ ] T004 Create a UTC timestamp-named ADR under `adrs/` for named upload rejections, browser image-mode isolation, exact-source JSON delivery, source-reuse limitations, payload cost and the explicit rendering-resource descope. Complete security review before implementation, including authenticated JSON, copied-source limitations, Chromium isolation and remote-avatar compatibility under the revised CSP. Record the reviewer, outcome and resolution of blocking findings in `specs/20261118-224349-configure-service-icons/plan.md`. Obtain ADR acceptance and record its full file stem in `ARCHITECTURE.md` and `plan.md`. Security review and ADR acceptance are separate blocking conditions (SR-001–SR-011; Constitution I/II/III).
+- [ ] T004 Create a UTC timestamp-named ADR under `adrs/` with status Accepted, using the stakeholder approval recorded in `contracts/service-icons.md`. Cover named upload rejections, browser image-mode isolation, exact-source JSON delivery, source-reuse limitations, payload cost, CSP and the rendering-resource scope. Complete security analysis before implementation, including authenticated JSON, copied-source limitations, Chromium isolation and remote-avatar compatibility. Record the analysis, actual checks and resolution of blocking findings in `specs/20261118-224349-configure-service-icons/plan.md`. Record the ADR's full file stem in `ARCHITECTURE.md` and `plan.md`. No further approval is required; do not mark this authoring/analysis task complete until its work is done (SR-001–SR-011; Constitution I/II/III).
 
 ### Phase 2b: Configuration Design
 
@@ -28,7 +28,7 @@ All subphases must finish before production behavior changes. Test-owned harness
 
 ### Phase 2c: API Design
 
-- [x] T006 Record stakeholder approval for Admin `icon_svg`, existing consent `ServiceRequirementForUser.iconSvg`, session `service_icon_svg` and omit/null/value semantics in `specs/20261118-224349-configure-service-icons/contracts/service-icons.md` and `plan.md`. Approval source: the explicit stakeholder message in this conversation, “I approve all outstanding API drafts. mark them accordingly”. Leave the unused ThirdpartyService schema and logoUrl unchanged, and emit no available_services catalog. Security/ADR review remains under T004 (FR-001–FR-016; Constitution IV/X).
+- [x] T006 Record stakeholder approval for Admin `icon_svg`, existing consent `ServiceRequirementForUser.iconSvg`, session `service_icon_svg` and omit/null/value semantics in `specs/20261118-224349-configure-service-icons/contracts/service-icons.md` and `plan.md`. Approval source: the explicit stakeholder messages approving all API drafts and all remaining design decisions in this conversation. Leave the unused ThirdpartyService schema and logoUrl unchanged, and emit no available_services catalog. T004 records the already-approved security/architecture design; it requires no further sign-off (FR-001–FR-016; Constitution IV/X).
 - [ ] T007 Publish confirmed fields, error/authentication/concurrency semantics and examples in `api/admin/openapi.yaml` and `api/enduser/openapi.yaml`, then regenerate rendered `docs/api/`. Leave the unused ThirdpartyService schema and logoUrl unchanged; do not add an SVG alias or remote fallback. Icon-only PUT must not acquire a mandatory If-Match requirement (FR-002/004/007/009/015; Constitution IV/X).
 
 ### Phase 2d: Database Design
@@ -51,7 +51,7 @@ All subphases must finish before production behavior changes. Test-owned harness
 
 - [ ] T015 Read `coding-standards/LOGGING.md` and `OPENTELEMETRY.md`; record in `specs/20261118-224349-configure-service-icons/plan.md` that no new telemetry is planned and identify existing write/error paths requiring source/credential non-disclosure protection. If changing telemetry becomes necessary, design its required tests/contracts/registry entries before touching it; do not add speculative instruments (SR-009; Constitution XV).
 
-**Checkpoint:** Security review has no unresolved blocking findings. Actual ADR/API approvals, canonical publication, model/migration design, UI review, examples and all twelve meaningful compiling acceptance cases are complete. No production implementation before this checkpoint.
+**Checkpoint:** All stakeholder approvals are recorded. Security analysis has no unresolved blocking findings. The Accepted ADR, canonical API publication, model/migration design, UI review, examples and all twelve meaningful compiling acceptance cases are complete. No production implementation before this checkpoint; unfinished work does not reopen approval.
 
 ## Phase 2.5: Shared Foundations
 
@@ -146,7 +146,7 @@ flowchart TD
   US3 --> Compliance[Compliance T046-T052]
 ```
 
-- T001 precedes scoped work. T002 fixes migration filenames before T008/T029. All of Phase 2 blocks behavior. T004 requires completed security review, resolution of blocking findings and ADR acceptance. T006 is complete through explicit stakeholder API approval in this conversation. T007 follows T006, T010 follows confirmed contracts, T011–T013 follow T010, T014 follows their authoring and T015 closes applicability before implementation.
+- T001 precedes scoped work. T002 fixes migration filenames before T008/T029. All of Phase 2 blocks behavior until its work is complete. All stakeholder approvals are recorded. T004 completes security analysis, resolves blocking findings and writes the already-approved ADR with status Accepted; no further sign-off is required. T006 is complete. T007 follows T006, T010 follows confirmed contracts, T011–T013 follow T010, T014 follows their authoring and T015 closes applicability before implementation.
 - T011 and T012 own different suite files and may be authored concurrently once contracts settle. T013 follows T012 because both edit the same browser file. Minimal type/signature setup for compilation is not permission to implement behavior before the test-first gate.
 - Foundations have three chains: T016→T017, T018→T019 and T020→T021. Test-authoring streams can overlap after design gates; implementations follow their own tests. These foundations cannot be omitted from the US1 increment.
 - US1: T022/T023/T024 are disjoint test slices. T028 follows T022/T023; T029 follows T008/T024; T030 follows T028/T029; T031 follows T030. T025 precedes T032/T033. T026/T027 precede T034/T035, even though T033 is a backend task. T034 follows T032/T033, T035 follows T019/T034; T036 follows all US1 work. Serialize changes to shared model/read-model files.
@@ -172,7 +172,7 @@ T042 shared-image regressions and the existing caller unit suites can run separa
 
 ## Implementation Strategy
 
-1. Complete setup and actual approvals/publication, then all twelve compiling acceptance journeys. Preserve approved image-mode semantics and the explicit rendering-resource descope.
+1. Complete setup, remaining design documentation, security analysis and canonical publication under the recorded stakeholder approvals, then all twelve compiling acceptance journeys. Preserve approved image-mode semantics and the explicit rendering-resource scope.
 2. Complete named-validation/image/CSP foundations before accepting or displaying any source. Do not add a permissive interim mode or claim complete source certification.
 3. Use US1 plus foundations as the first usable demonstration: create/persist/current metadata and every required identity surface, with existing safe fallback and controls. This is the suggested MVP scope, not final acceptance of the complete feature.
 4. Complete US2's Chromium isolation/source/decoding checks and US3's fallback/accessibility proof. Keep accepted external references inert rather than reintroduce comprehensive static detection.

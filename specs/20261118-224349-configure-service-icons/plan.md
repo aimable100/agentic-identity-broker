@@ -25,9 +25,9 @@ The existing service aggregate owns the icon; no new entity or typed ID is neede
 
 | Principles | Decision and remaining gate |
 |---|---|
-| I, III | Standard XML parser plus named rejections; browser secure animated image mode. T004 blocks implementation until security review resolves blocking findings and the timestamp-named ADR is Accepted. Review covers authenticated JSON, copied-source limitations, Chromium isolation and CSP effects, including remote-avatar compatibility. Record the reviewer and outcome. No security toggle. |
-| II, V | Add Service Icon glossary/trust-boundary text to ARCHITECTURE.md and record the approved source-versus-rendering distinction in the ADR. Accepted `004-storage-layer-architecture` and `035-root-mounted-spa` remain binding. |
-| IV, X | The stakeholder explicitly approved the API drafts in this conversation, as recorded in contracts/service-icons.md. Publish both canonical OpenAPI contracts and rendered docs before behavior. Leave the unused ThirdpartyService schema and logoUrl unchanged; add no available_services response. |
+| I, III | Standard XML parser plus named rejections; browser secure animated image mode. The stakeholder approved the security design and CSP. T004 still requires documented security analysis and resolution of blocking findings before implementation. Cover authenticated JSON, copied-source limitations, Chromium isolation and remote-avatar compatibility. Do not claim security checks ran merely because the design is approved. No security toggle. |
+| II, V | Add Service Icon glossary/trust-boundary text to ARCHITECTURE.md. Write the timestamp-named ADR with status Accepted under the recorded stakeholder approval. No further ADR sign-off is required. Accepted `004-storage-layer-architecture` and `035-root-mounted-spa` remain binding. |
+| IV, X | The stakeholder approved all API drafts and current design decisions in this conversation, as recorded in contracts/service-icons.md. Publish both canonical OpenAPI contracts and rendered docs before behavior. Leave the unused ThirdpartyService schema and logoUrl unchanged; add no available_services response. |
 | VI, XII | Domain service enforces source invariants; existing ports/adapters persist/project. No handler-to-repository shortcut or routing construction. No new dependency requiring builder changes. |
 | VII | No runtime configuration; no YAML or Helm changes. |
 | VIII, XIII | Write twelve canonical complete-journey acceptance cases and focused unit tests before behavior. Browser cases include meaningful screenshots; no pending/skipped placeholders. |
@@ -35,7 +35,7 @@ The existing service aggregate owns the icon; no new entity or typed ID is neede
 | XI, XIV | Existing semantic tokens, decorative image semantics, visible names, existing wireframes and original inline illustration. No required third-party artwork. |
 | XV | No new telemetry; review existing error paths so source/credentials never enter signals. Read binding standards before changing telemetry. |
 
-**Gate outcome:** The stakeholder API approval is complete. Implementation remains blocked by security review, resolution of blocking findings, canonical API publication, glossary/ADR acceptance and test-first prerequisites. API approval does not supply security review or ADR acceptance. Rendering quotas are out of scope, not an unimplemented security promise. `tasks.md` records the execution order.
+**Gate outcome:** All stakeholder approvals for the current design are complete. No further sign-off is required. Implementation prerequisites remain: security analysis, resolution of blocking findings, canonical API publication, architecture/glossary updates, an ADR recording the approved design with status Accepted, and test-first cases. These are unfinished work, not pending approval requests. Rendering quotas remain out of scope. `tasks.md` records the execution order.
 
 ## Project Structure
 
@@ -58,7 +58,7 @@ Use one service-specific image composition under `web/src/components/services/`,
 | Phase | Purpose |
 |---|---|
 | Setup | Read nearest scoped instructions; confirm exact migration slot and existing harness prerequisites. |
-| Mandatory design | Use the recorded stakeholder API approval, accept ADR, update architecture/glossary, publish OpenAPI/docs and write acceptance tests. |
+| Mandatory design | Use the recorded approvals, write the Accepted ADR, update architecture/glossary, publish OpenAPI/docs and write acceptance tests. |
 | Foundations | XML input policy, exact-source semantics, safe image composition and scoped SPA policy, each driven by tests. |
 | US1 | Presence-aware Admin writes, both adapters, current metadata projections and every identity surface. |
 | US2 | Prove named rejection and actual browser isolation, including CSS/animated/indirect references left in accepted source. |

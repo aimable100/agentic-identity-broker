@@ -1,8 +1,8 @@
 # Service Icon Contract
 
-**API approval:** The stakeholder explicitly approved all outstanding API drafts in this conversation: “I approve all outstanding API drafts. mark them accordingly”. This approval covers Admin `icon_svg`, consent `ServiceRequirementForUser.iconSvg`, session `service_icon_svg`, and the omission/null/value semantics below. The [consent scope correction](https://github.com/zalando-incubator/agentic-identity-broker/pull/510#discussion_r4632042688) remains part of the approved contract. No separate `available_services` response or `ThirdpartyService` extension is approved or required.
+**Stakeholder approval:** The stakeholder explicitly approved all outstanding decisions in this conversation: “I approve all things that still need approval.” This includes the API drafts, SVG upload/rendering boundary, authenticated JSON delivery, payload cost, CSP and rendering-resource scope. Admin `icon_svg`, consent `ServiceRequirementForUser.iconSvg`, session `service_icon_svg`, and omission/null/value semantics are approved. The [consent scope correction](https://github.com/zalando-incubator/agentic-identity-broker/pull/510#discussion_r4632042688) remains part of the approved contract. No separate `available_services` response or `ThirdpartyService` extension is required.
 
-Publish the approved schemas in `schemas.yaml` in both canonical OpenAPI documents before behavior changes. Include endpoint examples and existing authentication/error definitions. Additive icon fields do not authorize changes to existing fields or API versioning rules. This API approval does not supply security review or ADR acceptance; both remain separate implementation gates.
+No further stakeholder sign-off is required for this design. Publish the approved schemas in both canonical OpenAPI documents before behavior changes. Include endpoint examples and existing authentication/error definitions. Record the approved architecture in an ADR with status Accepted. Security analysis, resolution of blocking findings, ADR authoring and implementation checks remain unfinished work; this approval does not claim their completion. Additive icon fields do not authorize unrelated changes to existing fields or API versioning rules.
 
 ## Admin API
 
@@ -49,7 +49,7 @@ Rendering-resource budgets and stress tests are out of scope by explicit stakeho
 
 Use only `<img src="data:image/svg+xml;charset=utf-8,...">` with URI-encoded exact source and empty alt text. Never interpolate SVG markup or permit object/embed/iframe/document delivery. Do not expose a navigable SVG endpoint. JSON authentication controls receipt of bytes, not arbitrary reuse of bytes an authorized client copies.
 
-Preserve existing security headers. Use `frame-ancestors 'none'; object-src 'none'` for the built SPA, subject to security review and ADR acceptance. Add no `img-src` or `default-src` restriction: existing remote user avatars and agent images must remain available. No new script/style permission is needed. Parent CSP does not supply the SVG image-mode guarantees; verify the built image context in Chromium and retain remote-avatar coverage.
+Preserve existing security headers. The approved built-SPA policy is `frame-ancestors 'none'; object-src 'none'`. Record its analysis in the Accepted ADR; no further stakeholder sign-off is required. Add no `img-src` or `default-src` restriction: existing remote user avatars and agent images must remain available. No new script/style permission is needed. Parent CSP does not supply the SVG image-mode guarantees; verify the built image context in Chromium and retain remote-avatar coverage.
 
 Source-key only the image load/error state. Keep visible service names, original caller fallbacks and working controls during failure, replacement and clearing. Existing data refresh/cache lifetimes remain unchanged.
 

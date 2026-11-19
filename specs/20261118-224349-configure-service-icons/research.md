@@ -30,7 +30,7 @@
 
 ## 4. Delivery and persistence
 
-**Decision:** Embed exact source in existing authenticated JSON and encode it only into an img data source. No navigable SVG endpoint, public assets, provider discovery, remote fetch or operator image URL. The [contract](contracts/service-icons.md) records the API fields and explicit stakeholder approval in this conversation.
+**Decision:** Embed exact source in existing authenticated JSON and encode it only into an img data source. No navigable SVG endpoint, public assets, provider discovery, remote fetch or operator image URL. The [contract](contracts/service-icons.md) records stakeholder approval of the API drafts and all current design decisions.
 
 **Rationale:** Authentication already scopes metadata access. A source change changes the image input without a revision protocol. JSON text is not an SVG active document. Source is not safe for arbitrary downstream inline/document use; document this explicitly in API descriptions.
 
@@ -46,4 +46,4 @@
 
 **Rationale:** Session source must reflect the current service, never a session-creation snapshot. Key only image failure state by source so recovery does not remount actions. Existing consent/session caches remain authoritative; fresh-response observation is required.
 
-**Remaining gates:** Canonical API publication, security review, an Accepted timestamp-named ADR, glossary/architecture updates and test-first implementation. Stakeholder API approval is complete, as recorded in the contract. It does not supply security review or ADR acceptance.
+**Remaining work:** Canonical API publication, security analysis and resolution of blocking findings, a timestamp-named ADR recording the approved design with status Accepted, glossary/architecture updates and test-first implementation. All stakeholder approvals are complete. No further sign-off is required; approval does not claim this work is complete.

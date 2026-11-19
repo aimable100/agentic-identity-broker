@@ -31,7 +31,7 @@
 
 ## Notes
 
-- The [contract](../contracts/service-icons.md) records explicit stakeholder approval of the API drafts in this conversation and the SVG upload/rendering rules.
-- Stakeholder API approval is complete. Canonical API publication, security review, ADR acceptance, glossary work and test-first implementation remain gates.
+- The [contract](../contracts/service-icons.md) records explicit stakeholder approval of all API drafts and current design decisions, including security and CSP.
+- No further stakeholder sign-off is required. Canonical API publication, security analysis, ADR authoring, glossary work and test-first implementation remain unfinished work.
 - Twelve acceptance scenarios remain. The [plan](../plan.md) assigns restart persistence to backend Docker and storage integration tests, and rendering to Chromium.
 - Artifact checks are not runtime evidence. This PR changes planning documents, not application code or canonical OpenAPI contracts.

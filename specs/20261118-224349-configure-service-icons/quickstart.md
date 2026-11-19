@@ -4,7 +4,7 @@ This guide describes checks after implementation, not current capabilities. See 
 
 ## Prerequisites
 
-Use Go/Node versions in the manifests, just, existing test tools and Playwright Chromium. PostgreSQL restart/migration cases require Docker or Podman. Stakeholder API approval is recorded in [the contract](contracts/service-icons.md). Publish the approved canonical contract and complete security review, ADR/glossary and test-first gates before behavior changes. Use original synthetic artwork, never a required third-party logo or local download.
+Use Go/Node versions in the manifests, just, existing test tools and Playwright Chromium. PostgreSQL restart/migration cases require Docker or Podman. All stakeholder approvals are recorded in [the contract](contracts/service-icons.md). Before behavior changes, publish the canonical contract, document security analysis, write the Accepted ADR, update the glossary and complete test-first cases. These are unfinished work, not further approval requests. Use original synthetic artwork, never a required third-party logo or local download.
 
 ## Commands
 

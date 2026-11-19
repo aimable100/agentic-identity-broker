@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-18
 
-**Status**: Draft
+**Status**: Approved
 
 **Input**: [Issue #497 — Configurable Icons for Third-Party Services](https://github.com/zalando-incubator/agentic-identity-broker/issues/497)
 
@@ -92,7 +92,7 @@ The Admin API uses `https://admin.broker.example.com`. The trusted proxies authe
 All values are synthetic. Times are UTC on 2026-11-18.
 
 The Admin and end-user SVG fields describe the contract selected in this PR, not an existing capability.
-The [API approval record](contracts/service-icons.md) records explicit stakeholder approval of these fields in this conversation. Publication in both canonical OpenAPI documents remains a prerequisite for implementation.
+The [stakeholder approval record](contracts/service-icons.md) covers the API drafts and the full current design, including security and CSP decisions. Publication in both canonical OpenAPI documents remains a prerequisite for implementation, not a request for further approval.
 Response excerpts omit unrelated fields, but include icon source or show its absence. No new runtime configuration or token claims are involved.
 
 ### Journey 1 — Configure and Replace an SVG Document (US1.1–US1.2, US3.1, US3.4)
@@ -430,7 +430,7 @@ The service icon term and its relationship to the service must enter the `ARCHIT
 
 - **API-001**: Extend the existing Admin service create and replacement contracts with `icon_svg` only. Preserve unrelated field and precondition semantics.
 - **API-002**: Admin responses MUST omit `icon_svg` for no icon. Accepted SVG content remains readable administratively.
-- **API-003**: Existing authenticated consent and session JSON MUST carry the current SVG source. `ServiceRequirementForUser` uses `iconSvg` in `data.services`, including metadata reused by permission-set rows. Session summaries/details use `service_icon_svg`. These fields have explicit stakeholder approval under the [API approval record](contracts/service-icons.md). No separate image resource or `available_services` response is added; the unused `ThirdpartyService` schema remains unchanged.
+- **API-003**: Existing authenticated consent and session JSON MUST carry the current SVG source. `ServiceRequirementForUser` uses `iconSvg` in `data.services`, including metadata reused by permission-set rows. Session summaries/details use `service_icon_svg`. These fields have explicit stakeholder approval under the [approval record](contracts/service-icons.md). No separate image resource or `available_services` response is added; the unused `ThirdpartyService` schema remains unchanged.
 - **API-004**: The server MUST omit absent icon source. Consumers MUST treat omission or null as absence and retain the fallback.
 - **API-005**: The delivery design MUST document response size, request count, caching, authentication and image-mode isolation for source up to 64 KiB. Views MUST URI-encode the JSON source into `<img>` data images. Icon rendering adds no image HTTP requests and preserves existing JSON cache lifetimes. Security review MUST cover payload cost and CSP effects before implementation, independently of the API field decision.
 - **API-006**: Fresh JSON MUST replace previous icon metadata, not merge a cleared field back from stale state. Changed source triggers a new image attempt. Omitted or null source restores the fallback, as required by FR-011 and FR-012. No URL revision or obsolete-resource status is required.
@@ -452,11 +452,11 @@ An SVG rendering failure uses the display fallback. No operator-supplied image U
 
 **Security rationale**: Operator-supplied SVG is untrusted content. Rendering through `<img>` uses the browser's SVG image mode, which disables scripts and interactivity and isolates the SVG from the surrounding page DOM. Directly inserting SVG markup into the page does not provide that boundary. Image-mode isolation is defense in depth, not a replacement for the validation and external-resource restrictions below.
 
-The isolation comes from the image context. An SVG data URL in `<img>` uses image mode, but directly opening SVG does not. Authenticated JSON controls access to source bytes, not reuse of bytes an authorized client copies. Before implementation, security review MUST address this distinction and the CSP effects in SR-003. The feature adds no navigable SVG resource.
+The isolation comes from the image context. An SVG data URL in `<img>` uses image mode, but directly opening SVG does not. Authenticated JSON controls access to source bytes, not reuse of bytes an authorized client copies. Security analysis MUST address this distinction and the CSP effects in SR-003 before implementation. The stakeholder approved these design decisions; no further sign-off is required. The feature adds no navigable SVG resource.
 
 - **SR-001**: Only existing authorized Admin callers can change icon sources. End-user callers cannot modify them.
 - **SR-002**: Icon input MUST reject URLs and image paths, including same-origin paths. Only permitted SVG documents can become service icons.
-- **SR-003**: Service icon display MUST cause zero requests to third-party origins and preserve existing frontend security controls. The SPA policy is `frame-ancestors 'none'; object-src 'none'`, subject to security review and ADR acceptance before implementation. Do not add an `img-src` or `default-src` restriction: existing remote user avatars and agent images must keep working. Parent CSP does not replace browser image-mode isolation.
+- **SR-003**: Service icon display MUST cause zero requests to third-party origins and preserve existing frontend security controls. The approved SPA policy is `frame-ancestors 'none'; object-src 'none'`. Document its security analysis and record the approved design in an Accepted ADR before implementation. Do not add an `img-src` or `default-src` restriction: existing remote user avatars and agent images must keep working. Parent CSP does not replace browser image-mode isolation.
 - **SR-004**: SVG content MUST be a well-formed UTF-8 SVG document of at most 65,536 decoded bytes. Empty documents and non-SVG roots are invalid.
 - **SR-005**: Upload validation MUST reject script elements, event-handler attributes, hyperlink elements, `foreignObject`, explicitly script-capable attribute URLs, internal DTD subsets, entity declarations, other XML directives and processing instructions other than an initial XML declaration. Permit one SVG DOCTYPE before the root, with an optional external identifier and no internal subset. Never fetch or resolve its DTD. Checks MUST use parsed XML names and decoded attribute values, not XML regular expressions. Visual styles, filters, text, local reuse, media and declarative animation remain allowed. This is a named-construct rejection policy, not a complete SVG/CSS static capability analysis.
 - **SR-006**: The broker MUST NOT fetch SVG dependencies. Accepted content MUST be rendered only in browser SVG image mode, which disables scripts, interaction and external resource loads while permitting declarative animation. External references in CSS, attributes, media or animated values need not all fail upload; the rendering context must prevent their loads. Same-document and data references follow browser image-mode semantics. Source is not certified safe for inline SVG or active document embedding.
@@ -495,7 +495,7 @@ The isolation comes from the image context. An SVG data URL in `<img>` uses imag
 ## Assumptions
 
 - Operator-supplied SVG documents are the only icon input. Same-origin image paths, remote image URLs, remote import, and arbitrary URL proxying are excluded.
-- The selected design carries SVG source in authenticated consent/session JSON and renders URI-encoded data images through `<img>`. It adds no icon endpoint. API fields have explicit stakeholder approval; security review and ADR acceptance remain separate gates.
+- The selected design carries SVG source in authenticated consent/session JSON and renders URI-encoded data images through `<img>`. It adds no icon endpoint. All stakeholder approvals for the current design are complete. Security analysis, ADR authoring and implementation verification remain work, not further approval gates.
 - The 64 KiB SVG limit is a conservative default for small service icons. The limit applies uniformly to create and update requests.
 - Service identity cards, rows, and headers in consent and sessions are in scope. Service names inside explanatory prose and confirmation text do not gain decoration.
 - An Admin icon editor, raster uploads, icon discovery from providers, and changes to agent or user logos are out of scope.
