@@ -159,11 +159,10 @@ func (m *noopBranchKeyManager) Create(_ context.Context, _ domainencryption.Bran
 type functionFieldProviderRepository struct {
 	ports.ThirdpartyOAuth2ProviderRepository
 
-	createFn         func(context.Context, *model.ThirdpartyOAuth2ProviderEntity) error
-	getFn            func(context.Context, id.ServiceID) (*model.ThirdpartyOAuth2ProviderEntity, error)
-	updateFn         func(context.Context, *model.ThirdpartyOAuth2ProviderEntity, *int64) error
-	identityUpdateFn func(context.Context, *model.ThirdpartyOAuth2ProviderEntity, *int64) (bool, error)
-	listFn           func(context.Context) ([]*model.ThirdpartyOAuth2ProviderEntity, error)
+	createFn func(context.Context, *model.ThirdpartyOAuth2ProviderEntity) error
+	getFn    func(context.Context, id.ServiceID) (*model.ThirdpartyOAuth2ProviderEntity, error)
+	updateFn func(context.Context, *model.ThirdpartyOAuth2ProviderEntity, *int64) (bool, error)
+	listFn   func(context.Context) ([]*model.ThirdpartyOAuth2ProviderEntity, error)
 }
 
 func (m *functionFieldProviderRepository) Create(ctx context.Context, entity *model.ThirdpartyOAuth2ProviderEntity) error {
@@ -181,13 +180,10 @@ func (m *functionFieldProviderRepository) Get(ctx context.Context, serviceID id.
 }
 
 func (m *functionFieldProviderRepository) Update(ctx context.Context, entity *model.ThirdpartyOAuth2ProviderEntity, expectedVersion *int64) (bool, error) {
-	if m.identityUpdateFn != nil {
-		return m.identityUpdateFn(ctx, entity, expectedVersion)
-	}
 	if m.updateFn == nil {
 		return false, errors.New("unexpected repository Update call")
 	}
-	return false, m.updateFn(ctx, entity, expectedVersion)
+	return m.updateFn(ctx, entity, expectedVersion)
 }
 
 func (m *functionFieldProviderRepository) List(ctx context.Context) ([]*model.ThirdpartyOAuth2ProviderEntity, error) {
@@ -829,10 +825,10 @@ func TestThirdpartyOAuth2ProviderService_CIMDProvisionsServiceBranchKeyBeforePer
 					assert.True(t, stored.Secret.IsAbsent())
 					return nil
 				},
-				updateFn: func(_ context.Context, stored *model.ThirdpartyOAuth2ProviderEntity, _ *int64) error {
+				updateFn: func(_ context.Context, stored *model.ThirdpartyOAuth2ProviderEntity, _ *int64) (bool, error) {
 					calls = append(calls, "persist")
 					assert.True(t, stored.Secret.IsAbsent())
-					return nil
+					return false, nil
 				},
 			}
 			branchKeys := &functionFieldBranchKeyManager{createFn: func(_ context.Context, subject domainencryption.BranchKeySubject) (string, error) {
@@ -992,9 +988,9 @@ func TestThirdpartyOAuth2ProviderService_CIMDPublicCreateAndUpdateWithoutKey(t *
 						stored = provider.Copy()
 						return nil
 					},
-					updateFn: func(_ context.Context, provider *model.ThirdpartyOAuth2ProviderEntity, _ *int64) error {
+					updateFn: func(_ context.Context, provider *model.ThirdpartyOAuth2ProviderEntity, _ *int64) (bool, error) {
 						stored = provider.Copy()
-						return nil
+						return false, nil
 					},
 				}
 				var branchCalls, cryptoCalls int
@@ -1113,10 +1109,10 @@ func TestThirdpartyOAuth2ProviderService_Update_CIMDValidatesReplacementBeforeRe
 
 	var updateCalled bool
 	repo := &functionFieldProviderRepository{
-		updateFn: func(_ context.Context, provider *model.ThirdpartyOAuth2ProviderEntity, _ *int64) error {
+		updateFn: func(_ context.Context, provider *model.ThirdpartyOAuth2ProviderEntity, _ *int64) (bool, error) {
 			updateCalled = true
 			persisted = provider.Copy()
-			return nil
+			return false, nil
 		},
 	}
 	var encryptCalls int
@@ -1160,9 +1156,9 @@ func TestThirdpartyOAuth2ProviderService_Update_StaticToCIMDReplacesEncryptedSec
 			assert.Equal(t, serviceID, requestedID)
 			return persisted, nil
 		},
-		updateFn: func(_ context.Context, provider *model.ThirdpartyOAuth2ProviderEntity, _ *int64) error {
+		updateFn: func(_ context.Context, provider *model.ThirdpartyOAuth2ProviderEntity, _ *int64) (bool, error) {
 			stored = provider.Copy()
-			return nil
+			return false, nil
 		},
 	}
 	var encryptCalls, decryptCalls int
@@ -1217,9 +1213,9 @@ func TestThirdpartyOAuth2ProviderService_Update_CIMDToStaticRequiresNewSecretAnd
 			getFn: func(context.Context, id.ServiceID) (*model.ThirdpartyOAuth2ProviderEntity, error) {
 				return persisted, nil
 			},
-			updateFn: func(_ context.Context, _ *model.ThirdpartyOAuth2ProviderEntity, _ *int64) error {
+			updateFn: func(_ context.Context, _ *model.ThirdpartyOAuth2ProviderEntity, _ *int64) (bool, error) {
 				updateCalls++
-				return nil
+				return false, nil
 			},
 		}
 		encryption := &functionFieldEncryption{
@@ -1263,9 +1259,9 @@ func TestThirdpartyOAuth2ProviderService_Update_CIMDToStaticRequiresNewSecretAnd
 			getFn: func(context.Context, id.ServiceID) (*model.ThirdpartyOAuth2ProviderEntity, error) {
 				return persisted, nil
 			},
-			updateFn: func(_ context.Context, provider *model.ThirdpartyOAuth2ProviderEntity, _ *int64) error {
+			updateFn: func(_ context.Context, provider *model.ThirdpartyOAuth2ProviderEntity, _ *int64) (bool, error) {
 				stored = provider.Copy()
-				return nil
+				return false, nil
 			},
 		}
 		var encryptedPlaintext []byte
@@ -1319,9 +1315,9 @@ func TestThirdpartyOAuth2ProviderService_Update_CIMDToPublicPersistsAbsentSecret
 		getFn: func(context.Context, id.ServiceID) (*model.ThirdpartyOAuth2ProviderEntity, error) {
 			return persisted, nil
 		},
-		updateFn: func(_ context.Context, provider *model.ThirdpartyOAuth2ProviderEntity, _ *int64) error {
+		updateFn: func(_ context.Context, provider *model.ThirdpartyOAuth2ProviderEntity, _ *int64) (bool, error) {
 			stored = provider.Copy()
-			return nil
+			return false, nil
 		},
 	}
 	var encryptCalls, decryptCalls int
@@ -1369,9 +1365,9 @@ func TestThirdpartyOAuth2ProviderService_Update_CIMDPublicModeTransitions(t *tes
 		getFn: func(context.Context, id.ServiceID) (*model.ThirdpartyOAuth2ProviderEntity, error) {
 			return stored.Copy(), nil
 		},
-		updateFn: func(_ context.Context, entity *model.ThirdpartyOAuth2ProviderEntity, _ *int64) error {
+		updateFn: func(_ context.Context, entity *model.ThirdpartyOAuth2ProviderEntity, _ *int64) (bool, error) {
 			stored = entity.Copy()
-			return nil
+			return false, nil
 		},
 	}
 	readiness := &countingCIMDKeyReadiness{err: ports.ErrCIMDPublicKeyUnavailable}
@@ -1420,9 +1416,9 @@ func TestThirdpartyOAuth2ProviderService_Update_StaticAndCIMDPublicIdentitySwitc
 		getFn: func(context.Context, id.ServiceID) (*model.ThirdpartyOAuth2ProviderEntity, error) {
 			return stored.Copy(), nil
 		},
-		updateFn: func(_ context.Context, entity *model.ThirdpartyOAuth2ProviderEntity, _ *int64) error {
+		updateFn: func(_ context.Context, entity *model.ThirdpartyOAuth2ProviderEntity, _ *int64) (bool, error) {
 			stored = entity.Copy()
-			return nil
+			return false, nil
 		},
 	}
 	service := NewThirdpartyOAuth2ProviderService(repo, &functionFieldEncryption{
@@ -1782,9 +1778,9 @@ func TestThirdpartyOAuth2ProviderService_Update_PublicClient_ProvisionsBranchKey
 		getFn: func(context.Context, id.ServiceID) (*model.ThirdpartyOAuth2ProviderEntity, error) {
 			return entity.Copy(), nil
 		},
-		updateFn: func(_ context.Context, provider *model.ThirdpartyOAuth2ProviderEntity, _ *int64) error {
+		updateFn: func(_ context.Context, provider *model.ThirdpartyOAuth2ProviderEntity, _ *int64) (bool, error) {
 			stored = provider
-			return nil
+			return false, nil
 		},
 	}
 	var branchKeySubjects []domainencryption.BranchKeySubject
@@ -1816,9 +1812,9 @@ func TestThirdpartyOAuth2ProviderService_Update_TransitionsCredentialStorage(t *
 			getFn: func(context.Context, id.ServiceID) (*model.ThirdpartyOAuth2ProviderEntity, error) {
 				return persisted.Copy(), nil
 			},
-			updateFn: func(_ context.Context, provider *model.ThirdpartyOAuth2ProviderEntity, _ *int64) error {
+			updateFn: func(_ context.Context, provider *model.ThirdpartyOAuth2ProviderEntity, _ *int64) (bool, error) {
 				persisted = provider.Copy()
-				return nil
+				return false, nil
 			},
 		}
 		var encryptCalls int
@@ -1848,9 +1844,9 @@ func TestThirdpartyOAuth2ProviderService_Update_TransitionsCredentialStorage(t *
 			getFn: func(context.Context, id.ServiceID) (*model.ThirdpartyOAuth2ProviderEntity, error) {
 				return persisted.Copy(), nil
 			},
-			updateFn: func(_ context.Context, provider *model.ThirdpartyOAuth2ProviderEntity, _ *int64) error {
+			updateFn: func(_ context.Context, provider *model.ThirdpartyOAuth2ProviderEntity, _ *int64) (bool, error) {
 				persisted = provider.Copy()
-				return nil
+				return false, nil
 			},
 		}
 		var encryptedPlaintext []byte
@@ -3008,15 +3004,15 @@ func newRefreshTestRepository(stored *model.ThirdpartyOAuth2ProviderEntity) *ref
 			}
 			return repo.stored.Copy(), nil
 		},
-		updateFn: func(_ context.Context, entity *model.ThirdpartyOAuth2ProviderEntity, expectedVersion *int64) error {
+		updateFn: func(_ context.Context, entity *model.ThirdpartyOAuth2ProviderEntity, expectedVersion *int64) (bool, error) {
 			if expectedVersion == nil || *expectedVersion != repo.stored.Version {
-				return storage.NewStorageError("UpdateThirdpartyOAuth2Provider", storage.ErrorKindConflict, nil, "stale service version")
+				return false, storage.NewStorageError("UpdateThirdpartyOAuth2Provider", storage.ErrorKindConflict, nil, "stale service version")
 			}
 			previousVersion := repo.stored.Version
 			repo.updates++
 			repo.stored = entity.Copy()
 			repo.stored.Version = previousVersion + 1
-			return nil
+			return false, nil
 		},
 	}
 	return repo
@@ -3176,9 +3172,9 @@ func TestThirdpartyOAuth2ProviderService_Update_DuplicateNewIssuerClientRecordsF
 	const nextMetadata = "https://other-auth.example.test/.well-known/oauth-authorization-server/tenant"
 	stored := readyRefreshProvider(model.TokenEndpointAuthMethodClientSecretPost)
 	repo := newRefreshTestRepository(stored)
-	repo.updateFn = func(_ context.Context, _ *model.ThirdpartyOAuth2ProviderEntity, version *int64) error {
+	repo.updateFn = func(_ context.Context, _ *model.ThirdpartyOAuth2ProviderEntity, version *int64) (bool, error) {
 		require.Equal(t, stored.Version, *version)
-		return storage.NewStorageError("UpdateThirdpartyOAuth2Provider", storage.ErrorKindConflict,
+		return false, storage.NewStorageError("UpdateThirdpartyOAuth2Provider", storage.ErrorKindConflict,
 			storage.ErrDuplicateDCRClientIdentity, "provider DCR issuer and client_id already exist")
 	}
 	client := dcrDiscoveryClient(issuerDCRDocument([]string{"client_secret_post"}, nil))
@@ -3464,8 +3460,8 @@ func TestThirdpartyOAuth2ProviderService_Update_AudienceCountErrorDoesNotStartDi
 func TestThirdpartyOAuth2ProviderService_Update_CommitTimeAudienceConflictRecordsOnlyFailureStatus(t *testing.T) {
 	stored := readyRefreshProvider(model.TokenEndpointAuthMethodClientSecretBasic)
 	repo := newRefreshTestRepository(stored)
-	repo.updateFn = func(_ context.Context, _ *model.ThirdpartyOAuth2ProviderEntity, _ *int64) error {
-		return storage.NewStorageError("UpdateThirdpartyOAuth2Provider", storage.ErrorKindConflict,
+	repo.updateFn = func(_ context.Context, _ *model.ThirdpartyOAuth2ProviderEntity, _ *int64) (bool, error) {
+		return false, storage.NewStorageError("UpdateThirdpartyOAuth2Provider", storage.ErrorKindConflict,
 			storage.ErrResourceChangeHasSessions, "user sessions block resource change")
 	}
 	client := dcrDiscoveryClient(issuerDCRDocument([]string{"client_secret_basic"}, nil))
@@ -3889,7 +3885,7 @@ func TestClientIdentityAdminAuditUsesCommittedUpdateOutcome(t *testing.T) {
 					reads++
 					return stored.Copy(), nil
 				},
-				identityUpdateFn: func(_ context.Context, entity *model.ThirdpartyOAuth2ProviderEntity, expected *int64) (bool, error) {
+				updateFn: func(_ context.Context, entity *model.ThirdpartyOAuth2ProviderEntity, expected *int64) (bool, error) {
 					writes++
 					require.Equal(t, stored.Version, *expected)
 					assert.Empty(t, clientIdentityChangeRecords(t, &logs), "no event may precede the committed mutation result")
