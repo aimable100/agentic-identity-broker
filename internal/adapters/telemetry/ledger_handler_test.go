@@ -108,6 +108,40 @@ func TestLedgerHandlerRecognitionAndOccurrence(t *testing.T) {
 	}
 }
 
+func TestLedgerHandlerEventGroupOverridesDefinition(t *testing.T) {
+	cases := []struct {
+		name       string
+		inherited  []slog.Attr
+		attrs      []slog.Attr
+		wantEvent  any
+		wantStored bool
+	}{
+		{name: "record attributes", attrs: []slog.Attr{slog.String("detail", "record")}, wantEvent: map[string]any{"detail": "record"}},
+		{name: "inherited attributes", inherited: []slog.Attr{slog.String("detail", "inherited")}, wantEvent: map[string]any{"detail": "inherited"}},
+		{name: "empty logger group", wantEvent: ledgerTestEvent.Name(), wantStored: true},
+		{name: "omitted attributes", inherited: []slog.Attr{slog.Group("empty")}, attrs: []slog.Attr{slog.Group("empty")}, wantEvent: ledgerTestEvent.Name(), wantStored: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			appender := &ledgerCaptureAppender{}
+			var operational bytes.Buffer
+			handler := NewPrincipalPolicyHandler(NewMultiHandler(slog.NewJSONHandler(&operational, nil), NewLedgerHandler(appender, enabledNoopHandler{}, time.Second)))
+			handler = handler.WithAttrs([]slog.Attr{slog.Any("event", ledgerTestEvent)}).WithGroup("event").WithAttrs(tc.inherited)
+			require.NoError(t, handler.Handle(context.Background(), ledgerRecord(tc.attrs...)))
+			decoded := decodeLedgerJSON(t, operational.Bytes())
+			assert.Equal(t, tc.wantEvent, decoded["event"])
+			if !tc.wantStored {
+				assert.Empty(t, appender.events, "a group replacing the effective event must suppress persistence")
+				return
+			}
+			require.Len(t, appender.events, 1)
+			assert.Equal(t, decoded["event"], appender.events[0].Event)
+			delete(decoded, "event")
+			assert.Equal(t, decoded, normalizeLedgerJSON(t, appender.events[0].Attributes))
+		})
+	}
+}
+
 type ledgerLogValue struct{}
 
 func (ledgerLogValue) LogValue() slog.Value { return slog.GroupValue(slog.String("resolved", "yes")) }

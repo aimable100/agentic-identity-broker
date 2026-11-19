@@ -93,6 +93,9 @@ func (h *ledgerHandler) Handle(ctx context.Context, record slog.Record) error {
 	if len(h.groups) != 0 {
 		document = mergeLedgerAttrs(h.attrs, h.groups, h.openGroups, attrs)
 	}
+	if eventName, ok := document["event"].(string); !ok || eventName != definition.Name() {
+		return nil
+	}
 	event := &model.BusinessEvent{
 		ID:         id.BusinessEventID(uuid.Must(uuid.NewV7())),
 		Event:      definition.Name(),

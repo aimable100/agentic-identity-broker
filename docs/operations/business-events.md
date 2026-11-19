@@ -4,6 +4,7 @@
 
 The ledger stores typed business-event audit records in `business_events`. The first event is `consent.grant.revoked`.
 It adds no ledger-read API, activity UI, SSF delivery, or events from ExtProc and agentgateway.
+Only an effective top-level typed `event` is stored. A later nonempty logger group named `event` replaces that value and prevents storage; an empty group does not.
 PostgreSQL stores durable rows. The memory adapter loses rows when the process exits.
 
 The ledger is disabled by default because it stores principals. The central principal policy renders `principal`, `actor`, and `operator_principal` before storage.
