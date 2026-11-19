@@ -411,6 +411,20 @@ broker:
       # -- Emit the additive W3C traceresponse response header on HTTP responses
       responseEnabled: true
 
+  # Business event ledger and retention in each broker replica
+  businessEvents:
+    # -- Enable ledger writes and retention. Disabling leaves existing rows unchanged.
+    enabled: false
+    # -- Append context deadline (Go duration, 100ms-10s inclusive), not total logging or request latency.
+    writeTimeout: "1s"
+    retention:
+      # -- Retention age by storage time (Go duration, 24h-8760h inclusive). Default: 90 days.
+      period: "2160h"
+      # -- Time between retention runs (Go duration, 1s-24h inclusive). The first run starts immediately.
+      interval: "1h"
+      # -- Maximum rows per delete statement (integer, 1-10000 inclusive).
+      batchSize: 1000
+
   # OAuth2 configuration
   thirdPartyOauth2:
     # -- Optional broker/platform name sent during DCR. A blank name blocks DCR registration only.

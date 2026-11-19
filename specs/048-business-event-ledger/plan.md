@@ -54,28 +54,28 @@ clarification changes no scheduling decision.
 **Design Preconditions (BLOCKING)**:
 
 A checked item records completed work or a confirmed non-applicable requirement, not merely an approved plan.
-Unchecked items remain prerequisites for Phase 2.5. Task completion is recorded in `tasks.md`.
+The artifact prerequisites are complete. Task completion and remaining verification are recorded in `tasks.md`; checked artifacts do not certify unrun container-backed checks.
 
 - [x] **Domain Model**: Documented in [data-model.md](./data-model.md): Business Event Definition, Business Event, Business Event ID, ledger repository.
-- [ ] **Domain Concepts**: Add ledger glossary terms and the non-functional requirements reference alongside implementation (T007, T052). Until `/speckit-implement`, keep the design in the feature documents and ADR, not `ARCHITECTURE.md`.
-- [ ] **Entity IDs**: Add `id.BusinessEventID` through `gen_ids.go` and document it in `internal/domain/id/AGENTS.md` (T017). The handler must mint UUIDv7 IDs (research R6).
+- [x] **Domain Concepts**: Ledger glossary terms and linked non-functional requirements are in `ARCHITECTURE.md` (T007, T052).
+- [x] **Entity IDs**: `id.BusinessEventID` is generated and documented. The handler mints UUIDv7 occurrence IDs (T017; research R6).
 - [x] **Configuration Design**: [contracts/configuration.md](./contracts/configuration.md) lists every key with a YAML example.
-- [ ] **Config Examples**: Create and commit `examples/config/business-events.yaml` and its README entry (T009). The YAML example remains in the configuration contract until implementation.
-- [ ] **Helm Deployment Contract**: Add all five `broker.businessEvents.*` values, configmap template, schema, and chart tests (T011). The README describes the planned contract only. No new workload.
+- [x] **Config Examples**: `examples/config/business-events.yaml` and its README entry exist and are included with the implementation.
+- [x] **Helm Deployment Contract**: All five values, the ConfigMap, schema, README, and chart tests are implemented. No new workload (T011).
 - [x] **API Design First**: No API change. No endpoint is added or changed.
 - [x] **API Documentation**: Not applicable. The end-user API and the Admin API are not changed.
 - [x] **API Changes**: None.
-- [ ] **Database Design**: Create the designed atomic `049_create_business_events` up/down migration and schema-specific tests (T014, T031). `048` is occupied; recheck numbering before implementation.
-- [ ] **E2E Acceptance Tests**: Write all five mapped container-backed acceptance tests before foundation behavior (T018–T020).
+- [x] **Database Design**: Atomic migration `049_create_business_events` and schema-specific tests are present. PostgreSQL execution remains unvalidated locally (T014, T031).
+- [x] **E2E Acceptance Tests**: All five mapped container-backed scenarios were written before foundation behavior and compile (T018–T020).
 - [x] **E2E Test Mapping**: One `It()` per scenario (table in Testing Strategy).
-- [ ] **E2E Red Phase**: Write compiling acceptance/performance tests with realistic assertions before foundation behavior (T021, T084). Verify semantic failures where the runtime is available. First execution may occur in CI under Principles VIII and XIII; saved red-run evidence is not required.
+- [x] **E2E Red Phase**: Compiling acceptance/performance tests with persistence assertions preceded foundation behavior. Docker was unavailable, so their first execution remains pending (T021, T084).
 - [x] **Frontend Playwright E2E**: Not applicable. No UI change.
 - [x] **Frontend Screenshots**: Not applicable.
 
-**Implementation Considerations (planned, not verified)**:
+**Implementation Design**:
 
 - **Security-First**: The ledger adds no data class beyond LOGGING.md section 6. It is off by default because it stores principals; an enabled ledger always runs retention (SR-003). The default is a data-minimisation default, not a disabled security control.
-- **Architecture Docs**: `ARCHITECTURE.md` describes implemented behavior only. During `/speckit-implement`, add the ADR index entry, glossary terms, and short non-functional requirements reference alongside the implementation (T002, T007, T052). T058 verifies these additions later (Principles II, V).
+- **Architecture Docs**: `ARCHITECTURE.md` includes the ADR index, four glossary terms, implemented ledger behavior, and linked non-functional requirements (T002, T007, T052).
 - **ADRs**: `048-business-events-as-typed-log-records`, including the explicitly approved review revisions.
 - **Library-First Security**: No cryptography.
 - **Zalando Guidelines**: Not applicable. No API change.
@@ -85,19 +85,19 @@ Unchecked items remain prerequisites for Phase 2.5. Task completion is recorded 
 - **Persistence Patterns**: Follow `specs/004-persistence-layer/quickstart.md`: ISP ports in `internal/ports/storage.go`, both adapters, `sqlx`, `StorageError`, factory accessors.
 
 **Principle XV (coding standards)**: Every new log record and instrument is listed in
-[contracts/observability.md](./contracts/observability.md). T025 will amend LOGGING.md in sections 1,
-2.2, 8, 9, and 10, and OPENTELEMETRY.md in section 2 for the new scope `business_events`.
-The approved T025 amendments are deferred until `/speckit-implement`. The planned ledger handler adds no `trace_id` or `actor`: its
-failure record passes a context handler (LOGGING.md section 1). Each of the two PostgreSQL
-repository methods creates a `storage.*` span (OPENTELEMETRY.md section 3.1). `TestLoggedPrincipalsAreTyped`
-is not narrowed; a second guard test is added.
+[contracts/observability.md](./contracts/observability.md). T025's approved LOGGING.md amendments
+are applied in sections 1, 2.2, 8, 9, and 10. OPENTELEMETRY.md registers the `business_events` scope.
+The ledger handler adds no `trace_id` or `actor`: its failure record passes the context handler.
+Both PostgreSQL methods create the contracted `storage.*` spans. The existing principal guard
+is unchanged, and a separate typed-event key guard is present.
 
-**Result**: Review revisions are explicitly approved. The current change set is documentation only.
-The feature documents and ADR describe the approved design. `ARCHITECTURE.md` remains limited to implemented behavior.
-Code-bearing prerequisites T009, T011, T014, T017–T021, T031, and T084 remain incomplete.
-T025's standard amendments and PR-description step also remain pending. All implementation artifacts from the premature
-execution were removed at the user's request. Earlier checks on those artifacts do not establish
-current feature readiness. Implementation starts only through an explicit `/speckit-implement` invocation.
+**Result**: The ledger foundation, retention lifecycle, configuration and deployment contract,
+and the single consent event are implemented. Both committed-delete paths preserve their existing
+attributes and return behavior. A temporary production-bootstrap memory HTTP smoke verified
+`201` creation, `204` revocation, `404` retry, and exactly one enabled-ledger occurrence (zero when disabled).
+The smoke file was removed. PostgreSQL acceptance, migration execution, and SC-004 remain unvalidated
+without Docker. Final reachable checks and remaining gates are tracked in `tasks.md`.
+At implementation handoff, changes were uncommitted and PR #467 was unchanged. The user subsequently authorized committing; PR-description publication remains pending.
 
 ## Project Structure
 
@@ -337,12 +337,14 @@ event, reader API, UI, SSF delivery mechanism, or erasure operation is included.
 After Phase 2.5a, Phases 2.5b–2.5d can proceed independently against the stable ports. Phase 2.5e
 waits for all three; Phase 3 waits for integration; Phase 4 and Phase N verify the completed flow.
 
-**Implementation gate: not started — documentation only.** Review revisions are explicitly approved.
-The code-bearing Phase 2 prerequisites remain incomplete, as recorded in `tasks.md`.
-The scaffold, SQL migrations, chart configuration, example YAML, and tests were removed at the
-user's request. No prior compilation or test result certifies the current feature.
-All implementation, including code-bearing prerequisites, requires an explicit `/speckit-implement` invocation.
+**Implementation gate: code implemented — acceptance and PR readiness remain incomplete.**
+The final available static, race-enabled unit, self-contained integration, and backend E2E checks
+passed. Docker-backed validation, the full security/verification gate, and PR-description publication
+remain outstanding as recorded in `tasks.md`. The four accepted checklist deviations remain unchanged.
 
+On 2026-11-18, the user explicitly accepted all four documented specification-quality deviations
+and authorized implementation. Checklist markers remain unchanged. This acceptance does not waive
+implementation, security, testing, or compliance requirements. The onboarding review remains T054.
 ## Testing Strategy
 
 ### End-to-End (E2E) Acceptance Tests
@@ -358,13 +360,13 @@ enabled, disabled, write failing; retention) → one `It` per scenario.
 
 | Spec Scenario | E2E Test | Test Description | Red before implementation because |
 |---|---|---|---|
-| US1.1 | Planned `business_event_ledger_test.go`, `Label("docker")` | `It("stores exactly one consent.grant.revoked event with request and resource identities")` | No row is stored |
-| US1.2 | Same planned file, `Label("docker")` | `It("keeps exactly one event when a second revocation returns 404")` | The row of the first revocation is absent |
-| US1.3 | Same planned file, `Label("docker")` | `It("stores no event and still logs the revocation when the ledger is disabled")` | The audit record has `action`, not `event` |
-| US1.4 | Same planned file, `Label("docker")` | `It("returns 204 and reports exactly one failed write without losing the audit record")` | No failure is counted or logged, and the audit record has `action`, not `event` |
-| US2.1 | Same planned file, `Label("docker")` | `It("deletes only the expired event without a deletion log or counter")` | No events are stored; after onboarding but before retention, the expired row remains |
+| US1.1 | `business_event_ledger_test.go:211`, `Label("docker")` | `It("stores exactly one consent.grant.revoked event with request and resource identities")` | No row is stored |
+| US1.2 | `business_event_ledger_test.go:235`, `Label("docker")` | `It("keeps exactly one event when a second revocation returns 404")` | The row of the first revocation is absent |
+| US1.3 | `business_event_ledger_test.go:246`, `Label("docker")` | `It("stores no event and still logs the revocation when the ledger is disabled")` | The audit record has `action`, not `event` |
+| US1.4 | `business_event_ledger_test.go:270`, `Label("docker")` | `It("returns 204 and reports exactly one failed write without losing the audit record")` | No failure is counted or logged, and the audit record has `action`, not `event` |
+| US2.1 | `business_event_ledger_test.go:293`, `Label("docker")` | `It("deletes only the expired event without a deletion log or counter")` | No events are stored; after onboarding but before retention, the expired row remains |
 
-T021 adds line numbers after the tests are written during `/speckit-implement`. No mapped test file exists yet.
+All five scenarios and `business_event_ledger_performance_test.go:93` compile against T017's scaffold. Docker-backed execution remains unvalidated because the local daemon is unavailable.
 
 **Red Phase Requirements**: As in the plan template. No `XIt`, `PIt`, or `Skip()`. Assertions
 target the stored event (`Event`, `Principal`, `Actor`, `TraceID`, attribute keys), the HTTP
@@ -485,3 +487,26 @@ Keep the complete result of each acceptance run with its environment record, inc
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
 | The ledger is off by default | It stores principals, and an operator must choose the retention period first | On by default would store personal data in deployments that have not planned retention |
+
+## Unpublished PR-description draft
+
+PR #467 remains unchanged at the user's direction. This draft is not the published changelog record.
+
+### Breaking changes
+
+- `action=grant_revoked` becomes `event=consent.grant.revoked`.
+- `action=grant_deleted` becomes `event=consent.grant.revoked` after committed deletion with failed refresh cleanup. `refresh_cleanup=failed` and the returned cleanup error remain unchanged.
+- Dashboard, alert, and log-query filters must use the new discriminator and identifier.
+
+### Coding-standard amendments and rationale
+
+- LOGGING section 1 names the ledger branch after context and principal policy. Its nonrecursive operational fallback preserves request metadata without re-entering the ledger.
+- LOGGING sections 2.2, 9, and 10 require one typed declaration under `event`, a guard test, and a review check. They prevent duplicate catalogues and marker misuse.
+- LOGGING section 2.2 makes the PR description's `Breaking changes` section the event-rename changelog record. Generated release notes link to that record without duplicating it.
+- LOGGING section 8 removes the interim implementation notice. Post-commit projection semantics and unknown write-timeout outcomes remain explicit.
+- OPENTELEMETRY section 2 registers `business_events` so the ledger instruments have an explicit owner.
+
+### Onboarding review: FR-012 and SC-001
+
+Onboarding changes two consent production files: `events.go` and `service.go`. One package-local declaration has explicit owner visibility. Both top-level emissions follow committed deletion, retain canonical resource attributes, and distinguish cleanup failure without changing the operation's return behavior. External-package service tests cover committed deletion before append, missing and failed deletion, unchanged retries, and cleanup failure. Revocation handles no credential. Onboarding adds no migration, API, or builder change; those belong to the separate shared foundation.
+

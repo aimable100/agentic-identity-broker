@@ -9,6 +9,39 @@ import (
 	"github.com/google/uuid"
 )
 
+func TestBusinessEventIDSerialization(t *testing.T) {
+	const raw = "019a7f3e-5b7b-7c1e-9d2a-3f4b5c6d7e8f"
+	value, err := ParseBusinessEventID(raw)
+	if err != nil || value.IsZero() || value.String() != raw {
+		t.Fatalf("ParseBusinessEventID = %v, %v", value, err)
+	}
+	encoded, err := json.Marshal(value)
+	if err != nil || string(encoded) != `"`+raw+`"` {
+		t.Fatalf("MarshalJSON = %s, %v", encoded, err)
+	}
+	var decoded BusinessEventID
+	if err := json.Unmarshal(encoded, &decoded); err != nil || decoded != value {
+		t.Fatalf("UnmarshalJSON = %v, %v", decoded, err)
+	}
+	sqlValue, err := value.Value()
+	if err != nil || sqlValue != raw {
+		t.Fatalf("Value = %v, %v", sqlValue, err)
+	}
+	if err := decoded.Scan(sqlValue); err != nil || decoded != value {
+		t.Fatalf("Scan = %v, %v", decoded, err)
+	}
+	text, err := value.MarshalText()
+	if err != nil || string(text) != raw {
+		t.Fatalf("MarshalText = %s, %v", text, err)
+	}
+	if err := decoded.UnmarshalText(text); err != nil || decoded != value {
+		t.Fatalf("UnmarshalText = %v, %v", decoded, err)
+	}
+	if _, err := ParseBusinessEventID("invalid"); err == nil {
+		t.Fatal("invalid UUID accepted")
+	}
+}
+
 // ---- UUID-based ID tests ----
 
 func TestAgentID_NewAndString(t *testing.T) {

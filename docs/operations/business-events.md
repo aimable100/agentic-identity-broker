@@ -1,7 +1,5 @@
 # Operate the business event ledger
 
-**Status: Design documentation only.** The ledger is not implemented. These procedures describe the approved target behavior for future `/speckit-implement` work.
-
 ## Storage and privacy limits
 
 The ledger stores typed business-event audit records in `business_events`. The first event is `consent.grant.revoked`.

@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/id"
+	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/model"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/storage"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/ports"
 )
@@ -16,8 +17,9 @@ import (
 // Adapter implements storage repository and lifecycle helpers
 // using in-memory storage with sync.RWMutex for thread-safety.
 type Adapter struct {
-	mu    sync.RWMutex
-	users map[id.UserID]*ports.User
+	mu             sync.RWMutex
+	users          map[id.UserID]*ports.User
+	businessEvents []*model.BusinessEvent
 }
 
 // NewAdapter creates a new in-memory storage adapter.
@@ -67,6 +69,7 @@ func (a *Adapter) Close(ctx context.Context) error {
 
 	// Clear all data
 	a.users = make(map[id.UserID]*ports.User)
+	a.businessEvents = nil
 
 	return nil
 }

@@ -305,8 +305,6 @@ Each successful confidential-provider secret decryption emits `service_secret_de
 
 #### Business Event Configuration
 
-**Planned configuration, not implemented.** These keys describe feature 048's approved design and are not available in the broker yet.
-
 | Option | Type | Default Value | Valid Values | Required? | Environment Variable | CLI Flag | Description |
 |--------|------|---------------|--------------|-----------|----------------------|----------|-------------|
 | `business_events.enabled` | bool | `false` | `true`, `false` | No | `IDENTITY_BROKER_BUSINESS_EVENTS_ENABLED` | `--business_events.enabled` | Enable ledger writes and retention. Disabled operation preserves the original logger chain and leaves existing rows unchanged. |
@@ -795,8 +793,6 @@ log:
 **Recommendation**: Use `json` format in production for structured logging and log aggregation.
 
 ### Business Events
-
-**Design documentation only.** The ledger is not implemented. This section describes target behavior for future `/speckit-implement` work.
 
 The ledger stores typed business-event audit records and is disabled by default. An enabled ledger always runs retention in the broker process.
 
@@ -1633,7 +1629,7 @@ Grant deletion, expiration, or replacement ends refresh authority. Renewal of ex
 Consent denial returns the existing `invalid_grant` response without tokens. Verifier or storage errors return `server_error` without rotating the token.
 Grant and credential deletion precede session revocation because these repositories do not share the refresh transaction. A revocation error does not undo deletion.
 
-If deletion commits but refresh cleanup fails, the audit event uses `action=grant_deleted` and `refresh_cleanup=failed`. The request still returns an error. Retrying DELETE returns 404 because the grant is already absent. The event does not report successful session cleanup.
+After committed grant deletion, both revocation branches emit `event=consent.grant.revoked`. If refresh cleanup fails, the event retains `refresh_cleanup=failed` and the request returns the cleanup error. Retrying DELETE returns 404 because the grant is already absent. The failure event does not report successful session cleanup.
 
 Memory storage rejects a late successor after lifecycle revocation, including renewal that retains the grant ID. Revocation also marks consumed predecessors. Successor insertion and its predecessor check share one lock. PostgreSQL retains the rotation transaction and agent lock through insertion. Neither backend retracts access tokens from a refresh that completed before revocation.
 

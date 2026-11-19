@@ -261,8 +261,6 @@ Authorization initiation reads only the client-ID file. Metadata reads resolve n
 
 ### Business event ledger
 
-**Planned contract, not implemented.** These values are not present in the chart yet. The following design applies after `/speckit-implement` completes T011.
-
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `broker.businessEvents.enabled` | `boolean` | `false` | Enable ledger writes and retention in each broker replica. |

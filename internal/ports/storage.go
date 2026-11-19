@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/id"
+	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/model"
 	"github.com/agentic-identity-broker/agentic-identity-broker/internal/domain/storage"
 )
 
@@ -43,6 +44,17 @@ type StorageTransactionManager interface {
 	BeginTX(ctx context.Context) (context.Context, error)
 	Commit(ctx context.Context) error
 	Rollback(ctx context.Context) error
+}
+
+// BusinessEventAppender stores immutable occurrences outside any transaction in ctx.
+type BusinessEventAppender interface {
+	// Append assigns RecordedAt. A duplicate ID returns a storage Conflict.
+	Append(ctx context.Context, event *model.BusinessEvent) error
+}
+
+// BusinessEventRetention removes expired occurrences, oldest first.
+type BusinessEventRetention interface {
+	DeleteRecordedBefore(ctx context.Context, cutoff time.Time, limit int) (int64, error)
 }
 
 // ThirdpartyOAuth2ProviderDiscoveryStatusWriter records a failed discovery
