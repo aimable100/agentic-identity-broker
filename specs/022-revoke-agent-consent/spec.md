@@ -116,7 +116,7 @@ After a user revokes consent, any attempt by the revoked agent to perform a toke
 ### Security Requirements
 
 - **SR-001**: Revocation MUST be authorized — only the principal who owns the grant may delete it. Cross-user deletion returns `404 Not Found` by design: the principal-scoped `DELETE WHERE principal = $1 AND agent_id = $2` query naturally returns not-found for another user's grant, leaking no existence information. `403 Forbidden` is explicitly rejected because it would confirm a grant exists for a given agent ID. See `research.md §4` for full rationale.
-- **SR-002**: Revocation operations MUST emit structured audit log entries via the existing application logger (JSON to stdout) including: `principal`, `agent_id`, `grant_id`, `action=grant_revoked`, `timestamp`.
+- **SR-002**: Revocation operations MUST emit structured audit log entries via the existing application logger (JSON to stdout) including: `principal`, `agent_id`, `grant_id`, `event=consent.grant.revoked`, and `revoked_at` (UTC RFC3339Nano).
 - **SR-003**: System MUST fail closed — if the grant lookup during revocation fails with a transient error, the grant MUST NOT be deleted and the error MUST be surfaced to the caller.
 - **SR-004**: The `VerifyAgentAccess` domain function MUST treat a missing grant as an authorization denial (fail closed).
 

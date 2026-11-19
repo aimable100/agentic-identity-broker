@@ -127,10 +127,12 @@ A principal identifies a person, for example by email or subject. It is personal
 
 ### 5.2 Example
 
+This example uses the consent package's `GrantRevoked` definition from `internal/domain/consent/events.go`.
+
 ```go
 // Correct
 s.logger.InfoContext(ctx, "grant revoked",
-    "event", "consent.grant.revoked",
+    "event", GrantRevoked,
     "principal", grant.Principal, // id.Principal
     "agent_id", grant.AgentID)
 

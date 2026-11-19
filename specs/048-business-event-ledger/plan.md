@@ -365,13 +365,18 @@ enabled, disabled, write failing; retention) → one `It` per scenario.
 
 | Spec Scenario | E2E Test | Test Description | Red before implementation because |
 |---|---|---|---|
-| US1.1 | `business_event_ledger_test.go:120`, `Label("docker")` | `It("stores exactly one consent.grant.revoked event with request and resource identities")` | No row is stored |
-| US1.2 | `business_event_ledger_test.go:144`, `Label("docker")` | `It("keeps exactly one event when a second revocation returns 404")` | The row of the first revocation is absent |
-| US1.3 | `business_event_ledger_test.go:155`, `Label("docker")` | `It("stores no event and still logs the revocation when the ledger is disabled")` | The audit record has `action`, not `event` |
-| US1.4 | `business_event_ledger_test.go:179`, `Label("docker")` | `It("returns 204 and reports exactly one failed write without losing the audit record")` | No failure is counted or logged, and the audit record has `action`, not `event` |
-| US2.1 | `business_event_ledger_test.go:236`, `Label("docker")` | `It("deletes only the expired event without a deletion log or counter")` | No events are stored; after onboarding but before retention, the expired row remains |
+| US1.1 | `business_event_ledger_test.go`, `Label("docker")` | `It("stores exactly one consent.grant.revoked event with request and resource identities")` | No row is stored |
+| US1.2 | `business_event_ledger_test.go`, `Label("docker")` | `It("keeps exactly one event when a second revocation returns 404")` | The row of the first revocation is absent |
+| US1.3 | `business_event_ledger_test.go`, `Label("docker")` | `It("stores no event and still logs the revocation when the ledger is disabled")` | The audit record has `action`, not `event` |
+| US1.4 | `business_event_ledger_test.go`, `Label("docker")` | `It("returns 204 and reports exactly one failed write without losing the audit record")` | No failure is counted or logged, and the audit record has `action`, not `event` |
+| US1.5 | `business_event_ledger_test.go`, `Label("docker")` | `It("stores the deleted grant snapshot when refresh cleanup returns an HTTP error")` | Cleanup failure omits the full deleted grant snapshot |
+| US2.1 | `business_event_ledger_test.go`, `Label("docker")` | `It("deletes only the expired event without a deletion log or counter")` | No events are stored; after onboarding but before retention, the expired row remains |
 
-All five mapped scenarios passed through `just test-e2e-docker`. The SC-004 test at `business_event_ledger_performance_test.go:94` passed through `GOMAXPROCS=14 just test-e2e-performance`, with unchanged assertions; its complete environment and latency record is published in PR #467.
+The original five scenarios passed through `just test-e2e-docker`. All six ledger scenarios,
+including US1.5, passed the focused PostgreSQL-backed Ginkgo run on 2026-11-19.
+The SC-004 test at `business_event_ledger_performance_test.go:94` previously passed through
+`GOMAXPROCS=14 just test-e2e-performance`, with unchanged assertions; its complete environment
+and latency record is published in PR #467.
 
 **Red Phase Requirements**: As in the plan template. No `XIt`, `PIt`, or `Skip()`. Assertions
 target the stored event (`Event`, `Principal`, `Actor`, `TraceID`, attribute keys), the HTTP
@@ -386,6 +391,9 @@ status, the log buffer, and the metric reader.
   creates a `BEFORE INSERT` trigger on `business_events` whose function raises an exception, and
   drops the trigger and the function in `AfterEach`. No test-only production API is added. The
   handler's failure path is also covered by unit tests with a failing appender.
+- US1.5 seeds one refresh session and uses a PostgreSQL `BEFORE UPDATE` trigger to reject its cleanup.
+  The real HTTP revocation returns `500`. SQL verifies committed grant deletion, an uncleaned
+  refresh row, and one complete ledger snapshot. A repeated DELETE returns `404` without another event.
 - US1.1 creates the grant through the API first. That audit record has no typed definition, so
   "exactly one row" also proves that a record without a definition is not stored (FR-001).
 - US2.1 needs a row that is older than the retention period. The smallest valid period is 24

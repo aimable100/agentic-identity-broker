@@ -132,6 +132,63 @@ var _ = Describe("Business event ledger", Label("docker"), func() {
 		})
 	})
 
+	Context("when grant deletion commits but refresh cleanup fails", func() {
+		var snapshot *storagedomain.UserGrant
+
+		JustBeforeEach(func() {
+			var err error
+			snapshot, err = store.UserGrants().FindByPrincipalAndAgent(context.Background(), id.NewPrincipal(fixtures.DefaultPrincipal().String()), agent.ID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(store.RefreshTokenSessions().Create(context.Background(), &storagedomain.RefreshTokenSession{
+				Signature: "cleanup-failure-signature", RequestID: "cleanup-failure-request",
+				AgentID: agent.ID, ClientID: *agent.ClientID, Principal: snapshot.Principal, GrantID: &grantID,
+				CreatedAt: time.Now().UTC(), ExpiresAt: time.Now().Add(time.Hour).UTC(),
+			})).To(Succeed())
+			_, err = db.ExecContext(context.Background(), `
+				CREATE FUNCTION reject_refresh_cleanup() RETURNS trigger LANGUAGE plpgsql AS $$
+				BEGIN RAISE EXCEPTION 'refresh cleanup rejected'; END; $$`)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = db.ExecContext(context.Background(), `
+				CREATE TRIGGER reject_refresh_cleanup BEFORE UPDATE ON refresh_token_sessions
+				FOR EACH ROW EXECUTE FUNCTION reject_refresh_cleanup()`)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			_, err := db.ExecContext(context.Background(), "DROP TRIGGER IF EXISTS reject_refresh_cleanup ON refresh_token_sessions")
+			Expect(err).NotTo(HaveOccurred())
+			_, err = db.ExecContext(context.Background(), "DROP FUNCTION IF EXISTS reject_refresh_cleanup()")
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		// Scenario US1.5 from specs/048-business-event-ledger/spec.md (User Story 1)
+		It("stores the deleted grant snapshot when refresh cleanup returns an HTTP error", func() {
+			traceID := revoke(http.StatusInternalServerError)
+			events := helpers.CommittedBusinessEvents(db)
+			Expect(events).To(HaveLen(1))
+			Expect(events).To(matchers.HaveBusinessEvent("consent.grant.revoked", fixtures.DefaultPrincipal().String()))
+			Expect(events[0].Actor).To(HaveValue(Equal(fixtures.DefaultPrincipal().String())))
+			Expect(events[0].TraceID).To(Equal(traceID))
+			Expect(events[0].Attributes).To(HaveKeyWithValue("refresh_cleanup", "failed"))
+			Expect(events[0].Attributes).To(HaveKeyWithValue("agent_id", agent.ID.String()))
+			Expect(events[0].Attributes).To(HaveKeyWithValue("grant_id", grantID.String()))
+			Expect(events[0].Attributes).To(HaveKeyWithValue("valid_until", BeNil()))
+			Expect(events[0].Attributes).To(HaveKeyWithValue("updated_at", snapshot.UpdatedAt.UTC().Format(time.RFC3339Nano)))
+			Expect(events[0].Attributes).To(HaveKeyWithValue("granted_permission_sets", []any{map[string]any{
+				"permission_set_id":    fixtures.PlaceholderPermissionSetID.String(),
+				"included_service_ids": []any{fixtures.PlaceholderServiceID.String()},
+			}}))
+			Expect(events[0].Attributes).To(HaveKeyWithValue("revoked_at", MatchRegexp(`Z$`)))
+			var grants, pendingRefresh int
+			Expect(db.QueryRowContext(context.Background(), "SELECT COUNT(*) FROM user_grants WHERE id = $1", grantID).Scan(&grants)).To(Succeed())
+			Expect(grants).To(BeZero())
+			Expect(db.QueryRowContext(context.Background(), "SELECT COUNT(*) FROM refresh_token_sessions WHERE signature = $1 AND used_at IS NULL", "cleanup-failure-signature").Scan(&pendingRefresh)).To(Succeed())
+			Expect(pendingRefresh).To(Equal(1), "the failed cleanup must leave a session row, not undo grant deletion")
+			revoke(http.StatusNotFound)
+			Expect(helpers.CommittedBusinessEvents(db)).To(Equal(events))
+		})
+	})
+
 	Context("when the ledger is enabled and Alice has already revoked her grant", func() {
 		var original []model.BusinessEvent
 		JustBeforeEach(func() {

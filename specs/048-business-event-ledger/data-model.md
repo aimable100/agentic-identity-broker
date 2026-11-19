@@ -161,8 +161,9 @@ reports that the cleanup returned an error after the committed delete; its absen
 emitting path completed cleanup successfully. Consumers must evaluate this attribute when
 describing cleanup status, but must not suppress a grant-revocation signal merely because cleanup
 failed. A future SSF consumer must define its own mapping and delivery guarantee (ADR 048).
-`occurred_at` is the canonical record time. The optional success-path `revoked_at` attribute is
-not a second canonical event time or proof of the deletion's exact commit time.
+Both committed-delete paths include `valid_until`, `updated_at`, `granted_permission_sets`, and
+`revoked_at` from the deletion audit. `occurred_at` is the canonical record time. The `revoked_at`
+attribute is not proof of the deletion's exact commit time.
 
 ### Consumer cursor visibility
 

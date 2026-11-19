@@ -31,7 +31,14 @@ func TestConsentRevocationBusinessEvent(t *testing.T) {
 		t.Run(outcome, func(t *testing.T) {
 			ctx := t.Context()
 			grants := memory.NewUserGrantRepository()
-			grant := &storage.UserGrant{ID: id.NewGrantID(), Principal: id.NewPrincipal("resource-owner"), AgentID: id.NewAgentID()}
+			validUntil := time.Now().Add(time.Hour).UTC()
+			grant := &storage.UserGrant{
+				ID: id.NewGrantID(), Principal: id.NewPrincipal("resource-owner"), AgentID: id.NewAgentID(),
+				ValidUntil: &validUntil, UpdatedAt: validUntil.Add(-time.Hour),
+				GrantedPermissionSets: []storage.GrantedPermissionSetEntry{{
+					PermissionSetID: id.NewPermissionSetID(), IncludedServiceIDs: []id.ServiceID{id.NewServiceID()},
+				}},
+			}
 			if outcome != "not found" {
 				require.NoError(t, grants.Create(ctx, grant))
 			}
@@ -83,6 +90,16 @@ func TestConsentRevocationBusinessEvent(t *testing.T) {
 			require.NoError(t, json.Unmarshal(encoded, &attributes))
 			assert.Equal(t, grant.ID.String(), attributes["grant_id"])
 			assert.Equal(t, grant.AgentID.String(), attributes["agent_id"])
+			assert.Equal(t, validUntil.Format(time.RFC3339Nano), attributes["valid_until"])
+			assert.Equal(t, grant.UpdatedAt.Format(time.RFC3339Nano), attributes["updated_at"])
+			assert.Equal(t, []any{map[string]any{
+				"permission_set_id":    grant.GrantedPermissionSets[0].PermissionSetID.String(),
+				"included_service_ids": []any{grant.GrantedPermissionSets[0].IncludedServiceIDs[0].String()},
+			}}, attributes["granted_permission_sets"])
+			require.IsType(t, "", attributes["revoked_at"])
+			revokedAt, err := time.Parse(time.RFC3339Nano, attributes["revoked_at"].(string))
+			require.NoError(t, err)
+			assert.Equal(t, revokedAt.UTC().Format(time.RFC3339Nano), attributes["revoked_at"])
 			if outcome == "cleanup failure" {
 				assert.Equal(t, "failed", attributes["refresh_cleanup"])
 			} else {

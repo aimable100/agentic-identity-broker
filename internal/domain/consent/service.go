@@ -648,6 +648,10 @@ func (s *Service) RevokeConsentForPrincipal(ctx context.Context, principal id.Pr
 			"principal", grant.Principal,
 			"agent_id", grant.AgentID,
 			"grant_id", grant.ID,
+			"valid_until", grantAuditValidUntil(grant.ValidUntil),
+			"updated_at", grant.UpdatedAt.UTC().Format(time.RFC3339Nano),
+			"granted_permission_sets", (&storage.UserGrant{GrantedPermissionSets: grant.GrantedPermissionSets}).Copy().GrantedPermissionSets,
+			"revoked_at", time.Now().UTC().Format(time.RFC3339Nano),
 			"refresh_cleanup", "failed")
 		return err
 	}

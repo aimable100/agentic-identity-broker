@@ -72,6 +72,12 @@ ledger table. The test needs no consumer API.
 4. **Given** the ledger is enabled and the ledger write fails, **When** Alice revokes a grant,
    **Then** the revocation succeeds with `204`, the audit record is logged, the failure counter
    increases by one, and one `Error` record reports the failed write.
+5. **Given** the ledger is enabled, Alice has a grant and a refresh session, and refresh cleanup fails,
+   **When** Alice revokes the grant, **Then** the API returns `500`, the grant stays deleted, and
+   the uncleaned refresh session row remains. Exactly one `consent.grant.revoked` row contains
+   `refresh_cleanup=failed`, request identities, and the deleted grant's full audit snapshot:
+   `valid_until`, `updated_at`, `granted_permission_sets`, and `revoked_at`.
+   A repeated DELETE returns `404` and adds no ledger row.
 
 ---
 

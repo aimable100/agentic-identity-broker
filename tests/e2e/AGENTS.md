@@ -167,7 +167,7 @@ It sets the listener URL before production services initialize.
 
 ```bash
 just test-e2e-backend          # Backend functional suite
-just test-e2e-docker           # Agentgateway policy and five ledger acceptance scenarios
+just test-e2e-docker           # Agentgateway policy and six ledger acceptance scenarios
 just test-e2e-backend-coverage # Backend coverage report
 just test-e2e-backend-watch    # Backend watch mode
 just test-e2e-extproc          # ExtProc suite
@@ -177,10 +177,10 @@ ginkgo -v --label-filter="!performance && !docker" --focus="pattern" ./tests/e2e
 ```
 
 Use `just test-e2e-extproc` for the ExtProc suite. Some agentgateway scenarios require Docker.
-Use `just test-e2e-docker` for the backend agentgateway `oauthTokenExchange` policy scenario and all five business-event ledger acceptance scenarios.
+Use `just test-e2e-docker` for the backend agentgateway `oauthTokenExchange` policy scenario and all six business-event ledger acceptance scenarios.
 The policy scenario uses a real agentgateway container and the production broker.
 The ledger scenarios use PostgreSQL and production bootstrap from `tests/e2e/business_event_ledger_test.go`.
-They cover US1.1–US1.4 and US2.1 from `specs/048-business-event-ledger/spec.md`.
+They cover US1.1–US1.5 and US2.1 from `specs/048-business-event-ledger/spec.md`.
 These scenarios require Docker or Podman. `AGENTGATEWAY_IMAGE` overrides the pinned agentgateway image.
 Default backend recipes exclude Docker-tagged scenarios.
 
