@@ -155,6 +155,40 @@ On a Spec Kit draft PR, `/architecture-review` and the automatic review after
 The status comment links the latest review and proposal and names the next step. A new
 review replaces the proposal, so items left unticked stay open until the next review.
 
+Planning includes an architecture review of the planning artifacts: the feature's `spec.md`,
+`plan.md`, `tasks.md`, design documents, and ADR or API contract drafts. It covers five of the
+nine dimensions: ubiquitous language, hexagonal compliance, ADR compliance, data authority, and
+coupling and cohesion. OTel parity, E2E test quality, maintainability, and the behavioral probe
+judge an implementation and wait for the review after `/speckit-implement`. The plan review runs
+once tasks exist, beside the analysis, and publishes no remediation proposal. Remediation applies
+its findings together with the analysis findings. Where a finding has a real alternative,
+remediation chooses the recommended option and, when the choice is consequential, records it as
+Proposed, so it appears on the approval comment. The reanalysis then checks the result. Before
+implementation, `/architecture-review [focus]` runs the plan review alone; its findings then only
+advise, and `/speckit-plan <guidance>` applies them. A failed plan review does not block planning;
+remediation then resolves the analysis findings alone, and the status comment notes the failure.
+
+The automatic clarification answers its own questions so the specification stays complete, and
+marks each answer Proposed. A **Spec Kit clarification** comment tables each question, the
+recommended answer, and links to its alternatives in `spec.md`. React with 👍 to accept all
+answers, then comment `/speckit-plan`, which refuses to start without that 👍 and records the
+acceptance in the specification. To choose another answer, comment `/speckit-clarify <answer>`.
+
+Spec Kit pull requests carry the `[spec-driven]` title prefix and describe the feature they
+deliver. The pipeline rewrites its own block of the description on every run: a **Feature
+stage** line (Specified › Planned › Implemented › Reviewed) and the **Maintainer commands**
+of the current pipeline. It also removes the command list that older pull requests carry
+from the specify agent. The phases push only to pull requests with that prefix, so the pipeline
+renames a pull request that still carries the earlier `[Spec Kit]` prefix when its next phase
+starts.
+
+After `/speckit-implement`, the container tests run on the last commit that the pipeline
+pushes. A failure starts a repair run, up to three per command. When the tests pass on that
+commit after the implementation's architecture review and its automatic fixes, the pipeline
+marks the pull request ready for review. It acts only on draft pull requests, so it then
+ignores commands and test results there. Convert the pull request back to a draft to use the
+pipeline again, for example to apply items of a remediation proposal.
+
 The agentic workflows (Spec Kit, architecture review, conflict resolution, Repo Assist, Repo Ask, and the
 grumpy reviewer) open their pull requests, push, comment, review, and react as the Agentic Workflows App, never as `github-actions[bot]` or a personal token. They need the App
 described under [Opt-in conflict resolution](#opt-in-conflict-resolution) with Actions read/write
@@ -169,6 +203,10 @@ there. Issue, comment, label, schedule, and workflow-run events run workflows fr
 so a fork that iterates on them can make a separate branch its default and keep `main` an unchanged
 mirror of upstream. A `/speckit-` command in a pull request review is the exception: it runs the
 workflow file from the pull request's merge ref.
+
+Each agent run stops at the AI credit budget that the Actions variable `GH_AW_DEFAULT_MAX_AI_CREDITS`
+sets, 1000 when it is unset. A plan review or an implementation can exceed that, so a fork sets
+the variable as well.
 
 ### Backend
 

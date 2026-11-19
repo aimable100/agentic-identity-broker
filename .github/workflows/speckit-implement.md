@@ -24,6 +24,8 @@ imports:
   - shared/speckit-common.md
   - shared/speckit-phase-instructions.md
 timeout-minutes: 180
+# Sub-agents share this model-call budget; the gateway's default of 500 covers only part of a feature.
+max-turns: 2000
 network:
   allowed:
     - local
@@ -62,7 +64,7 @@ safe-outputs:
     # Reading branch protection needs Administration, which the App does not hold; Spec Kit branches are unprotected.
     check-branch-protection: false
     target: ${{ inputs.pr }}
-    required-title-prefix: "[Spec Kit] "
+    required-title-prefix: "[spec-driven] "
     base-branch: ${{ github.event.repository.default_branch }}
     allowed-files:
       - "internal/**"
