@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -302,7 +303,7 @@ func TestSelectCredentialsDiscardsLostPairObservation(t *testing.T) {
 				assert.Equal(t, ports.ClientIdentityObservation{ServiceVersion: current.Version, CanonicalID: *current.CanonicalID, Revision: current.ClientIdentityRevision}, expected)
 				return ports.ClientIdentityState{Identity: current.ClientIdentity, Revision: current.ClientIdentityRevision}, true, false, nil
 			}})
-			clientID, secret, err := service.selectCredentials(context.Background(), initial, credentialOperationRefresh, identityPointer("current-client"))
+			clientID, secret, selected, err := service.selectCredentials(context.Background(), initial, credentialOperationRefresh, identityPointer("current-client"))
 			if target == "new revision" {
 				require.Error(t, err)
 				var source *model.CredentialSourceError
@@ -314,6 +315,7 @@ func TestSelectCredentialsDiscardsLostPairObservation(t *testing.T) {
 				require.NoError(t, err)
 				assert.Equal(t, id.ClientID("current-client"), clientID)
 				assert.Equal(t, "current-secret", secret)
+				assert.Equal(t, current, selected)
 			}
 			assert.Equal(t, 1, gets)
 			wantReads := 2
@@ -354,10 +356,11 @@ func TestSelectCredentialsPairObservationFailsClosed(t *testing.T) {
 					return ports.ClientIdentityState{}, false, false, nil
 				}})
 			}
-			clientID, secret, err := service.selectCredentials(context.Background(), entity, credentialOperationRefresh, identityPointer("client-sentinel"))
+			clientID, secret, selected, err := service.selectCredentials(context.Background(), entity, credentialOperationRefresh, identityPointer("client-sentinel"))
 			require.ErrorIs(t, err, model.ErrCredentialSourceUnavailable)
 			assert.Empty(t, clientID)
 			assert.Empty(t, secret)
+			assert.Nil(t, selected)
 			assert.Empty(t, logs.String(), "the returning helper does not own the failed use")
 			assert.NotContains(t, err.Error(), "secret-sentinel")
 			assert.NotContains(t, err.Error(), "first-file")
@@ -375,4 +378,38 @@ func TestSelectCredentialsPairObservationFailsClosed(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestExchangeCodeWithRetryRejectsReselectedDiscoveryContext(t *testing.T) {
+	canonical := "first"
+	initial := &model.ThirdpartyOAuth2ProviderEntity{
+		ID: id.NewServiceID(), CanonicalID: &canonical, Version: 2,
+		CredentialSource: model.CredentialSourceFilesystem, Secret: model.NewAbsentSecret(),
+	}
+	current := initial.Copy()
+	current.Version++
+	current.CredentialSource = model.CredentialSourceStored
+	current.ClientID = "current-client"
+	current.TokenEndpointAuthMethod = model.TokenEndpointAuthMethodNone
+	resource := "https://resource.example.test"
+	current.Discovery.ResourceURL = &resource
+	current.IssuerURI = "https://replacement.example.test"
+	current.AuthorizationParams = map[string]string{"resource": resource}
+	service, _ := identityService(t, func(context.Context, id.ServiceID) (*model.ThirdpartyOAuth2ProviderEntity, error) {
+		return current.Copy(), nil
+	})
+	service.config.MaxRetries = 1
+	service.httpClient = &http.Client{Transport: operationTransport(func(*http.Request) (*http.Response, error) {
+		t.Error("a changed discovery context must not receive the authorization code")
+		return operationTokenResponse(200, `{"access_token":"unexpected"}`), nil
+	})}
+	service.credentialFileReader = pairObservationReader(func(string, string) (string, string, error) {
+		return "current-client", "retired-secret", nil
+	})
+	service.WithClientIdentityRepository(identityObservationRepository{observe: func(context.Context, id.ServiceID, id.ClientID, ports.ClientIdentityObservation) (ports.ClientIdentityState, bool, bool, error) {
+		return ports.ClientIdentityState{}, false, false, nil
+	}})
+	token, err := service.exchangeCodeWithRetry(context.Background(), "https://broker.example.test/callback", initial, identityPointer("current-client"), "code", "verifier")
+	assert.Nil(t, token)
+	assert.ErrorIs(t, err, ErrInvalidStateToken)
 }

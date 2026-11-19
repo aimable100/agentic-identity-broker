@@ -386,8 +386,7 @@ func TestExchangeAndRefreshLogsOmitURLAndCredentialMaterial(t *testing.T) {
 				require.NoError(t, err)
 				service.config.MaxRetries = 2
 				service.config.RetryBaseDelay = time.Nanosecond
-				cfg := &oauth2.Config{ClientID: provider.ClientID.String(), Endpoint: oauth2.Endpoint{TokenURL: endpoint, AuthStyle: oauth2.AuthStyleInParams}}
-				_, err = service.exchangeCodeWithRetry(context.Background(), cfg, provider, nil, "sentinel-code", "sentinel-verifier", nil)
+				_, err = service.exchangeCodeWithRetry(context.Background(), "", provider, nil, "sentinel-code", "sentinel-verifier")
 				assert.ErrorIs(t, err, cause)
 				assert.NotContains(t, err.Error(), "sentinel-")
 			} else {

@@ -438,3 +438,63 @@ func TestCredentialSelection_MissingExactBindingFailsClosedAtEveryBoundary(t *te
 		}
 	}
 }
+
+func TestCredentialSelection_ReselectionKeepsReplacementSecretAtCurrentEndpoint(t *testing.T) {
+	for _, operation := range []string{"code exchange retry", "refresh"} {
+		t.Run(operation, func(t *testing.T) {
+			bindings := map[string]ports.CredentialFileBinding{
+				"retired": credentialPair(t, "same-client", "retired-secret"),
+				"current": credentialPair(t, "same-client", "replacement-secret"),
+			}
+			h := newCredentialSessionHarness(t, bindings)
+			provider := h.register(t, model.CredentialSourceFilesystem, "retired", "", "")
+			principal := id.Principal("snapshot@example.com")
+			flow := h.initiate(t, principal, provider.ID)
+			currentEndpoint := newCredentialTokenEndpoint(t)
+			var updateOnce sync.Once
+			var updateErr error
+			update := func() error {
+				updateOnce.Do(func() {
+					current, err := h.records.Get(context.Background(), provider.ID)
+					if err != nil {
+						updateErr = err
+						return
+					}
+					canonical := "current"
+					current.CanonicalID = &canonical
+					current.Endpoints.TokenEndpoint = currentEndpoint.server.URL
+					updateErr = h.providers.Update(context.Background(), current, &current.Version)
+				})
+				return updateErr
+			}
+			if operation == "code exchange retry" {
+				h.endpoint.setOnRequest(func(credentialTokenRequest) (int, error) {
+					return http.StatusInternalServerError, update()
+				})
+				h.callback(t, principal, provider.ID, flow.StateToken)
+			} else {
+				h.reader.afterPair = update
+				entity, err := h.providers.GetForTokenAcquisition(context.Background(), provider.ID)
+				require.NoError(t, err)
+				established := id.ClientID("same-client")
+				token, err := h.service.RefreshAccessToken(context.Background(), entity, "established-refresh", &established)
+				require.NoError(t, err)
+				assert.Equal(t, "credential-access", token.AccessToken)
+			}
+			for _, request := range h.endpoint.captured(t) {
+				assert.Equal(t, "retired-secret", request.secret, "the retired endpoint must never receive replacement credentials")
+			}
+			requests := currentEndpoint.captured(t)
+			require.NotEmpty(t, requests, "reselection must use the replacement endpoint")
+			for _, request := range requests {
+				assert.Equal(t, "same-client", request.clientID)
+				assert.Equal(t, "replacement-secret", request.secret)
+				if operation == "refresh" {
+					assert.Equal(t, "established-refresh", request.form.Get("refresh_token"))
+				} else {
+					assert.Equal(t, "credential-code", request.form.Get("code"))
+				}
+			}
+		})
+	}
+}

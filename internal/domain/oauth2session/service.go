@@ -584,46 +584,53 @@ func shouldRetryTokenExchange(err error) bool {
 // exchangeCodeWithRetry exchanges authorization code for tokens with exponential backoff retry.
 func (s *OAuth2SessionService) exchangeCodeWithRetry(
 	ctx context.Context,
-	config *oauth2.Config,
+	callbackURL string,
 	service *model.ThirdpartyOAuth2ProviderEntity,
 	established *id.ClientID,
 	code string,
 	verifier string,
-	authorizationParams map[string]string,
 ) (resultToken *oauth2.Token, resultErr error) {
 	defer func() {
 		if resultErr != nil && ctx.Err() != nil && ctx.Value(sharedRefreshContextKey{}) != true {
 			resultErr = callerCanceledError(ctx, OperationCodeExchange, resultErr)
 		}
 	}()
-	client, err := s.tokenHTTPClient(service)
-	if err != nil {
-		return nil, sessionOperationError(ctx, OperationCodeExchange, DetailConfiguration, errors.Join(ErrInvalidConfiguration, err))
-	}
 	var lastErr error = NewOperationError(NewErrorMetadata(OperationCodeExchange, DetailConfiguration), ErrInvalidConfiguration)
-	ctx = context.WithValue(ctx, oauth2.HTTPClient, client)
 
 	for attempt := range s.config.MaxRetries {
+		clientID, clientSecret, selected, err := s.selectCredentials(ctx, service, credentialOperationExchange, established)
+		if err != nil {
+			return nil, err
+		}
+		if (selected.Discovery.ResourceURL != nil) != (service.Discovery.ResourceURL != nil) ||
+			(selected.Discovery.ResourceURL != nil && (selected.IssuerURI != service.IssuerURI || selected.AuthorizationParams["resource"] != service.AuthorizationParams["resource"])) {
+			return nil, ErrInvalidStateToken
+		}
+		config, err := s.buildOAuth2Config(selected, callbackURL)
+		if err != nil {
+			return nil, sessionOperationError(ctx, OperationCodeExchange, DetailConfiguration, errors.Join(ErrInvalidConfiguration, err))
+		}
+		client, err := s.tokenHTTPClient(selected)
+		if err != nil {
+			return nil, sessionOperationError(ctx, OperationCodeExchange, DetailConfiguration, errors.Join(ErrInvalidConfiguration, err))
+		}
+		attemptCtx := context.WithValue(ctx, oauth2.HTTPClient, client)
 		// Try to exchange code for token
 		params := url.Values{}
-		addProviderAuthorizationParams(params, authorizationParams)
-		if service.Discovery.ResourceURL != nil {
-			params.Set("resource", service.AuthorizationParams["resource"])
+		addProviderAuthorizationParams(params, selected.AuthorizationParams)
+		if selected.Discovery.ResourceURL != nil {
+			params.Set("resource", selected.AuthorizationParams["resource"])
 		}
 		opts := make([]oauth2.AuthCodeOption, 0, len(params)+3)
 		opts = append(opts, oauth2.VerifierOption(verifier))
 		for name, values := range params {
 			opts = append(opts, oauth2.SetAuthURLParam(name, values[0]))
 		}
-		clientID, clientSecret, err := s.selectCredentials(ctx, service, credentialOperationExchange, established)
-		if err != nil {
-			return nil, err
-		}
-		if service.IsCIMDConfidentialClient() {
+		if selected.IsCIMDConfidentialClient() {
 			if s.cimdAssertionSigner == nil {
 				return nil, NewOperationError(NewErrorMetadata(OperationCodeExchange, DetailConfiguration).WithDependency(DependencySigning), ports.ErrCIMDKeyUnavailable)
 			}
-			assertion, err := s.cimdAssertionSigner.SignClientAssertion(ctx, service.ClientID, service.Endpoints.TokenEndpoint)
+			assertion, err := s.cimdAssertionSigner.SignClientAssertion(ctx, selected.ClientID, selected.Endpoints.TokenEndpoint)
 			if err != nil {
 				failure := sessionOperationError(ctx, OperationCodeExchange, DetailProviderUnavailable, errors.Join(ports.ErrCIMDKeyUnavailable, err))
 				return nil, failure.WithMetadata(failure.Metadata().WithDependency(DependencySigning))
@@ -635,19 +642,19 @@ func (s *OAuth2SessionService) exchangeCodeWithRetry(
 		}
 		config.ClientID = clientID.String()
 		config.ClientSecret = clientSecret
-		token, err := config.Exchange(ctx, code, opts...)
+		token, err := config.Exchange(attemptCtx, code, opts...)
 		if err == nil {
 			return token, nil
 		}
-		if service.CredentialSource == model.CredentialSourceFilesystem && credentialProviderRejected(err) {
+		if selected.CredentialSource == model.CredentialSourceFilesystem && credentialProviderRejected(err) {
 			s.auditCredentialProviderRejection(ctx, service.ID, credentialOperationExchange)
 		}
-		if service.Discovery.ResourceURL != nil {
+		if selected.Discovery.ResourceURL != nil {
 			lastErr = safeDiscoveredTokenExchangeError(err)
 		} else {
 			lastErr = safeTokenExchangeError(err)
 		}
-		if (service.IsCIMDConfidentialClient() || service.Discovery.ClientMethod == model.ClientBootstrapDCR) && tokenExchangeErrorIsPermanent(err) {
+		if (selected.IsCIMDConfidentialClient() || selected.Discovery.ClientMethod == model.ClientBootstrapDCR) && tokenExchangeErrorIsPermanent(err) {
 			return nil, lastErr
 		}
 
@@ -983,18 +990,11 @@ func (s *OAuth2SessionService) HandleCallback(
 		return nil, ErrInvalidStateToken
 	}
 
-	// Build OAuth2 config
 	callbackURL := s.config.CallbackBaseURL + "/api/third-party/" + req.ServiceID.String() + "/oauth2/callback"
-	cfg, err := s.buildOAuth2Config(service, callbackURL)
-	if err != nil {
-		failure := sessionOperationError(ctx, OperationCodeExchange, DetailConfiguration, errors.Join(ErrInvalidConfiguration, err))
-		s.logger.ErrorContext(ctx, "failed to build oauth2 config during callback", "service_id", req.ServiceID, "oauth2_session", failure.Metadata())
-		return nil, failure
-	}
 
 	// Exchange authorization code for tokens (with retry)
 	s.logger.InfoContext(ctx, "exchanging authorization code for token", "service_id", req.ServiceID, "operation", OperationCodeExchange)
-	token, err := s.exchangeCodeWithRetry(ctx, cfg, service, claims.UpstreamClientID, req.Code, claims.PKCEVerifier, service.AuthorizationParams)
+	token, err := s.exchangeCodeWithRetry(ctx, callbackURL, service, claims.UpstreamClientID, req.Code, claims.PKCEVerifier)
 	if err != nil {
 		if errors.Is(err, model.ErrCredentialSourceUnavailable) {
 			return nil, err
@@ -1103,13 +1103,6 @@ func (s *OAuth2SessionService) refreshAccessToken(
 	}
 
 	isCIMDClient := entity.IsCIMDConfidentialClient()
-	client, err := s.tokenHTTPClient(entity)
-	if err != nil {
-		if isCIMDClient {
-			s.auditCIMDTokenAcquisition(ctx, entity.ID, "refresh", "rejected")
-		}
-		return nil, sessionOperationError(ctx, OperationRefresh, DetailConfiguration, errors.Join(ErrInvalidConfiguration, err))
-	}
 	if err := entity.ValidateOutboundCredentials(); err != nil {
 		if isCIMDClient {
 			s.auditCIMDTokenAcquisition(ctx, entity.ID, "refresh", "rejected")
@@ -1123,12 +1116,21 @@ func (s *OAuth2SessionService) refreshAccessToken(
 		return nil, sessionOperationError(ctx, OperationRefresh, DetailRefreshUnavailable, ErrRefreshNotAvailable)
 	}
 
-	clientID, clientSecret, err := s.selectCredentials(ctx, entity, credentialOperationRefresh, established)
+	clientID, clientSecret, selected, err := s.selectCredentials(ctx, entity, credentialOperationRefresh, established)
 	if err != nil {
 		if isCIMDClient {
 			s.auditCIMDTokenAcquisition(ctx, entity.ID, "refresh", "rejected")
 		}
 		return nil, err
+	}
+	entity = selected
+	isCIMDClient = entity.IsCIMDConfidentialClient()
+	client, err := s.tokenHTTPClient(entity)
+	if err != nil {
+		if isCIMDClient {
+			s.auditCIMDTokenAcquisition(ctx, entity.ID, "refresh", "rejected")
+		}
+		return nil, sessionOperationError(ctx, OperationRefresh, DetailConfiguration, errors.Join(ErrInvalidConfiguration, err))
 	}
 
 	attempts := max(s.config.MaxRetries, 1)
