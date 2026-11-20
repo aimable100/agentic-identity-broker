@@ -32,8 +32,8 @@ This development stack trusts a simulated user identity. Do not expose it to oth
 
 Use `http://aib.localhost:3000` for browser consent. Browsers resolve this name
 to loopback; Compose resolves it to the frontend. If your host resolver needs
-an explicit mapping, add `127.0.0.1 aib.localhost` to `/etc/hosts`.
-See [Shared development hostname](../docker-compose-setup.md#shared-development-hostname).
+an explicit mapping, add `127.0.0.1 aib.localhost` to your hosts file
+(`/etc/hosts` on macOS/Linux or `C:\Windows\System32\drivers\etc\hosts` on Windows).
 
 ## Step 1: Start the stack
 
